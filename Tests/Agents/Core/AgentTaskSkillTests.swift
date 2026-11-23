@@ -1082,13 +1082,24 @@ private func photographyAcceptance(
     await agent.stop()
 }
 
+private actor ListeningProbe: ListeningModeControlling {
+    private(set) var applied: [(ListeningMode, AgentStateSource)] = []
+    var rejection: AgentStateError?
+    func reject(_ error: AgentStateError?) { rejection = error }
+    func apply(_ mode: ListeningMode, source: AgentStateSource, wakeCondition: String?) async throws {
+        if let rejection { throw rejection }
+        applied.append((mode, source))
+    }
+}
+
 @Test(.actionCatalog) func hostWritesDeclaredVariablesAndStateGetReadsThem() async throws {
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
+    let probe = ListeningProbe()
     let agent = try AssistantAgent(
         stateContext: try publicStateFixture(),
-        chat: SkillModel(mediaID: "preview_1"), context: context)
+        chat: SkillModel(mediaID: "preview_1"), listening: probe, context: context)
     try await agent.start()
     let session = UUID().uuidString
     func run(_ operation: AgentControlOperation, _ arguments: [String: String]) async throws -> ActionCompletion {
@@ -1096,23 +1107,37 @@ private func photographyAcceptance(
             operation, arguments: arguments, source: "assistant", sessionID: session, inputID: UUID().uuidString,
             decisionID: nil)
     }
-    // The host may write a read-only declared variable; free names are the model's and unknown to the host.
-    _ = try await run(.stateSet, ["name": "quiet", "value": "true"])
-    #expect(try await context.snapshot().state.variables.value("quiet") == "true")
+    // Free names are the model's and unknown to the host.
     await #expect(throws: AgentStateError.unknownVariable("mood")) {
         _ = try await run(.stateSet, ["name": "mood", "value": "calm"])
     }
-    await #expect(throws: AgentStateError.invalidValue("quiet")) {
-        _ = try await run(.stateSet, ["name": "quiet", "value": "maybe"])
+    _ = try await run(.stateSet, ["name": "listening", "value": "quiet"])
+    #expect(try await context.snapshot().state.variables.value("listening") == "quiet")
+    #expect(await probe.applied.map(\.0) == [.quiet])
+    await #expect(throws: AgentStateError.invalidValue("listening")) {
+        _ = try await run(.stateSet, ["name": "listening", "value": "maybe"])
     }
-    let value = try await run(.stateGet, ["path": "quiet"])
+    await #expect(throws: AgentStateError.invalidValue("listening")) {
+        _ = try await run(.stateSet, ["name": "listening", "value": "full", "wakeCondition": "秦始皇"])
+    }
+    // A rejecting trigger leaves the previous value in force.
+    await probe.reject(.rejected("listening", reason: "no echo cancellation"))
+    await #expect(throws: AgentStateError.rejected("listening", reason: "no echo cancellation")) {
+        _ = try await run(.stateSet, ["name": "listening", "value": "full"])
+    }
+    #expect(try await context.snapshot().state.variables.value("listening") == "quiet")
+    await probe.reject(nil)
+    let value = try await run(.stateGet, ["path": "listening"])
     guard case .value(let json) = value else { throw CommunicationError.invalidPayload }
-    #expect(json.contains("\"value\":\"true\"") && json.contains("writtenAt"))
+    #expect(json.contains("\"mode\":\"quiet\"") && json.contains("writtenAt"))
     let unset = try await run(.stateGet, ["path": "mood"])
     guard case .value(let empty) = unset else { throw CommunicationError.invalidPayload }
     #expect(empty.contains("\"value\":null"))
-    try await agent.setHostState("quiet", to: nil)
-    #expect(try await context.snapshot().state.variables.value("quiet") == nil)
+    // Clearing returns to the default mode through the same trigger.
+    try await agent.setHostState("listening", to: nil)
+    #expect(try await context.snapshot().state.variables.value("listening") == nil)
+    #expect(await probe.applied.map(\.0) == [.quiet, .full])
+    #expect(await probe.applied.last?.1 == .host)
     await #expect(throws: AgentStateError.unknownVariable("task")) { try await agent.setHostState("task", to: "g") }
     await agent.stop()
 }
@@ -1270,7 +1295,8 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     #expect(basic.controls.contains { $0.alias == "state.set" })
     #expect(!basic.actions.contains { $0.alias == "send" })
     #expect(!basic.actions.contains { $0.alias == "readEnvironment" })
-    let identity = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
+    let identity = try AgentConfigurations.identityInstructions(
+        named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     #expect(!identity.contains("state.set") && !identity.contains("task.delegate"))
     #expect(!identity.contains("<state.set") && !identity.contains("<skill.load"))
 }
@@ -2387,7 +2413,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         }))
     let consumer = try await output.consumer(for: assistant)
     #expect(await assistant.trackedTaskCount == 0)
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
     let collection = Task {
         do {
             try await IndependentOutputWorkflow.consumeGeneration(assistant.outputs) { envelope in
@@ -2439,7 +2465,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     }
     #expect(await model.requests.count == 1)
     #expect(await assistant.trackedTaskCount == 1)
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
     let received = try #require(await child.inputs.last)
     guard case .observation(let message) = received.payload else { throw CommunicationError.invalidPayload }
     let request = try #require(message.content(as: AgentTaskRequest.self))
@@ -2718,7 +2744,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     try await writerRuntime.retireTask(#require(ended.signal))
     let settled = try await context.snapshot()
     #expect(await assistant.trackedTaskCount == 0)
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
     #expect(settled.state.taskViews?[scope.id]?.terminal == true)
     #expect(settled.state.taskViews?[scope.id]?.event?.kind == kind)
     #expect(settled.state.skillState?.activeTaskID == priorTask)
@@ -2920,7 +2946,7 @@ private func fixtureEventPublication(
         _ = try await output.consumer(for: assistant)
         try await assistant.start()
         #expect(await assistant.trackedTaskCount == 0)
-        #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(3))
+        #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
         try await manager.remove(.assistant)
         #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
     }

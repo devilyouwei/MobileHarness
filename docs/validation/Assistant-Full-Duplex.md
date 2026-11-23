@@ -323,3 +323,17 @@ Mac 上通过同一个 ModelKit 端口验证 hugging-mac 三输入制品与原�
 五个 iOS Simulator 目标通过。全量集成阶段的两个 Action 结算用例在定向重跑中通过；全量检查另复现 Writer/Web Action 声明缺失，在 AppWorkflow 停滞后中止。
 
 D3 共用签名适配验收在 Mac 上运行了四个组合：三输入 Edge、三输入 Lite，以及同一张实际五输入图分别经 Edge 和 Lite 注册端口执行。四个组合均预热至 ready、完成四候选文本推理并拒绝超过 512 token 的输入。1,180 项 IntegrationTests 和五个 iOS Simulator 目标通过。全量检查复现 Writer/Web 缺少 Action 声明，在 AppWorkflow 停滞后中止。iPhone 加载仍待真机验证。
+
+## 2026-11-23 打断判定上下文
+
+Swift 定向回归通过 25 项，覆盖中英文请求正文、空回复、云端适配收到的两项输入，以及迟到判定的目标校验。五个 iOS Simulator 构建成功，主应用资源校验通过。日志为 `/tmp/mh-decision-targeted.log` 和 `/tmp/mh-decision-ios.log`。
+
+全量 `check.sh` 在边界检查阶段停止，报告 State Value codec 检查失败以及本地化 JSON 的 Xcode 分组问题，日志为 `/tmp/mh-decision-check.log`。本次未运行真实模型或真机验收。
+
+### Laya 正文窗口回归
+
+ModelKit 输入组装回归通过 4 项，含 Laya 短正文、恰好填满、超长正文、头部拒绝及 D3 既有用例。macOS 真实 Laya 通过 3 个既有原生参考请求和 1 个超长正文请求，超长请求返回单个带有效评分的布尔结果。五个 iOS Simulator 构建成功。日志分别为 `/tmp/mh-laya-tests.log`、`/tmp/mh-laya-native.log` 和 `/tmp/mh-laya-ios.log`。
+
+全量 `check.sh` 仍在 State Value codec 和本地化 JSON 的 Xcode 分组检查处停止，日志为 `/tmp/mh-laya-check.log`。本次未执行真机验收。
+
+真机复验交付：MobileHarness Debug 构建号 `2026112302` 通过签名和包内资源校验，覆盖安装至 iPhone 17 Pro（安装序号 7864）并成功启动。保留现有 App 数据。证据为 `/tmp/mh-laya-device-build.log`、`/tmp/mh-laya-device-install.log` 和 `/tmp/mh-laya-device-launch.log`。本次确认设备安装与启动，打断行为由用户在真机上验收。

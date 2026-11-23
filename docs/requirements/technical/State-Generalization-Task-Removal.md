@@ -32,7 +32,7 @@ State 是 Agent 的**自身变量表**，挂在该 Agent 的 Container State 下
 
 | 种类 | 定义 | 说明 |
 | --- | --- | --- |
-| 类型化变量 | Swift 代码预设键、解析/校验规则 | 值在 Swift 中解析后用于逻辑判断，可绑定 Trigger。解析失败原样返回错误，旧值不变。例：`quiet`（布尔） |
+| 类型化变量 | Swift 代码预设键、解析/校验规则 | 值在 Swift 中解析后用于逻辑判断，可绑定 Trigger。解析失败原样返回错误，旧值不变。例：`listening`（枚举，见 [聆听模式](Listening-Mode-State.md)） |
 | 语义变量 | 无需预设，模型自由命名 | 自然语言字符串，原样进入提示词，如 `mood`、`style`、`waiting`。**`task` 是预设的语义变量**：键预设、值为字符串、需要压缩，将来可绑定“完成后做什么”的 Trigger |
 
 - 语义变量数量上限 32（字节上限随实施在 README 定值，建议总计 ≤ 8 KiB、单值 ≤ 1 KiB）；**超限不报错，自动淘汰最早写入的变量**。预设变量（如 `task`）不被淘汰；单值超长拒绝并报错。
@@ -72,7 +72,7 @@ Agent 自身变量就是现有节点 `agents.<id>` 的 business 字段（`AgentS
 ### 1.0.3 写入权限：模型只读与可读写
 
 - **按构造隔离**：模型只能写自己的 `agent.<id>` 命名空间，camera、robot 等 Container 的 State 不可达，无需逐项声明。
-- **自身变量 `access`**：`states` 每项带 `access`：`readWrite`（模型可写）或 `readOnly`（仅 Agent 代码/宿主写，如 `quiet` 由宿主按勿扰设置写入）。缺省 `readOnly`，开放给模型必须显式声明。`task` 为 `readWrite`。
+- **自身变量 `access`**：`states` 每项带 `access`：`readWrite`（模型可写）或 `readOnly`（仅 Agent 代码/宿主写）。缺省 `readOnly`，开放给模型必须显式声明。`task` 为 `readWrite`。
 - **不在提示词中告知，在 `state.set`/`state.clear` 中拒绝**：对 `readOnly` 变量返回 `controlFailed`（原因 `readOnly`），作为工具结果进入 ReACT，模型据此调整；状态不变，不触发 Trigger。
 - **名称碰撞**：模型自创的语义变量不得与预设变量（含 `readOnly`）或 `agents.<id>` 节点已有字段（runtime 计数、`loadedSkills` 等）同名，同样拒绝。
 - 宿主/Agent 代码写入走 `source=host`，不受 `access` 限制，仍按类型解析并触发 Trigger。
@@ -88,8 +88,8 @@ Agent `skills`、Skill 依赖展开、`useStates`、`useActions`、控制函数�
 
 ### 2. Trigger（本期只预留入口）
 
-- Trigger 是 Agent 内聚的预设规则，绑定到类型化变量：变量变化（或将来的时间条件）→ 预设函数/逻辑过程。例：`quiet` 变化 → 输出网关抑制/恢复语音（含 Writer 完成播报；错误、安全提示与用户直接提问的回复不被抑制）；将来 `alarm` 到点 → 触发一次决策。
-- 本期实现：Trigger 注册接口（变量名 → 处理器；处理器有界、不重入、失败显式返回且不发布变更）和 `quiet` 一个内置处理器。闹钟、定时循环、用户自定义规则不做，README 说明扩展点。
+- Trigger 是 Agent 内聚的预设规则，绑定到类型化变量：变量变化（或将来的时间条件）→ 预设函数/逻辑过程。例：`listening` 变化 → 聆听模式切换（见 [聆听模式](Listening-Mode-State.md)）；将来 `alarm` 到点 → 触发一次决策。
+- 本期实现：Trigger 注册接口（变量名 → 处理器；处理器有界、不重入、失败显式返回且不发布变更），后续由 [聆听模式](Listening-Mode-State.md) 增加 `listening` 处理器。闹钟、定时循环、用户自定义规则不做，README 说明扩展点。
 - 语义变量一般不绑 Trigger；`task` 是第一个绑定 Trigger 的变量：`task` 变化（`state.set` 替换或 `state.clear`）触发“压缩历史对话上下文”函数，沿用现有历史压缩（`reconcileTaskCompressions`），以该次变化的 set→clear 区间为单元，`state.clear` 的 note 作为摘要来源；替换视为先结束旧区间再开始新区间。处理器有界、不重入，失败显式返回且不发布变更。将来的“完成后动作”在同一入口扩展。
 
 ### 2.1 `state.get`
@@ -182,7 +182,7 @@ Control 是 Assistant 自己执行、不进入 Actions Shell 的内置函数（�
 3. 语义变量超限自动淘汰最早写入者；每次写入记录时间，按时间排序并进入提示词。
 4. 内存存储，不持久化；用户不可编辑，UI 增加只读日志 tab。
 5. 固定模板转换函数，输出到用户输入前的独立 system 块。
-6. Trigger 入口本期只有 `task`：变化→目标记录开闭与历史压缩；`quiet`（含 Writer 播报）由执行点直接读取；闹钟等不做。
+6. Trigger 入口本期只有 `task`：变化→目标记录开闭与历史压缩；`quiet` 已由 `listening` 取代（见 [聆听模式](Listening-Mode-State.md)）；闹钟等不做。
 9. 时间为自然语言绝对时间；语义变量数量上限 32。
 7. `state.get` 无授权；`useStates` 只是随 Skill 注入。
 8. Skill 与目标无关；Control 库重整为 state.set/clear/get、skill.load/unload、send。
@@ -193,10 +193,10 @@ Control 是 Assistant 自己执行、不进入 Actions Shell 的内置函数（�
 
 ## 实施记录与剩余工作
 
-**已实现并同步技术 README（本轮）**：`Agent.json` v12（`baseSkills`→`skills`、新增 `states`）；`AgentStateVariables` / `AgentStatePrompt`（变量表、写入权限、类型解析、容量淘汰、自然语言时间、AGENT STATE 块与变量说明）；控制库重整为 `state.set/clear/get`、`skill.load/unload`、`send`（Controls 资源与中英教学重写）；Skill 状态机去除 Task 持有、暂停计数与回收（schema v5）；`task` 变量由目标记录唯一持有，Trigger 驱动目标记录开闭与历史压缩；`quiet` 由宿主写入并在输出点静默主动播报；`AGENT CONTEXT` 只保留 skills；边界检查脚本与 Xcode 引用同步。
+**已实现并同步技术 README（本轮）**：`Agent.json` v12（`baseSkills`→`skills`、新增 `states`）；`AgentStateVariables` / `AgentStatePrompt`（变量表、写入权限、类型解析、容量淘汰、自然语言时间、AGENT STATE 块与变量说明）；控制库重整为 `state.set/clear/get`、`skill.load/unload`、`send`（Controls 资源与中英教学重写）；Skill 状态机去除 Task 持有、暂停计数与回收（schema v5）；`task` 变量由目标记录唯一持有，Trigger 驱动目标记录开闭与历史压缩；`quiet` 当时由宿主写入并在输出点静默主动播报（现已由 `listening` 取代）；`AGENT CONTEXT` 只保留 skills；边界检查脚本与 Xcode 引用同步。
 
 **与上文设计的差异（以代码为准）**：
-- `quiet` 没有 Trigger 处理器：它是只读变量，执行点（Writer 播报）直接读取它。目前只有 `task` 绑定 Trigger。
+- 当时 `quiet` 没有 Trigger 处理器，只读变量由执行点直接读取；现为 `listening` 变量并绑定 Trigger。
 - `task` 的值不在变量表中，由当前目标记录派生（避免两份状态）；`state.set` 增加可选 `note`（替换旧目标时的摘要）；替换仅在全双工或宿主模式可用，否则返回 `replacementUnavailable`。
 - `continueDecision` 取消：清除 `task` 总是结束当前决策。
 - 宿主写入入口为 `AssistantAgent.setHostState`，尚未接入任何 UI/设置。

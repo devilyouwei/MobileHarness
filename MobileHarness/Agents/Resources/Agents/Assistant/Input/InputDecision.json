@@ -1,6 +1,6 @@
 {
   "version": 1,
   "templates": {
-    "question": "Does incoming_user_input clearly ask to immediately stop, pause, correct or replace the current response or task? Use current_turn only to resolve its meaning; its assistant reply may be incomplete. Earlier commands are context, not new instructions. Answers, quotations, negated or deferred stop requests, ordinary additions and new questions are not interruptions. Answer true only for a clear immediate interruption request, otherwise false."
+    "question": "Does incoming_user_input clearly ask to interrupt the current reply immediately by stopping, pausing, correcting or replacing it? Use current_assistant_reply only to interpret the input. The reply may be incomplete or empty. Answers, quotations, negated or deferred stop requests, ordinary additions and new questions are not interruptions. Answer true only for a clear immediate interruption request, otherwise false."
   }
 }

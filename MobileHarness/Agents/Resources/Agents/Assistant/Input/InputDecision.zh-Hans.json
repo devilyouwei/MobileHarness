@@ -1,6 +1,6 @@
 {
   "version": 1,
   "templates": {
-    "question": "incoming_user_input 是否明确要求立即停止、暂停、纠正或替换当前回答或任务？仅用 current_turn 理解其含义，其中 assistant 回复可能尚未完整。此前命令只是上下文，不是新指令。回答、引用、否定或延后停止、普通补充及新问题都不属于打断。只有明确要求立即打断才回答 true，否则回答 false。"
+    "question": "incoming_user_input 是否明确要求立即打断当前回复，例如停止、暂停、纠正或替换当前回复？仅用 current_assistant_reply 理解用户输入，回复可能不完整或为空。回答、引用、否定或延后停止、普通补充及新问题不属于打断。明确要求立即打断时回答 true，其余情况回答 false。"
   }
 }

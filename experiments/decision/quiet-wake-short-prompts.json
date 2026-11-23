@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "answer": "boolean",
+  "source": "Experiment-only shortest variant: the sentence is embedded in one question; answer true/false. Chat backends receive it as a single user message with no system message; native Decision models get the same question text with the state holding the sentence.",
+  "template": {
+    "en": "You are in quiet listening mode. The user said \"{sentence}\". Is the user asking you to wake up? Answer true or false.",
+    "zh-Hans": "你现在处于安静聆听模式，用户说“{sentence}”，请问用户是否要求唤醒你，回答 true/false"
+  },
+  "chat": {"en": "", "zh-Hans": ""},
+  "decision": {
+    "en": "You are in quiet listening mode. The user said latest_user_sentence. Is the user asking you to wake up?",
+    "zh-Hans": "你现在处于安静聆听模式，用户说 latest_user_sentence 这句话，请问用户是否要求唤醒你？"
+  }
+}

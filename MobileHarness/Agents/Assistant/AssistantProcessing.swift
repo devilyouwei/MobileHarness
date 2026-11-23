@@ -64,7 +64,8 @@ public struct AssistantContextState: AssistantChatState {
             try AgentPrompts.assistantInput(),
             try capabilityContext.protocolRules(),
             try capabilityContext.controlsSection(capabilities),
-            try AgentStatePrompt.declarations(AgentConfigurations.stateSchema(named: configurationName)),
+            try AgentStatePrompt.declarations(
+                AgentConfigurations.stateSchema(named: configurationName), agent: configurationName),
             try AgentPrompts.skillCatalog().render("availableHeading"), try AgentConfigurations.skillOverview(),
             try AgentPrompts.agentCatalog().render("heading"), delegates,
             try capabilityContext.catalogSection(capabilities),
@@ -76,6 +77,7 @@ public struct AssistantContextState: AssistantChatState {
     }
     public var skillState: AgentTaskSkillState?
     public var variables = AgentStateVariables()
+    public var listeningWakeCondition: String?
     public var taskViews: [String: AgentTaskView]?
     public var history = AssistantArchive()
     public var admissionSequence: UInt64 = 0

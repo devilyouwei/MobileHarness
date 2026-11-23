@@ -112,8 +112,14 @@
         }
         func endSession() async throws {
             await agent?.stop()
-            outputTask?.cancel()
-            await outputTask?.value
+            // Stopping finishes the output stream; let its closing speech Signals publish before giving up.
+            let task = outputTask
+            let watchdog = Task {
+                try? await Task.sleep(for: .seconds(2))
+                task?.cancel()
+            }
+            await task?.value
+            watchdog.cancel()
             outputTask = nil
             if let agent, let manager { try await manager.remove(agent.descriptor.id) }
             agent = nil

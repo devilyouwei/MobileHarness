@@ -223,3 +223,41 @@ private actor PausedBinaryStore: FileStore {
     let retained = try await repository.snapshot()
     #expect(retained.revision == committed.revision && retained.records.count == 64)
 }
+
+@Test func listeningDialogsRoundTripAndDropWholeOldestEpisodesBeyondTheBound() async throws {
+    let repository = try SQLiteRepositories.temporary().listeningDialogs
+    let first = ListeningDialogRecord(
+        sessionID: "s", episodeID: "a", text: "我想一想", decision: .stay, reason: "thinking", modelTier: "system",
+        modelID: "apple-system", latencyMS: 12, createdAt: Date(timeIntervalSince1970: 1))
+    try await repository.appendListeningDialog(first)
+    #expect(try await repository.listeningDialogs(episodeID: "a").map(\.id) == [first.id])
+    let stored = try #require(try await repository.recentListeningDialogs(limit: 1).first)
+    #expect(stored.text == first.text && stored.decision == .stay && stored.modelTier == "system")
+    #expect(stored.latencyMS == 12 && stored.reason == "thinking")
+    await #expect(throws: RecordStorageError.invalidRecord) {
+        try await repository.appendListeningDialog(
+            .init(
+                sessionID: "s", episodeID: "a",
+                text: String(repeating: "x", count: ListeningDialogRecord.maximumTextBytes + 1), decision: .stay))
+    }
+    await #expect(throws: RecordStorageError.invalidRecord) {
+        _ = try await repository.recentListeningDialogs(limit: 0)
+    }
+    let half = SQLiteListeningDialogRepository.maximumRecords / 2
+    for index in 0..<half {
+        try await repository.appendListeningDialog(
+            .init(
+                sessionID: "s", episodeID: "b", text: "b\(index)", decision: .error, error: "failed",
+                createdAt: Date(timeIntervalSince1970: 10 + Double(index))))
+    }
+    // The last write of "c" exceeds the bound: the oldest whole episode goes, never the one being written.
+    for index in 0..<half {
+        try await repository.appendListeningDialog(
+            .init(
+                sessionID: "s", episodeID: "c", text: "c\(index)", decision: .stay,
+                createdAt: Date(timeIntervalSince1970: 100_000 + Double(index))))
+    }
+    #expect(try await repository.listeningDialogs(episodeID: "a").isEmpty)
+    #expect(try await repository.listeningDialogs(episodeID: "b").count == half)
+    #expect(try await repository.listeningDialogs(episodeID: "c").count == half)
+}

@@ -326,3 +326,5 @@ Historical [ADR0155 — Explicit Action serialization identity](0155-explicit-ac
 - [0219 — Actions root and neutral Gateway](0219-actions-container-and-neutral-gateway.md): App-owned three-root lifecycle, canonical execution and cognition-free scheduling; supersedes ADR0161 ownership.
 
 - [0220 — Agent state generalization](0220-agent-state-generalization.md): declared string state variables with Triggers replace Task; `skill.load/unload` and `send` are independent controls.
+
+- [0221 — Listening mode state](0221-listening-mode-state.md): one typed `listening` variable (`half`/`full`/`quiet`) replaces `quiet`; Triggers become a registry of named handlers; `quiet` is a wake mode ended by a separate short-prompt judge whose judgments are stored in `listening_dialogs`.

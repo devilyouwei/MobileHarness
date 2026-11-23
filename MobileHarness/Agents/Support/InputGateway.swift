@@ -441,7 +441,7 @@ public actor InputGateway {
                 id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
                 version: input.metadata.version, hops: input.metadata.hops, payloadBytes: bytes,
                 expiresAt: input.metadata.deadline, cleanup: cleanup,
-                control: input.metadata.contract == "agent.interruption.v1"),
+                control: AgentContracts.isControlContract(input.metadata.contract)),
             scope: scope, audience: audience.map { Set($0.map(\.rawValue)) }, observer: observer
         ) { [self] results in
             await settlePublication(input, traceID: traceID, results: results, initialFailures: initialFailures)
@@ -632,7 +632,7 @@ public actor InputGateway {
         }
 
         let retainedBytes = encodedBytes * targets.count
-        let control = input.metadata.contract == "agent.interruption.v1" || input.metadata.origin == .runtime
+        let control = AgentContracts.isControlContract(input.metadata.contract) || input.metadata.origin == .runtime
         guard activeAdmissions < (control ? 128 : 112), activeBranches + targets.count <= (control ? 256 : 240),
             observationBytes + retainedBytes <= 8 * 1024 * 1024 - (control ? 0 : 256 * 1024)
         else { throw CommunicationError.capacityExceeded }
@@ -745,7 +745,7 @@ public actor InputGateway {
                                                 let task = message.content(as: AgentTaskSignal.self)
                                             else { return false }
                                             return task.kind == .cancel || task.kind == .result
-                                        }(), control: input.metadata.contract == "agent.interruption.v1"),
+                                        }(), control: AgentContracts.isControlContract(input.metadata.contract)),
                                 payload: input)
                         }
                         return (target, nil, nil)

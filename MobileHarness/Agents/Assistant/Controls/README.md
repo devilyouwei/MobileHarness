@@ -13,7 +13,7 @@ The late-bound link also forwards speech publication failures to the Assistant's
 
 | Alias | Destination | Completion | Effect |
 | --- | --- | --- | --- |
-| `state.set(name,value[,note])` | self | void; failure throws | Writes one of the Agent's own variables. |
+| `state.set(name,value[,note][,wakeCondition])` | self | void; failure throws | Writes one of the Agent's own variables. |
 | `state.clear(name[,note])` | self | void; failure throws | Clears one own variable; clearing an unset one is a no-op. |
 | `state.get(path)` | self | value; failure throws | Short name reads an own variable; a dotted path reads any state through the Container context resolver. |
 | `skill.load(skills)` / `skill.unload(skills)` | self | value | Atomic Skill transitions; they occupy the whole response and take effect on the next request. |
@@ -24,6 +24,8 @@ A thrown error becomes a `controlFailed` tool result and a value result is busin
 ## State writes
 
 The model supplies only a short name; the variable always lives in the Assistant's own table, so Container State and other Agents are unreachable. Declared variables come from `states` in Agent.json (see [Resources/Agents](../../Resources/Agents/README.md)); every other lowercase name is a free note. The model cannot write a `readOnly` variable, and nothing about access appears in the prompt: the write is rejected with `readOnly` and the decision continues. The host writes through `setHostState` (source `host`), which ignores `access` but accepts only declared names and never the `task` variable.
+
+`wakeCondition` is accepted only for `listening=quiet`. It is optional and limited to 512 UTF-8 bytes after trimming. Use `literal:` followed by the exact phrase for a keyword, or plain text for a semantic condition. The mode write commits the condition alongside the variable and clears it whenever the mode leaves quiet. `state.get("listening")` returns an object with `mode` and `wakeCondition`. See [listening input](../Input/README.md#listening-and-quiet).
 
 `task` is the variable bound to the `task` trigger. Its value is owned by the foreground goal record, not by the variable table, so exactly one copy exists:
 

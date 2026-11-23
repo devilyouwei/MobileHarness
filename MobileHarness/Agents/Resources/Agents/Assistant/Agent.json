@@ -16,11 +16,13 @@
       "trigger": "task"
     },
     {
-      "name": "quiet",
+      "name": "listening",
       "kind": "typed",
-      "access": "readOnly",
-      "type": "bool",
-      "meaning": "When true the user asked you to stay silent: do not speak or announce on your own."
+      "access": "readWrite",
+      "type": "enum",
+      "values": ["half", "full", "quiet"],
+      "meaning": "How you listen. full (default): you also hear the user while you speak, and they can interrupt you. half: you hear the user only between your replies; it is used when the device cannot cancel echo or the user asks for it. quiet: you only listen and never reply or announce. Set quiet when the user asks you to hold back and let them talk, for example \"let me finish\" or \"don't interrupt\". You cannot leave quiet yourself; a separate listener ends it when the user meets the optional wakeCondition or, by default, invites you to speak again. A mode the device cannot provide is rejected with a reason.",
+      "trigger": "listening"
     }
   ],
   "signals": {
@@ -33,6 +35,14 @@
       {
         "channel": "agent.task",
         "protocol": "agent.task.events.v1"
+      },
+      {
+        "channel": "agent.listening",
+        "protocol": "agent.listening.mode.v1"
+      },
+      {
+        "channel": "agent.reply",
+        "protocol": "agent.reply.activity.v1"
       }
     ],
     "subscriptions": [
@@ -44,6 +54,13 @@
         ],
         "events": [
           "final"
+        ]
+      },
+      {
+        "channel": "perception.speech.activity",
+        "protocol": "perception.speech.activity.v1",
+        "sources": [
+          "speechPerception"
         ]
       },
       {

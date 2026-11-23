@@ -24,7 +24,7 @@ extension SpeechPerceptionAgent {
         do {
             let capture = try await microphoneInput.listenCapture()
             opened = capture
-            setCaptureDuplex(capture.supportsFullDuplex)
+            await setCaptureDuplex(capture.supportsFullDuplex)
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             _ = try admitsMicrophone(sessionID: sessionID)
@@ -32,22 +32,22 @@ extension SpeechPerceptionAgent {
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             bindMicrophoneGeneration(capture.generation)
-            await speechCaptureStarted(epoch)
+            await publishSpeech(SpeechActivity(.captureStarted, generation: epoch.uuidString))
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             nativeInput = Task {
                 do { try await self.consumeMicrophone(capture, sessionID: sessionID, epoch: epoch) } catch {
                     await capture.frames.cancel()
                     await capture.frames.join()
-                    await self.speechCaptureStopped(epoch)
+                    await self.publishSpeech(SpeechActivity(.captureStopped, generation: epoch.uuidString))
                     throw error
                 }
                 await capture.frames.cancel()
                 await capture.frames.join()
-                await self.speechCaptureStopped(epoch)
+                await self.publishSpeech(SpeechActivity(.captureStopped, generation: epoch.uuidString))
             }
         } catch {
-            await speechCaptureStopped(epoch)
+            await publishSpeech(SpeechActivity(.captureStopped, generation: epoch.uuidString))
             await opened?.frames.cancel()
             await opened?.frames.join()
             if nativeInputEpoch == epoch { nativeInputEpoch = nil }

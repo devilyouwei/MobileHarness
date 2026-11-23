@@ -9,6 +9,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | [PerceptionMessage.swift](PerceptionMessage.swift) | 感知业务枚举，AgentMessage 工厂与类型化读取，按消息类型验证内容和字节上限 |
+| [SpeechActivityMessage.swift](SpeechActivityMessage.swift) | `perception.speech.activity.v1`：采集代、起声候选／确认、utterance 退休与感知角色停止事实（无 PCM／文本，≤ 1 KiB），变体与载荷一一校验 |
 | [PoseObservation.swift](PoseObservation.swift) | COCO-17 姿态、几何／置信度与观测新鲜度 |
 | [SoundSourceObservation.swift](SoundSourceObservation.swift) | 声源方向、质量、格式及有效状态 |
 | [AgentTasks.swift](AgentTasks.swift) | Task 内容／视图、用户回复、公开委派许可、固定任务准入和通信函数声明 |
@@ -31,7 +32,7 @@ flowchart LR
 
 PerceptionMessage 包含 user.input.speech.v1（partial）、user.input.speech.v1（final）、perception.audio.source.v1 和 perception.vision.pose.v1。语音片段与最终文本共用 user.input.speech 频道，订阅按契约、主题和来源匹配。AgentMessage 持有类型化内容及验证闭包。编码上限通常为 16 KiB，姿态为 256 KiB；最终文本非空且最多 4096 UTF-8 字节，片段最多 16300 字节。
 
-姿态、声源和识别阶段由对应角色拥有。见 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md)。
+SpeechActivity 另走 perception.speech.activity 频道，Assistant 订阅并按控制车道准入；Assistant 拥有的 agent.listening.mode.v1 由 SpeechPerception 订阅（[Assistant 输入](../../Assistant/Input/README.md#speech-activity-and-listening-signals)）。姿态、声源和识别阶段由对应角色拥有。见 [VisionPerception](../../VisionPerception/README.md) 与 [SpeechPerception](../../SpeechPerception/README.md)。
 
 AgentTaskContent 保存最多 4096 字节的业务文本与 running／waitingUser／completed 阶段；waitingUser 要求 interactionID。AgentTaskInputIntent 显式指向既有 taskID 与 interactionID，标识各最多 128 字节；运行时所有权由可信上下文提供。固定任务用 AgentTaskSignal.request 传输业务载荷。后台 Writer 通过 AgentTaskRequest 接收文本，任务级进度与终态继续使用执行范围。
 

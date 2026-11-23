@@ -5,6 +5,7 @@ import OSLog
 import StorageChat
 import StorageCore
 import StorageTasks
+import Synchronization
 import UI
 
 struct AssistantChatRoundFailure: Error, CustomStringConvertible {
@@ -194,7 +195,6 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id: UUID
         let inputID: String
         let sessionID: String
-        let user: String
         var assistant: String = ""
     }
     var decisionTurn: DecisionTurn?
@@ -202,18 +202,19 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var interruptReceipts: [String] = []
     func beginDecisionTurn(_ input: AgentInput) {
         guard decisionTurn?.inputID != input.id else { return }
-        decisionTurn = .init(
-            id: UUID(), inputID: input.id, sessionID: input.sessionID,
-            user: batchTexts[input.id] ?? Self.inputText(input) ?? "")
+        decisionTurn = .init(id: UUID(), inputID: input.id, sessionID: input.sessionID)
     }
     let speechSessionID: String?
     var speechUtterances: Set<String> = []
     var interruptionWait: UUID?
     private var interruptionSpeechObserved = false
-    private var interruptionProbeStart: ContinuousClock.Instant?
-    private var interruptionProbeSamples = 0
-    private var speechCaptureGeneration: UUID?
+    private var onsetCandidateActive = false
+    private var interruptionProbeElapsed = false
+    private var speechCaptureGeneration: String?
     var interruptionWaitTask: Task<Void, Never>?
+    /// 40 VAD windows of 512 samples at 16 kHz: how long after cleanup silence must hold before nobody is assumed
+    /// to be speaking.
+    static var interruptionProbeDuration: Duration { .milliseconds(1280) }
 
     func speechStarted(_ id: String) throws {
         guard lifecycle == .running else { return }
@@ -251,8 +252,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         interruptionWaitTask = nil
         interruptionWait = nil
         interruptionSpeechObserved = false
-        interruptionProbeStart = nil
-        interruptionProbeSamples = 0
+        interruptionProbeElapsed = false
     }
 
     func finishInterruptionWaitIfReady() {
@@ -263,32 +263,66 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         drain()
     }
 
-    func speechCaptureStarted(_ generation: UUID) {
-        if let prior = speechCaptureGeneration, prior != generation, interruptionWait != nil {
-            failInterruptionProbe("Speech capture changed during interruption wait")
+    /// Speech facts arrive only as the authenticated `perception.speech.activity.v1` Signal this Agent subscribes to.
+    func receiveSpeechActivity(_ input: AgentInput, _ activity: SpeechActivity) async throws {
+        guard input.sessionID == speechSessionID, lifecycle != .stopped else { return }
+        switch activity.kind {
+        case .captureStarted:
+            if let generation = activity.generation { speechCaptureStarted(generation) }
+            await listening?.republish()
+            await refreshReplyActivity(force: true)
+        case .captureStopped:
+            if let generation = activity.generation { speechCaptureStopped(generation) }
+        case .duplexSupport:
+            if let supported = activity.fullDuplex { await listening?.captureDuplex(supported) }
+        case .onsetStarted:
+            onsetCandidateActive = true
+        case .onsetCleared:
+            onsetCandidateActive = false
+            concludeInterruptionProbeIfSilent()
+        case .onsetConfirmed:
+            onsetCandidateActive = false
+            if let utterance = activity.utterance { try speechStarted(utterance) }
+        case .utteranceEnded:
+            if let utterance = activity.utterance { speechEnded(utterance) }
+        case .utterancesCleared:
+            onsetCandidateActive = false
+            clearSpeechUtterances()
+        case .ended:
+            onsetCandidateActive = false
+            if let generation = speechCaptureGeneration { speechCaptureStopped(generation) }
+            clearSpeechUtterances()
+            await listening?.perceptionEnded()
+        }
+    }
+
+    private func speechCaptureStarted(_ generation: String) {
+        if let prior = speechCaptureGeneration, prior != generation {
+            // Utterances of an earlier capture can no longer end by themselves.
+            onsetCandidateActive = false
+            speechUtterances.removeAll()
+            if interruptionWait != nil { failInterruptionProbe("Speech capture changed during interruption wait") }
         }
         speechCaptureGeneration = generation
     }
 
-    func speechCaptureStopped(_ generation: UUID) {
+    private func speechCaptureStopped(_ generation: String) {
         guard speechCaptureGeneration == generation else { return }
         speechCaptureGeneration = nil
+        onsetCandidateActive = false
         if interruptionWait != nil {
             failInterruptionProbe("Speech capture stopped during interruption wait")
         }
     }
 
-    func speechWindow(
-        generation: UUID, capturedAt: ContinuousClock.Instant, samples: Int, onsetCandidate: Bool
-    ) {
-        guard speechCaptureGeneration == generation, interruptionWait != nil, !executionCancellationBarrier,
-            !interruptionSpeechObserved, let start = interruptionProbeStart, capturedAt >= start
+    /// The probe window has passed with no confirmed speech; a candidate still pending keeps the wait open until it
+    /// confirms or clears.
+    private func concludeInterruptionProbeIfSilent() {
+        guard interruptionWait != nil, interruptionProbeElapsed, !interruptionSpeechObserved,
+            !onsetCandidateActive
         else { return }
-        interruptionProbeSamples += samples
-        if interruptionProbeSamples >= 40 * 512, !onsetCandidate {
-            cancelInterruptionWait()
-            drain()
-        }
+        cancelInterruptionWait()
+        drain()
     }
 
     private func failInterruptionProbe(_ reason: String) {
@@ -310,11 +344,19 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             failInterruptionProbe("Speech capture unavailable for interruption wait")
             return
         }
-        interruptionProbeStart = .now
+        interruptionProbeElapsed = false
         interruptionWaitTask = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(10)) } catch { return }
+            do { try await Task.sleep(for: Self.interruptionProbeDuration) } catch { return }
+            await self?.interruptionProbeDurationPassed(id)
+            do { try await Task.sleep(for: .seconds(10) - Self.interruptionProbeDuration) } catch { return }
             await self?.interruptionProbeTimedOut(id)
         }
+    }
+
+    private func interruptionProbeDurationPassed(_ id: UUID) {
+        guard interruptionWait == id else { return }
+        interruptionProbeElapsed = true
+        concludeInterruptionProbeIfSilent()
     }
 
     private func interruptionProbeTimedOut(_ id: UUID) {
@@ -447,7 +489,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var reportHostCancellationFailure = false
     var hostCancelledInput: (id: String, round: String?)?
     var worker: Task<Void, Never>?
-    var activeInput: AgentInput?
+    var activeInput: AgentInput? { didSet { scheduleReplyActivityRefresh() } }
+    var publishedReplyActivity: Bool?
+    var replyActivityRefreshing = false
+    var replyActivityDirty = false
     var begunInputID: String?
     var begunSession: String?
     var begunTurn: AgentTurn?
@@ -497,7 +542,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         var cancelled = false
         var publishing = false
     }
-    var pendingRounds: [String: PendingRound] = [:]
+    var pendingRounds: [String: PendingRound] = [:] { didSet { scheduleReplyActivityRefresh() } }
     var settlementAdmissions: Set<String> = []
     var batchMembers: [String: [AgentInput]] = [:]
     var batchTexts: [String: String] = [:]
@@ -557,6 +602,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var uiInputs = AgentUIInputs()
     var uiTextOrdinal: UInt64 = 0
     let stateContext: AgentStateContext?
+    let listening: (any ListeningModeControlling)?
+    /// Handlers for the triggers `Agent.json` declares; installed at the end of initialization.
+    private let triggerSlot = Mutex<AgentStateTriggers>(AgentStateTriggers())
+    var stateTriggers: AgentStateTriggers { triggerSlot.withLock { $0 } }
     var ephemeralImageIDs: Set<String> = []
     var resourceBindings: [String: String] = [:]
     var imageScopes: [String: String] = [:]
@@ -574,6 +623,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         configuration: AgentConfiguration? = nil,
         conversations: AssistantHistoryStore = AssistantHistoryStore(),
         communications: (any AgentMessageRepository)? = nil,
+        listening: (any ListeningModeControlling)? = nil,
         modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
         observations:
             @escaping @Sendable ([AssistantChatObservation], AgentInput, any ChatCapability) async throws ->
@@ -626,7 +676,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         usesSkills = supportsSkills
         if supportsSkills {
             // The `task` variable's trigger needs its declaration; a missing one is a configuration error.
-            guard try AgentConfigurations.stateSchema(named: State.configurationName).declaration(boundTo: .task) != nil
+            guard
+                try AgentConfigurations.stateSchema(named: State.configurationName).declaration(boundTo: "task") != nil
             else { throw AgentConfigurationError.invalidField("task state declaration") }
         }
         if supportsSkills, let communications {
@@ -636,6 +687,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
         taskRecords = supportsSkills ? conversations.tasks : nil
         self.communicationPolicy = configuration.communication
+        self.listening = listening
         self.modelCapabilities = runtimeCapabilities
         _ = try AgentPrompts.load(named: State.configurationName)
         self.language = language
@@ -647,6 +699,33 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(outputCapacity))
         outputs = stream.stream
         continuation = stream.continuation
+        var handlers: [String: AgentStateTriggerHandler] = [:]
+        handlers["task"] = { [weak self] write in
+            guard let self else { throw CommunicationError.unavailableTarget }
+            return try await self.taskTrigger(write)
+        }
+        handlers["listening"] = { [weak self] write in
+            guard let self else { throw CommunicationError.unavailableTarget }
+            try await self.applyListeningMode(write)
+            return .publish
+        }
+        let triggers = try AgentStateTriggers(handlers)
+        try triggers.validate(schema: AgentConfigurations.stateSchema(named: State.configurationName))
+        triggerSlot.withLock { $0 = triggers }
+    }
+
+    private func applyListeningMode(_ write: AgentStateWrite) async throws {
+        guard let listening else { return }
+        let mode = ListeningMode(variable: write.new)
+        let reply =
+            write.source == .model && mode == .quiet && listening.mode != .quiet
+            ? activeInput.flatMap { $0.id == write.inputID && $0.sessionID == write.sessionID ? $0 : nil }
+            : nil
+        try await listening.apply(mode, source: write.source, wakeCondition: write.wakeCondition)
+        if let reply {
+            // Join only audio production here. The caller still owns generation and round settlement.
+            await speechOutput?.cancel(input: reply)
+        }
     }
     /// Shared with explicit model diagnostics; capability declarations remain in role JSON.
     public nonisolated static func systemPrompt(capabilities: CapabilityRegistry) throws -> String {

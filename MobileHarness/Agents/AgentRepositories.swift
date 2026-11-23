@@ -13,13 +13,15 @@ public struct AgentRepositories: Sendable {
     public let logs: any ModelRequestLogRepository
     public let media: any MediaRepository
     public let devices: any DeviceRepository
+    public let listeningDialogs: (any ListeningDialogRepository)?
     public init(
         assistantConversations: any AssistantConversationRepository, assistantMessages: any AssistantMessageRepository,
         assistantTasks: any AssistantTaskRepository & AssistantTaskSummaryRepository,
         writerMessages: any WriterMessageRepository, writerExecutions: any WriterExecutionRepository,
         agentMessages: any AgentMessageRepository, logs: any ModelRequestLogRepository, media: any MediaRepository,
-        devices: any DeviceRepository
+        devices: any DeviceRepository, listeningDialogs: (any ListeningDialogRepository)? = nil
     ) {
+        self.listeningDialogs = listeningDialogs
         self.assistantConversations = assistantConversations
         self.assistantMessages = assistantMessages
         self.assistantTasks = assistantTasks

@@ -6,6 +6,7 @@ import ModelKit
 import ModelKitDefaults
 import ModelKitRuntime
 import StorageChat
+import Synchronization
 import Testing
 
 @testable import Agents
@@ -337,18 +338,18 @@ func malformedBooleanIsFailureNotFalse(output: String) async throws {
 }
 
 @Test(arguments: ["en", "zh-Hans"])
-func binaryContextContainsOnlyCurrentExchangeAndLatest(language: String) throws {
+func binaryContextContainsOnlyCurrentReplyAndLatestInput(language: String) throws {
     try AgentPrompts.$language.withValue(language) {
         let snapshot = InputDecisionSnapshot(
-            input: .init(id: "context", sessionID: "s", payload: .text("不是这个")),
-            text: "不是这个", currentTurn: .init(user: "介绍北京", assistant: "北京是"))
+            input: .init(id: "context", sessionID: "s", payload: .text("previous request and Web.Page.browse result")),
+            text: "不是这个", currentAssistantReply: "北京是")
         let request = try snapshot.request()
-        let state = try #require(JSONSerialization.jsonObject(with: Data(request.text.utf8)) as? [String: Any])
-        #expect(Set(state.keys) == ["current_turn", "incoming_user_input"])
-        #expect(state["incoming_user_input"] as? String == "不是这个")
-        let current = try #require(state["current_turn"] as? [String: String])
-        #expect(current == ["user": "介绍北京", "assistant": "北京是"])
-        #expect(!request.text.contains("assistant_busy"))
+        let context = try JSONDecoder().decode([String: String].self, from: Data(request.text.utf8))
+        #expect(context == ["current_assistant_reply": "北京是", "incoming_user_input": "不是这个"])
+        let pending = try InputDecisionSnapshot(input: snapshot.input, text: "等一下").request()
+        let pendingContext = try JSONDecoder().decode([String: String].self, from: Data(pending.text.utf8))
+        #expect(pendingContext == ["current_assistant_reply": "", "incoming_user_input": "等一下"])
+        #expect(request.instructions.contains("current_assistant_reply"))
         #expect(request.instructions.contains(language == "en" ? "immediately" : "立即"))
     }
 }
@@ -464,7 +465,10 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
     #expect(await probe.count == 0)
     #expect(logs.statuses["b"] == "target_expired")
     let request = try #require(await deferred.requests.last)
-    #expect(request.messages.first?.content.contains("Explain A") == true)
+    let content = try #require(request.messages.first?.content)
+    #expect(content.contains(#""current_assistant_reply":"""#))
+    #expect(content.contains(#""incoming_user_input":"Stop A and explain B""#))
+    #expect(!content.contains("Explain A"))
     await agent.stop()
     pump.cancel()
     _ = await pump.result
@@ -714,6 +718,65 @@ func unifiedInterruptLocksTargetAndPreservesQueuedInput() async throws {
     _ = await pump.result
 }
 
+private func speechSignal(_ activity: SpeechActivity, session: String = "s") -> AgentInput {
+    let payload = InputPayload.observation(activity.message())
+    let id = UUID().uuidString
+    return AgentInput(
+        id: id, sessionID: session, payload: payload,
+        metadata: InputMetadata(
+            payload: payload, source: AgentID.speechPerception.rawValue, incarnation: "i", origin: .agent, rootID: id,
+            topic: SpeechActivity.channel))
+}
+
+private final class QuietListeningProbe: ListeningModeControlling, Sendable {
+    private let texts = Mutex<[String]>([])
+    var received: [String] { texts.withLock { $0 } }
+    var mode: ListeningMode { .quiet }
+    func apply(_ mode: ListeningMode, source: AgentStateSource, wakeCondition: String?) async throws {}
+    func receiveQuiet(_ text: String, _ input: AgentInput) { texts.withLock { $0.append(text) } }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func speechActivityIsAcceptedOnlyFromTheSubscribedPerceptionAgent() async throws {
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, speechSessionID: "s", chat: DeferredBooleanChat(blocksFirst: false), context: context)
+    try await agent.start()
+    let forged = speechSignal(SpeechActivity(.onsetConfirmed, utterance: "u"))
+    let impostor = AgentInput(
+        id: forged.id, sessionID: "s", payload: forged.payload,
+        metadata: InputMetadata(
+            payload: forged.payload, source: "writer", incarnation: "i", origin: .agent, rootID: forged.id,
+            topic: SpeechActivity.channel))
+    await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(impostor) }
+    try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "u")))
+    #expect(await agent.speechUtterances == ["u"])
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func quietFinalSpeechIsJudgedInsteadOfEnteringTheConversation() async throws {
+    let main = DeferredBooleanChat(blocksFirst: false)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let listening = QuietListeningProbe()
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, speechSessionID: "s", chat: main, listening: listening, context: context)
+    try await agent.start()
+    try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "u")))
+    let payload = InputPayload.observation(.transcript("let me think", final: true))
+    try await agent.receive(
+        AgentInput(
+            id: "final", sessionID: "s", payload: payload,
+            metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: "final"),
+            turn: .init(id: "u", ordinal: 1)))
+    #expect(listening.received == ["let me think"])
+    #expect(await agent.speechUtterances.isEmpty)
+    #expect(await main.requests.isEmpty)
+    await agent.stop()
+}
+
 @Test(
     .actionCatalog, .timeLimit(.minutes(1)),
     arguments: [
@@ -727,12 +790,13 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     let agent = try FixtureNativeAgent(fullDuplex: true, speechSessionID: "s", chat: main, context: context)
     _ = try await bindSpeechRequests(agent)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
-    let generation = UUID()
-    await agent.speechCaptureStarted(generation)
+    let generation = UUID().uuidString
+    try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: generation)))
     await agent.bindInputInterruption { session in
-        if scenario == "duringCleanup" { try await agent.speechStarted("new-turn") }
+        if scenario == "duringCleanup" {
+            try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "new-turn")))
+        }
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
-        await agent.speechWindow(generation: generation, capturedAt: .now, samples: 40 * 512, onsetCandidate: false)
     }
     try await agent.start()
     try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("original")))
@@ -743,7 +807,7 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     try #require(await main.requests.count == 1)
     try await agent.receive(.init(id: "queued", sessionID: "s", payload: .text("stop")))
     if ["final", "twoTurns", "empty", "deliveryFailure"].contains(scenario) {
-        try await agent.speechStarted("new-turn")
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "new-turn")))
     }
     func finalInput(id: String, turn: String, text: String) -> AgentInput {
         let payload = InputPayload.observation(.transcript(text, final: true))
@@ -752,37 +816,37 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
             metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: id),
             turn: .init(id: turn, ordinal: 1))
     }
-    if scenario == "twoTurns" { try await agent.speechStarted("next-turn") }
+    if scenario == "twoTurns" {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "next-turn")))
+    }
     #expect(try await agent.requestInterrupt(AssistantInterrupt(), sessionID: "s") == .interrupted)
     #expect(await main.requests.count == 1)
     let releaseStarted = ContinuousClock.now
-    if scenario == "captureClosed" { await agent.speechCaptureStopped(generation) }
-    if scenario == "empty" { await agent.speechEnded("new-turn") }
+    if scenario == "captureClosed" {
+        try await agent.receive(speechSignal(SpeechActivity(.captureStopped, generation: generation)))
+    }
+    if scenario == "empty" {
+        try await agent.receive(speechSignal(SpeechActivity(.utteranceEnded, utterance: "new-turn")))
+    }
     if scenario == "twoTurns" {
         try await agent.receive(finalInput(id: "early", turn: "new-turn", text: "first addition"))
     }
     if ["noSpeech", "candidate", "candidateClears"].contains(scenario) {
-        await agent.speechWindow(
-            generation: generation, capturedAt: .now.advanced(by: .seconds(-2)), samples: 40 * 512,
-            onsetCandidate: false)
-        await agent.speechWindow(generation: UUID(), capturedAt: .now, samples: 40 * 512, onsetCandidate: false)
+        if scenario != "noSpeech" { try await agent.receive(speechSignal(SpeechActivity(.onsetStarted))) }
+        // The probe window has not elapsed, and a pending candidate keeps the wait open after it does.
         #expect(await main.requests.count == 1)
-        await agent.speechWindow(generation: generation, capturedAt: .now, samples: 39 * 512, onsetCandidate: false)
-        #expect(await main.requests.count == 1)
-        await agent.speechWindow(
-            generation: generation, capturedAt: .now, samples: 512, onsetCandidate: scenario != "noSpeech")
+        try await Task.sleep(for: .milliseconds(1500))
+        if scenario != "noSpeech" { #expect(await main.requests.count == 1) }
         if scenario == "candidate" {
-            #expect(await main.requests.count == 1)
-            try await agent.speechStarted("new-turn")
+            try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "new-turn")))
             try await agent.receive(finalInput(id: "final", turn: "new-turn", text: "continue speaking"))
         }
         if scenario == "candidateClears" {
-            #expect(await main.requests.count == 1)
-            await agent.speechWindow(generation: generation, capturedAt: .now, samples: 512, onsetCandidate: false)
+            try await agent.receive(speechSignal(SpeechActivity(.onsetCleared)))
         }
     }
     if ["final", "duringCleanup", "deliveryFailure", "twoTurns"].contains(scenario) {
-        await agent.speechEnded("stale-turn")
+        try await agent.receive(speechSignal(SpeechActivity(.utteranceEnded, utterance: "stale-turn")))
         let turn = scenario == "twoTurns" ? "next-turn" : "new-turn"
         let input = finalInput(id: "final", turn: turn, text: "continue speaking")
         if scenario != "deliveryFailure" {
@@ -791,13 +855,13 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
             await agent.speechPublicationFailed(input, reason: "rejected")
         }
     }
-    for _ in 0..<1000 {
+    for _ in 0..<2000 {
         if await main.requests.count == 2 { break }
         try await Task.sleep(for: .milliseconds(2))
     }
     #expect(await main.requests.count == 2)
     let dispatched = try #require(await main.requestInstants.dropFirst().first)
-    #expect(releaseStarted.duration(to: dispatched) < .seconds(1))
+    #expect(releaseStarted.duration(to: dispatched) < .seconds(4))
     let text = await main.requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
     #expect(text.contains("stop"))
     if ["candidate", "final", "duringCleanup", "twoTurns"].contains(scenario) {

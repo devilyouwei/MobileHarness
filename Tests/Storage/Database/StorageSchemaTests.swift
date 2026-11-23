@@ -80,7 +80,7 @@ import UI
             tables == [
                 "agent_messages", "assistant_conversations",
                 "assistant_messages", "assistant_tasks", "devices", "invocation_evidence",
-                "media_files",
+                "listening_dialogs", "media_files",
                 "model_request_log", "workspace_files", "writer_executions",
                 "writer_messages", "writer_workspaces",
             ])

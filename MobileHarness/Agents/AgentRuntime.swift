@@ -115,6 +115,7 @@ import StorageFiles
             summarizeTitle: @escaping @Sendable (AssistantConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
+            quietTiers: [QuietModelTier] = [],
             language: @escaping @Sendable () -> String
         ) throws -> AgentExecutionPreparation {
             try writerContainer.configureHistory(
@@ -266,6 +267,19 @@ import StorageFiles
                         applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
                         inputDecision: makeInputDecision(business), inputQueueStatus: business.inputQueueStatus,
+                        listening: ListeningCoordinator(
+                            judge: quietTiers.isEmpty ? nil : QuietExitJudge(tiers: quietTiers, language: language),
+                            dialogs: repositories.listeningDialogs, sessionID: applicationControlSessionID,
+                            report: { [weak home] message in
+                                Logger(subsystem: "dev.mobileharness", category: "SpeechListening").error(
+                                    "\(message, privacy: .public)")
+                                let issue = ExecutionIssue(
+                                    title: "Listening", source: "speech-perception", message: message)
+                                Task { @MainActor in
+                                    log?.record(.issue(issue))
+                                    home?.notices.offerToast(issue, placement: .toast)
+                                }
+                            }),
                         modelName: modelName, assistantContainer: assistantContainer,
                         applicationControlContainer: applicationControlContainer, memoryContainer: memoryContainer,
                         photographerContainer: photographerContainer, writerContainer: writerContainer,
@@ -286,6 +300,7 @@ import StorageFiles
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
             inputDecision: AssistantInputDecision? = nil,
             inputQueueStatus: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in },
+            listening: ListeningCoordinator,
             modelName: @escaping @Sendable () async throws -> String, assistantContainer: AssistantContainer,
             applicationControlContainer: ApplicationControlContainer, memoryContainer: MemoryContainer,
             photographerContainer: PhotographerContainer, writerContainer: WriterContainer,
@@ -361,10 +376,12 @@ import StorageFiles
                 inputQueueStatus: { ready, deciding in await inputQueueStatus(ready, deciding) },
                 uiHome: home, uiSessionID: applicationControlSessionID, speechSessionID: interactionSessionID,
                 presentsReply: true, chatProvider: chatProvider, conversations: conversations,
-                communications: communications,
+                communications: communications, listening: listening,
                 modelName: modelName,
                 context: assistantContext, language: language)
             assistantControl.bind(main)
+            // The model sees the mode from the first request; the default is written as the host.
+            Task { try? await main.setHostState("listening", to: ListeningMode.default.rawValue) }
             log?.provideStateVariables { await main.stateVariables() }
             let interaction = AssistantExecutionSession(
                 agent: main, manager: manager, output: gateway, speech: speechOutput,
@@ -372,6 +389,15 @@ import StorageFiles
                     Logger(subsystem: "dev.mobileharness", category: "Agents").error("\(message, privacy: .private)")
                 })
             self.interaction = interaction
+            listening.bind(
+                cancelReply: { [interactionSessionID] in
+                    try await interaction.interruptConversation(sessionID: interactionSessionID)
+                },
+                writeMode: { [assistantControl] mode in
+                    try await assistantControl.setHostState("listening", to: mode.rawValue)
+                },
+                publishMode: { [weak main] in try await main?.publishListeningMode($0) },
+                release: { [weak main] in try await main?.receive($0) })
             try assistantContainer.install(interaction)
             try applicationControlContainer.install(intents)
             try memoryContainer.install(history)
@@ -427,6 +453,7 @@ import StorageFiles
                 stopSpeech: { [interaction] in await interaction.speech?.endSession() },
                 playbackChanged: { [interaction] id, active, time in
                     await interaction.speech?.playbackChanged(audioID: id, active: active, at: time)
+                    await interaction.agent.refreshReplyActivity()
                 },
                 makePerception: {
                     [
@@ -438,22 +465,6 @@ import StorageFiles
                         recognition: $0, vad: $1, enhancement: $5, speechEnhancementEnabled: enhancementEnabled,
                         sessionID: $2, interactionSessionID: interactionSessionID,
                         residentListening: true, uiHome: uiHome, microphoneInput: $3, microphoneSpectrum: $4,
-                        speechEndpointActivity: { await assistant.speechEndpointActivity() },
-                        speechStarted: { try await assistant.speechStarted($0) },
-                        speechEnded: { id in
-                            if let id {
-                                await assistant.speechEnded(id)
-                            } else {
-                                await assistant.clearSpeechUtterances()
-                            }
-                        },
-                        speechCaptureStarted: { await assistant.speechCaptureStarted($0) },
-                        speechCaptureStopped: { await assistant.speechCaptureStopped($0) },
-                        speechWindow: { generation, capturedAt, samples, candidate in
-                            await assistant.speechWindow(
-                                generation: generation, capturedAt: capturedAt, samples: samples,
-                                onsetCandidate: candidate)
-                        },
                         speechPlayback: {
                             await speechOutput?.playbackSnapshot(sessionID: interactionSessionID) ?? .init()
                         },

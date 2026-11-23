@@ -66,11 +66,6 @@ extension AssistantChatWorker {
         return lifecycle == .running && (hasReplyWork(sessionID: sessionID) || playing == true)
     }
 
-    func speechEndpointActivity() async -> Bool {
-        guard let speechSessionID, lifecycle == .running else { return false }
-        return await hasActiveReply(sessionID: speechSessionID)
-    }
-
     public func status() -> AgentStatus {
         AgentStatus(lifecycle: lifecycle, queuedInputs: queue.count, processedInputs: processed)
     }
@@ -89,10 +84,17 @@ extension AssistantChatWorker {
         var items: [StateVariableItem] = []
         for declaration in schema?.declarations.values ?? [:].values {
             let entry = visible.entries[declaration.name]
+            var value = entry?.value
+            if declaration.name == "listening", let mode = value {
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                let fields = ["mode": mode, "wakeCondition": context.state.listeningWakeCondition]
+                value = (try? encoder.encode(fields)).map { String(decoding: $0, as: UTF8.self) }
+            }
             items.append(
                 .init(
                     path: prefix + declaration.name, category: declaration.access == .readOnly ? .readOnly : .readWrite,
-                    value: entry?.value, writtenAt: entry?.writtenAt))
+                    value: value, writtenAt: entry?.writtenAt))
         }
         for (name, entry) in visible.entries where schema?.declarations[name] == nil {
             items.append(

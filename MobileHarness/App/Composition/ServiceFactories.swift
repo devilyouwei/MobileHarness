@@ -71,7 +71,8 @@ import UI
                         writerExecutions: storage.database.writerExecutions,
                         agentMessages: storage.database.agentMessages, logs: storage.database.logs,
                         media: storage.database.media,
-                        devices: storage.database.devices)
+                        devices: storage.database.devices,
+                        listeningDialogs: storage.database.listeningDialogs)
                 }, cache: storage.cache, files: files, camera: camera,
                 cameraPresentation: presentation,
                 cameraUI: uiContainer.camera, albumUI: uiContainer.album, windows: uiContainer.windows,

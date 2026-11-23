@@ -59,6 +59,17 @@ public final class AgentPrompts: @unchecked Sendable {
         lock.withLock { cache[path] = nil }
     }
 
+    /// Simplified Chinese text kept beside an owner's English-only metadata file (`Agent.json`, `Skill.json`);
+    /// nil when the language is English or the owner has not translated the key.
+    func translation(of path: String, _ key: String) throws -> String? {
+        guard Self.language == "zh-Hans" else { return nil }
+        let templates: PromptTemplates
+        do { templates = try loadAsset(Self.translatedPath(path)) } catch let error as CocoaError
+            where error.code == .fileReadNoSuchFile
+        { return nil }
+        do { return try templates.render(key) } catch PromptTemplateError.missingTemplate(_) { return nil }
+    }
+
     /// Role/concern paths preserve resource ownership without a global text catalog.
     static func text(_ owner: String, _ key: String, _ variables: [String: String] = [:]) throws -> String {
         try shared.render("Agents/" + owner + ".json", template: key, variables: variables)

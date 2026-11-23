@@ -217,7 +217,7 @@ public enum AgentConfigurations {
     }
     public static func publicDescription(named name: String) throws -> String {
         let value = try resource(named: name)
-        return try localizedDescription("agent." + value.id, default: value.description)
+        return try localizedDescription(agent: name, key: "description", default: value.description)
     }
     /// Descriptions never add a task adapter or grant. Live availability remains State data.
     public static func delegationOverview(
@@ -241,7 +241,7 @@ public enum AgentConfigurations {
                     variables: [
                         "id": value.id,
                         "description": localizedDescription(
-                            "agent." + value.id, default: value.description),
+                            agent: name, key: "description", default: value.description),
                     ]))
         }
         let result = entries.joined(separator: "\n")
@@ -341,8 +341,7 @@ public enum AgentConfigurations {
         let result = try skills.map { skill in
             var description = ""
             for character in try localizedDescription(
-                "skill." + skill.id.replacingOccurrences(of: "-", with: "_"),
-                default: skill.description)
+                path: catalog().skills[skill.id], key: "description", default: skill.description)
             {
                 guard description.utf8.count + String(character).utf8.count <= perDescription else { break }
                 description.append(character)
@@ -352,11 +351,16 @@ public enum AgentConfigurations {
         guard result.utf8.count <= 4096 else { throw AgentConfigurationError.invalidField("Skill discovery capacity") }
         return result
     }
-    private static func localizedDescription(_ key: String, default source: String) throws -> String {
-        guard AgentPrompts.language == "zh-Hans" else { return source }
-        do { return try AgentPrompts.text("Shared/Descriptions", key) } catch let error as CocoaError
-            where error.code == .fileReadNoSuchFile
-        { return source } catch PromptTemplateError.missingTemplate(_) { return source }
+    /// Translations live beside the owner's `Agent.json` or `Skill.json`, with the English text as fallback.
+    private static func localizedDescription(path: String?, key: String, default source: String) throws -> String {
+        guard let path else { return source }
+        return try AgentPrompts.shared.translation(of: path, key) ?? source
+    }
+    private static func localizedDescription(agent name: String, key: String, default source: String) throws -> String {
+        try localizedDescription(path: catalog().agents[name], key: key, default: source)
+    }
+    static func localizedStateMeaning(agent name: String, state: String, default source: String) throws -> String {
+        try localizedDescription(agent: name, key: "state." + state, default: source)
     }
     public static func identityInstructions(named name: String, variables: [String: String] = [:]) throws -> String {
         guard let path = try catalog().agents[name] else { throw AgentConfigurationError.resourceMissing(name) }

@@ -49,7 +49,7 @@ try await session.withCleanup {
 
 Vela31Decision解析full-coreai/1 manifest中的decision组件，按F32 safetensors的映射绑定只读weight输入；CPU-only图接收input_ids、attention_mask、q_index、opt_index、unit_index、ent_index，返回候选logits。q_index保留Q位置及正文pool区间，候选按O位置读出。noul保持no/yes两项，32768 token容量超限抛错，不截断。
 
-LayaDecision接收平台对应bundle根目录；App下载iOS portable JIT wfp16-s512源图，用stripPrefix安装到LayaMultilingual。Mac实验直接传入macos/wfp16-s512目录，不能加载iOS图。GPU公开specialization加载一次模型并共享main/act函数。序列为CLS/type question/instructions/SEP/MASK options/SEP/state/SEP，右填充512。候选至多48 token、问题及候选head预算256；凡上游会截掉正文/问题/选项的请求明确拒绝。按发布协议处理文本中的mask字面量，不加入业务噪声词表。
+LayaDecision接收平台对应bundle根目录；App下载iOS portable JIT wfp16-s512源图，用stripPrefix安装到LayaMultilingual。Mac实验直接传入macos/wfp16-s512目录，不能加载iOS图。GPU公开specialization加载一次模型并共享main/act函数。序列为CLS/type question/instructions/SEP/MASK options/SEP/state/SEP，右填充512。候选至多48 token、问题及候选head预算256；问题或候选超预算时明确拒绝。正文超预算时保留能放入剩余窗口的尾部 token，同时保留完整问题、候选 marker 和分隔符。按发布协议处理文本中的mask字面量，不加入业务噪声词表。
 
 Laya的choice与noul具有不同qtype_onehot和原生选项；noul用false/true解释文本，并从true概率读取布尔值。main输出token_logits及pooled_cls，host在marker处取值并构造act四维特征；act输出验证后不作为上层路由覆盖。候选温度先按type/候选数量分桶，再用制品声明的type温度；按发布协议四位小数、noul严格>0.5。choice保持argmax。输入失败、加载失败、取消或非法输出均传播错误，不制造false或代替分类。
 

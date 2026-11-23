@@ -736,7 +736,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
         try basic.resolveControl("task.delegate", parameters: ["target": "writer", "goal": "old"])
     }
     let start = try #require(basic.controls.first { $0.alias == "state.set" })
-    #expect(start.optionalParameters == ["note"])
+    #expect(start.optionalParameters == ["note", "wakeCondition"])
     #expect(
         basic.controls.filter { $0.destination == .peer }.map(\.alias) == ["send"],
         "Only relaying to another Agent is a peer control")

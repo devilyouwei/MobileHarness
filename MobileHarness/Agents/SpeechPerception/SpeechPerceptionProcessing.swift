@@ -28,7 +28,11 @@ public struct SpeechPerceptionSignalPreprocessor: SignalPreprocessor {
         switch input.payload {
         case .actionResult: return .feedback
         case .observation(let message)
-        where [ListeningIntent.contract, SpeechCaptureEnded.contract].contains(message.contract):
+        where [
+            ListeningIntent.contract, SpeechCaptureEnded.contract, ListeningModeSignal.contract,
+            ReplyActivitySignal.contract,
+        ]
+        .contains(message.contract):
             return .control
         default: throw HarnessError.unsupportedInput
         }

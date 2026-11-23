@@ -368,9 +368,18 @@ extension LiveRuntimeTests {
     #expect(policy.destinations(for: signal(final: false)).isEmpty)
     #expect(policy.destinations(for: signal(final: true, source: "writer")).isEmpty)
     #expect(policy.destinations(for: signal(final: true, topic: "user.input.speech.v1")).isEmpty)
-    #expect(Set(speech.publications.map(\.protocol)) == ["user.input.speech.v1", "perception.audio.source.v1"])
-    #expect(assistant.publications == [.init(channel: "agent.task", protocol: "agent.task.events.v1")])
-    #expect(speech.subscriptions.isEmpty)
+    #expect(
+        Set(speech.publications.map(\.protocol)) == [
+            "user.input.speech.v1", "perception.speech.activity.v1", "perception.audio.source.v1",
+        ])
+    #expect(
+        Set(assistant.publications) == [
+            .init(channel: "agent.task", protocol: "agent.task.events.v1"),
+            .init(channel: "agent.listening", protocol: "agent.listening.mode.v1"),
+            .init(channel: "agent.reply", protocol: "agent.reply.activity.v1"),
+        ])
+    #expect(Set(speech.subscriptions.map(\.protocol)) == ["agent.listening.mode.v1", "agent.reply.activity.v1"])
+    #expect(speech.subscriptions.allSatisfy { $0.sources == ["assistant"] })
 
     #expect(assistant.requests.isEmpty)
     #expect(Set(assistant.feedback) == ["action.result.v1", "agent.round.result.v1"])

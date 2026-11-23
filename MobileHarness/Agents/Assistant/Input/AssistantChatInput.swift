@@ -72,6 +72,31 @@ extension AssistantChatWorker {
             emit(.control("assistant.interrupt: \(result.rawValue)"), for: input)
             return
         }
+        if case .observation(let message) = input.payload, message.contract == SpeechActivity.contract {
+            guard State.agentID == .assistant, input.metadata.origin == .agent,
+                input.metadata.incarnation != nil,
+                communicationPolicy.subscriptions.contains(where: {
+                    $0.channel == SpeechActivity.channel && $0.protocol == SpeechActivity.contract
+                        && $0.sources.contains(input.metadata.source) && input.metadata.topic == $0.channel
+                }),
+                let activity = message.content(as: SpeechActivity.self)
+            else { throw CommunicationError.unauthorized }
+            guard !input.metadata.expired else { throw CommunicationError.expired }
+            guard input.metadata.contract == SpeechActivity.contract, input.metadata.version == 1 else {
+                throw CommunicationError.invalidPayload
+            }
+            try input.validate(message)
+            try await receiveSpeechActivity(input, activity)
+            return
+        }
+        if case .transcript(let text, final: true)? = input.payload.perception, input.sessionID == speechSessionID,
+            let listening, listening.mode == .quiet
+        {
+            // `quiet` keeps the utterance out of the conversation; only the exit judgment reads it.
+            if let turn = input.turn { speechEnded(turn.id) }
+            listening.receiveQuiet(text, input)
+            return
+        }
         let arrivedAt = ContinuousClock.now
         let turnAtArrival = decisionTurn
         let replyAtArrival = hasReplyWork(sessionID: input.sessionID)
@@ -465,7 +490,7 @@ extension AssistantChatWorker {
         let snapshot = (occupied ? userText : nil).map { text in
             InputDecisionSnapshot(
                 input: input, text: text,
-                currentTurn: turn.map { .init(user: $0.user, assistant: $0.assistant) }, receivedAt: arrivedAt)
+                currentAssistantReply: turn?.assistant ?? "", receivedAt: arrivedAt)
         }
         try queue.admit(input, disposition: .enqueue(priority: 0))
         admitted = true

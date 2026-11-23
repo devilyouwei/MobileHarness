@@ -12,6 +12,7 @@ Skill 是可复用的流程与能力集合，Task 是运行时目标、状态和
 | --- | --- |
 | `../Catalog.json` | `version: 1`，`skills` 显式映射 Skill ID 到 `Skills/<SkillName>/Skill.json`。运行时按 ID 加载，不扫描文件夹。 |
 | `<SkillName>/Skill.json` | 必需。v3 资源配置，引用 canonical 函数绑定。 |
+| `<SkillName>/Skill.zh-Hans.json` | 可选。`templates.description` 为该 Skill 的简体中文简介，缺失回退 Skill.json 的英文。 |
 | `<SkillName>/Instructions.md` | 必需。UTF-8 静态运行时指令，与 Skill.json 同目录；加载后进入模型上下文。开发 README 不能替代它。 |
 
 目录用 UpperCamelCase，如 `Photography`；ID 用稳定的 kebab-case，如 `photography`、`history-query`。ID 必须与 Catalog 键完全一致。文件名固定为 Skill.json 和 Instructions.md；路径相对 Resources，不允许绝对路径、反斜杠和 `.` / `..` 段。Skill 引用其他 Skill 使用 ID，不使用文件路径。

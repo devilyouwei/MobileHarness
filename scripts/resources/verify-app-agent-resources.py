@@ -66,15 +66,14 @@ for path, original in expected.items():
         if set(re.findall(placeholders, template)) != set(re.findall(placeholders, translated_templates[key])):
             raise SystemExit(f'Template placeholder mismatch: {path}:{key}')
 catalog = json.loads((bundle / 'Catalog.json').read_text())
-descriptions = json.loads((bundle / 'Agents/Shared/Descriptions.zh-Hans.json').read_text())['templates']
+def translated(path, key):
+    sibling = (bundle / path).with_name(pathlib.Path(path).stem + '.zh-Hans.json')
+    return json.loads(sibling.read_text())['templates'].get(key) if sibling.is_file() else None
 for path in catalog['agents'].values():
-    metadata = json.loads((bundle / path).read_text())
-    if not descriptions.get(f"agent.{metadata['id']}"):
+    if not translated(path, 'description'):
         raise SystemExit(f'Missing Chinese role description: {path}')
 for path in catalog['skills'].values():
-    metadata = json.loads((bundle / path).read_text())
-    key = metadata['id'].replace('-', '_')
-    if not descriptions.get(f'skill.{key}'):
+    if not translated(path, 'description'):
         raise SystemExit(f'Missing Chinese Skill description: {path}')
 for name in ('Input/InputProtocol.json', 'Input/InputDecision.json', 'Controls/Controls.json', 'Controls/Controls.md', 'Prompts.json', 'Instructions.md'):
     if not (bundle / 'Agents/Assistant' / name).is_file():

@@ -76,13 +76,13 @@ recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或�
 
 ## Agent state variables
 
-Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Agents/Resources/Agents](../../Resources/Agents/README.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（目前仅 `task`）。
+Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Agents/Resources/Agents](../../Resources/Agents/README.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（`task` 与 `listening`）。
 
 - **写入**：`set` / `clear` 校验名称（小写字母开头，小写字母、数字、下划线，≤ 32 字节）、写入者（`model` 不能写 `readOnly`，`host` 只能写已声明项）、类型（`bool`/`enum`/`text`，写入前规范化）与单值 ≤ 1 KiB；任何失败抛出且变量不变。清除未设置的变量无变化。重新写入同值只更新时间。
 - **容量**：已声明变量不被淘汰；自由变量最多 32 个、名称与值合计 ≤ 8 KiB，超出时不报错，按写入先后淘汰最早者。
 - **时间与排序**：每次写入记录时间；`ordered` 按写入时间升序。`showing` 返回叠加了他处持有值的副本（例如当前目标 `task`），仅用于渲染与读取，不写入表。
-- **提示词**：[AgentStatePrompt](AgentStatePrompt.swift) 是唯一的转换函数：`block` 生成用户输入前 system 块中的 `# AGENT STATE`（每行 `名称（写入于 自然语言绝对时间）：值`，值以 JSON 字符串引用为数据），`declarations` 生成系统提示中的变量说明（含义与取值，不含访问级别）。模板位于 Shared/StateContext*.json，中文说明按 `state.<name>` 取 Shared/Descriptions.zh-Hans.json。
-- **Trigger**：`AgentStateTrigger` 绑定到声明的 `trigger` 名。`task` 触发目标记录的开始/结束与历史压缩，由 Assistant 的控制执行层处理；闹钟、定时循环等未实现。
+- **提示词**：[AgentStatePrompt](AgentStatePrompt.swift) 是唯一的转换函数：`block` 生成用户输入前 system 块中的 `# AGENT STATE`（每行 `名称（写入于 自然语言绝对时间）：值`，值以 JSON 字符串引用为数据），`declarations` 生成系统提示中的变量说明（含义与取值，不含访问级别）。模板位于 Shared/StateContext*.json，`declarations(_:agent:)` 的中文说明按 `state.<name>` 取声明所在 Agent 的 `Agent.zh-Hans.json`。
+- **Trigger**：声明的 `trigger` 是一个名字，处理器由所属 Agent 在 [AgentStateTriggers](AgentStateTriggers.swift) 中按名注册；处理器类型是 `AgentStateWrite`（变量名、旧值、新值、note、来源、session/input/decision）到 `AgentStateTriggerOutcome` 的异步函数。`publish` 表示处理器接受变更、由变量表保存值；`handled` 表示处理器自己持有存储（`task` 的目标记录），之后不再发布。处理器抛出即拒绝写入：变量表不变，错误原样返回写入者。同一 Trigger 不可重入，运行中再次写入返回 `triggerBusy`。注册集合在构造时固定，数量不超过声明上限 16。声明了未注册的 Trigger 名是配置错误，在 Agent 启动时由 `validate(schema:)` 报告，而不是首次写入时。模型的 `state.set/clear` 与宿主的 `setHostState` 经 Assistant 控制执行层的同一入口：校验名称、权限与类型，读取旧值，运行处理器，仅在 `publish` 时事务提交。当前处理器：`task`（目标记录开闭与历史压缩）与 `listening`（见 [聆听模式](../../SpeechPerception/README.md#聆听模式-listening)）。闹钟、定时循环等不存在。
 - **读取**：`state.get` 的短名读自身变量，带点路径经 AgentStateContext 读取容器状态；无授权门槛，Skill 的 `useStates` 只决定随请求注入哪些来源。
 
 ## Task and Skill lifecycle

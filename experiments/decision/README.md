@@ -18,4 +18,18 @@ python3 experiments/decision/evaluate_decision.py --config experiments/decision/
 - [datasets](datasets/README.md) 拥有输入；[results](results/README.md) 拥有历史及新原始输出；[benchmark](benchmark/README.md) 拥有固定矩阵准备、配对汇总和特定制品对照。
 - [historical-prompts.json](historical-prompts.json) 是原历史实验提示词的冻结副本，不从 App 资源动态读取。当前 App 提示构造契约由 Tests 验证。
 
+## quiet 退出判定
+
+[evaluate_quiet_exit.py](evaluate_quiet_exit.py) 评估 Assistant 在 quiet 模式下仅凭最新一句话判断是否退出。用例 [quiet-exit-cases-2026-11-23.json](datasets/quiet-exit-cases-2026-11-23.json)，冻结提示词 [quiet-exit-prompts.json](quiet-exit-prompts.json)；生成式后端（Apple、云端）使用与 App 相同的 system/user 结构并答 exit/stay，原生 Decision 模型使用同一指令的布尔问句。云端配置 [quiet-cloud-model.json](quiet-cloud-model.json) 的密钥只经环境变量读取（默认 `EXPERIMENT_API_KEY`），endpoint 按实际服务修改或使用不入库的本地副本。
+
+```bash
+python3 experiments/decision/evaluate_quiet_exit.py --model laya --output experiments/decision/results/quiet-exit-laya-DATE.json
+python3 experiments/decision/evaluate_quiet_exit.py --config experiments/decision/apple-model.json --output experiments/decision/results/quiet-exit-apple-system-DATE.json
+python3 experiments/decision/evaluate_quiet_exit.py --config experiments/decision/quiet-cloud-model.json --output experiments/decision/results/quiet-exit-qwen3-8-flash-DATE.json
+```
+
+报告 JSON 同时含总体 `metrics` 与中英分开的 `metricsByLanguage`。`--prompts quiet-wake-short-prompts.json` 选择最短问句（`template` 单条 user 消息）。`--prompts quiet-wake-prompts.json` 选择简化的是非问句变体（文件中 `answer` 为 `boolean`，生成式后端答 true/false）。
+
+报告写入 [docs/validation](../../docs/validation/Quiet-Exit-Evaluation.md)；离线回归见 [test_evaluate_quiet_exit.py](test_evaluate_quiet_exit.py)。
+
 方法和结论写入 [docs/validation](../../docs/validation/README.md)，Python 验证与真实模型测量分别报告。

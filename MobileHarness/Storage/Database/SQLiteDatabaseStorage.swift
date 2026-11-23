@@ -44,6 +44,9 @@ public actor SQLiteDatabaseStorage: DatabaseStorage {
     public nonisolated var logs: any ModelRequestLogRepository { get throws { try repositories().logs } }
     public nonisolated var media: any MediaRepository { get throws { try repositories().media } }
     public nonisolated var devices: any DeviceRepository { get throws { try repositories().devices } }
+    public nonisolated var listeningDialogs: any ListeningDialogRepository {
+        get throws { try repositories().listeningDialogs }
+    }
 
     private nonisolated let access = DatabaseAccess()
     private let open: @Sendable () throws -> SQLiteRepositories
@@ -179,7 +182,7 @@ private final class DatabaseAccess: Sendable {
                 assistantTasks: backend.assistantTasks, writerMessages: backend.writerMessages,
                 writerExecutions: backend.writerExecutions, agentMessages: backend.agentMessages, logs: backend.logs,
                 media: backend.media, devices: backend.devices,
-                workspaces: backend.workspaces)
+                workspaces: backend.workspaces, listeningDialogs: backend.listeningDialogs)
         }
     }
     func closeAdmission() {

@@ -30,6 +30,7 @@ public protocol AssistantChatState: AgentTaskContextState {
     var skillState: AgentTaskSkillState? { get set }
     /// The Agent's own variables; roles without State keep the empty default.
     var variables: AgentStateVariables { get set }
+    var listeningWakeCondition: String? { get set }
     /// The variables as the model sees them, including values another owner keeps (such as the active goal).
     func visibleVariables(session: String?) -> AgentStateVariables
     var history: AssistantArchive { get set }
@@ -92,6 +93,10 @@ public enum AssistantHistoryContext {
 }
 
 extension AssistantChatState {
+    public var listeningWakeCondition: String? {
+        get { nil }
+        set {}
+    }
     public static func sessionControl(_ message: AgentMessage) throws -> AssistantChatControl? { nil }
     public static func systemPrompt(_ capabilities: CapabilityRegistry, skills: AgentTaskSkillState?) throws -> String {
         try systemPrompt(capabilities) + (try skills?.instructions() ?? "")

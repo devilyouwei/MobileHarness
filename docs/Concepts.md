@@ -19,7 +19,7 @@
 | Function Token | 自然文本/XML 混合行为协议中的结构单元，不是模型 tokenizer 的 token。 |
 | Task | Agent 的 `task` 变量：跨轮持续目标的一段自然语言，设置时开启目标记录，清除（附摘要）时关闭并压缩所覆盖的历史；不是独立机制，也不持有 Skill。 |
 | Skill | 可复用流程说明、函数绑定与 useStates 读取声明，不是目标或执行权限凭证。 |
-| State | 供 LLM 读取的有限当前事实；业务拥有者发布公开视图，完整内部对象和执行状态保持私有。Agent 自身的变量（`task`、`mood`、`quiet` 等）也是 State，模型可经 `state.set` / `state.clear` 在自己的命名空间内读写。 |
+| State | 供 LLM 读取的有限当前事实；业务拥有者发布公开视图，完整内部对象和执行状态保持私有。Agent 自身的变量（`task`、`mood`、`listening` 等）也是 State，模型可经 `state.set` / `state.clear` 在自己的命名空间内读写。 |
 | Delegation / send | `send` 把用户要求转述给同伴 Agent，独立于任何状态；送达只表示对端接纳。 |
 | useStates | 当前加载 Skill 随请求带入的状态来源；每次实际模型请求重新采集，各来源不承诺跨容器原子一致。它只决定注入哪些来源，不是授权。 |
 | Request catalog | 某次模型请求冻结的已加载 Skill/函数视图，用于解释和验证该次输出。 |

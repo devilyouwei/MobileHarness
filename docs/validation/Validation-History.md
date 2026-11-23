@@ -2,6 +2,35 @@
 
 本文件是按日期追加的跨模块验证日志。每节中的版本、数字、失败与未执行范围只对应该轮，不作为当前设计；专项模型和硬件样本在 [验证索引](README.md) 所列报告中拥有正文。相同运行的摘要与专项报告不能算作两次独立验收。
 
+## 2026-11-24 — quiet 关键词规则与状态收尾
+
+- 真机构建 2026112304 的 SQLite 只读快照通过 `quick_check`。00:03 的两轮中，一次普通对话模型 `qwen3.8-flash` 漏写“除非喊名字”约定。另一次正确写入“秦始皇”，Apple 系统模型仍对“你是谁？”返回 exit，理由写的是未明确允许开口。
+- 14 项定向 Swift 测试通过，覆盖关键词分支零模型请求、语义判定拒绝夹带说明的输出、关键词与语义两种唤醒后的 State 清空，以及打包提示词和大小检查。修改文件通过严格格式检查。
+- 五个 iOS Simulator scheme 构建通过，主 App 的 Agent/Skill、Live Activity 和中英文打包资源校验通过。
+- `./scripts/check.sh` 仍在既有 State Value codec 与 Xcode 本地化资源归类检查处停止。优化后尚未在真机重新验证条件提取与语义判定。
+
+## 2026-11-23 — quiet 自定义唤醒条件
+
+- 15 项定向 Swift 测试通过。新增回归用模型替身验证控制写入条件、判定收到条件和当句 ASR、普通招呼保持 quiet、关键词唤醒、状态 JSON 和恢复对话。还验证了控制声明及中英文提示词的打包与编译。
+- 修改的生产 Swift 文件通过严格格式检查。工程工具的 8 项 Python 测试通过。`./scripts/check.sh` 在已有 State Value codec 缺项和 Xcode 本地化资源归类检查处停止。
+- 五个 iOS Simulator scheme 构建通过，主 App 的 Agent/Skill、Live Activity 和中英文打包资源校验通过。
+- 条件提取和 Apple 系统模型判定效果尚未在 iPhone 上验收。
+
+## 2026-11-23 — 模型进入 quiet 时的生成收尾
+
+- 聆听相关 Swift 定向测试 9 项通过。新回归由模型替身在生成中写入 quiet，验证原模型请求终态、输入音频取消、后续语音进入退出判定及恢复对话。退出判定使用模型替身并将结果写入临时 SQLite。
+- 修改过的 Swift 文件通过严格格式检查。工程工具 8 项 Python 测试和 plist 校验通过。`./scripts/check.sh` 在边界检查停止，报告现有 `Agents/AgentContainer.swift` State Value codec 缺项和 Xcode 本地化资源归类问题。
+- `./scripts/build-ios.sh` 五个 Simulator scheme 均构建通过，主 App 的 Agent/Skill、Live Activity 和中英文打包资源校验通过。
+- 修复后的 iPhone 播放及语音接纳尚未实机验证。
+
+## 2026-11-23 — 聆听模式 `listening` 与 Trigger 注册层
+
+实现 `listening`（`half`/`full`/`quiet`）、按名注册的 Trigger 处理器、`quiet` 独立退出判定通道与 `listening_dialogs` 表；需求与取舍见[聆听模式](../requirements/technical/Listening-Mode-State.md)。
+
+- ✅ 非运行时 `swift test` 1243 项以上全部通过（含新增 Trigger 注册、`listening` 写入与拒绝、`quiet` 路由、`full` 能力检查、判定降级/超时/取代/失败上限/退出恢复/会话结束复位、`listening_dialogs` 存取与容量淘汰）；运行时阶段 `LiveRuntimeTests|NativePresentationTests` 232 项通过。`AgentStateTests.swift` 此前未登记到 Package.swift，现已登记并通过。`./scripts/build-ios.sh` 的五个 iOS Simulator 构建通过，Agent/Skill 资源、Live Activity、中英文资源校验通过；Python 单测与 plist 检查通过。
+- ❌ `./scripts/check.sh` 未通过：`scripts/checks/check-modelkit-boundaries.py` 在本次改动之前已因 `Agents/AgentContainer.swift` 缺少标准 State Value codec 失败（HEAD 同样缺失），脚本在此处退出，因此 Swift 测试、格式与 plist 步骤按脚本内容手动执行。`swift format lint --strict` 仍有 `Tests/Agents/Assistant/PromptTemplateTests.swift` 三处既有超长行，与本次无关。
+- ❌ 未执行：真机全双工回声消除与打断、半双工闸门、`quiet` 误唤醒/漏唤醒、Apple 系统模型与已下载本地模型的真实判定、判定准确率实验；测试中的判定模型为脚本化替身。
+
 ## 2026-11-10 — Assistant 内聚语音合成
 
 在 `codex/assistant-owned-speech` 完成合成生产、播放展示及取消归属迁移；删除独立 SpeechSynthesis 角色与通信。完整检查、四个 iOS Simulator 构建及资源校验通过；新回归覆盖容量、session/input 隔离和停止加入。真实模型、iPhone 播放与打断尚未验收。工具链过程、具体命令及证据边界见[专项验证](Assistant-Owned-Speech.md)。

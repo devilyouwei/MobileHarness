@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "answer": "boolean",
+  "source": "Experiment-only simplified variant of quiet-exit-prompts.json: one yes/no question, whether the sentence asks the assistant to wake up and talk. Chat backends answer true or false; native Decision models read the same question as a boolean (noul) with probability > 0.5 meaning true.",
+  "chat": {
+    "en": "The user asked you to stay quiet and is talking. Is the user, in their latest sentence, asking you to wake up and talk with them? Answer only true or false.",
+    "zh-Hans": "用户要求你保持安静，正在说话。用户说的最新这句话，是否在要求唤醒你、和你对话？只回答 true 或 false。"
+  },
+  "decision": {
+    "en": "Is the user, in latest_user_sentence, asking you to wake up and talk with them?",
+    "zh-Hans": "用户说 latest_user_sentence 这句话，是否在要求唤醒你、和你对话？"
+  }
+}

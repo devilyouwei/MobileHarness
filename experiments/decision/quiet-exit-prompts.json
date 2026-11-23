@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "source": "chat: frozen copy of the Assistant's quiet-exit judge instructions (MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.json and QuietExit.zh-Hans.json, 2026-11-23); the user message is the latest sentence alone. decision: experiment-only boolean form of the same instruction for state-plus-question Decision models, which cannot answer exit/stay words.",
+  "chat": {
+    "en": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, decide whether they are now inviting you to talk again: they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you). Sentences meant for someone else, thinking aloud, or continuing what they were saying keep you quiet. If unsure, stay quiet. Answer with one word, exit or stay, optionally followed by a short reason.",
+    "zh-Hans": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。只回答一个词 exit 或 stay，后面可附一句简短理由。"
+  },
+  "decision": {
+    "en": "Is latest_user_sentence the user inviting you to talk again? Answer true when the user says you may speak, wants to discuss with you, or calls you (any name or greeting aimed at you). Answer false for sentences meant for someone else, thinking aloud, continuing what the user was saying, or telling you to stay quiet or wait. If unsure, answer false.",
+    "zh-Hans": "latest_user_sentence 是否是用户在邀请你重新开口？用户说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）时回答 true。说给别人听、自言自语、继续之前话题，或要求你保持安静、先等等的句子回答 false。拿不准时回答 false。"
+  }
+}

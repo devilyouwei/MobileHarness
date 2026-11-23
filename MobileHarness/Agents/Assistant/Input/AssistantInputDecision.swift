@@ -35,42 +35,31 @@ public struct InputDecisionOutcome: Sendable, Equatable {
     public var modelName: String? = nil
 }
 
-/// Frozen at admission: current user/reply and latest input; no queue or runtime state.
+/// Frozen at admission: current assistant reply and latest user input.
 public struct InputDecisionSnapshot: Sendable {
-    public struct Exchange: Sendable, Equatable, Codable {
-        public let user: String
-        public let assistant: String
-        public init(user: String, assistant: String) {
-            self.user = user
-            self.assistant = assistant
-        }
-    }
     public let input: AgentInput
     public let text: String
-    public let currentTurn: Exchange?
+    public let currentAssistantReply: String
     public let receivedAt: ContinuousClock.Instant
     public init(
-        input: AgentInput, text: String, currentTurn: Exchange? = nil,
+        input: AgentInput, text: String, currentAssistantReply: String = "",
         receivedAt: ContinuousClock.Instant = .now
     ) {
         self.input = input
         self.text = text
-        self.currentTurn = currentTurn
+        self.currentAssistantReply = currentAssistantReply
         self.receivedAt = receivedAt
     }
     func request() throws -> NoulRequest {
-        struct State: Encodable {
-            enum CodingKeys: String, CodingKey {
-                case currentTurn = "current_turn"
-                case incomingUserInput = "incoming_user_input"
-            }
-            let currentTurn: Exchange?
+        struct Context: Encodable {
+            let currentAssistantReply: String
             let incomingUserInput: String
         }
         let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let text = String(
-            decoding: try encoder.encode(State(currentTurn: currentTurn, incomingUserInput: text)), as: UTF8.self)
+        let context = Context(currentAssistantReply: currentAssistantReply, incomingUserInput: text)
+        let text = String(decoding: try encoder.encode(context), as: UTF8.self)
         return try NoulRequest(
             text: text, instructions: AgentPrompts.text("Assistant/Input/InputDecision", "question"),
             context: .init(requestID: input.id + ".decision", scopeID: input.sessionID))

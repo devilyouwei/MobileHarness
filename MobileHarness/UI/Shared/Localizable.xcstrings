@@ -4116,6 +4116,17 @@
         }
       }
     },
+    "Listening quietly": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安静聆听中"
+          }
+        }
+      }
+    },
     "Listening feedback did not finish. Try again.": {
       "extractionState": "manual",
       "localizations": {

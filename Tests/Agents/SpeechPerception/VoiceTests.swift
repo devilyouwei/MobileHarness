@@ -470,23 +470,19 @@ private actor EndpointVADSession: VoiceActivitySession {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func nativeSpeechReportsVADWindowsWithCaptureTimeAndGeneration() async throws {
+func nativeSpeechPublishesCaptureAndOnsetSignals() async throws {
     let root = UUID().uuidString
     let captureSession = UUID().uuidString
     let microphone = NativeMicrophoneFixture()
-    let generations = Mutex<[UUID]>([])
-    let windows = Mutex<[(UUID, ContinuousClock.Instant, Int, Bool)]>([])
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "hello", includeFinal: true), vad: EndpointVAD(), sessionID: root,
         interactionSessionID: root, residentListening: true, microphoneInput: microphone,
-        speechCaptureStarted: { generation in generations.withLock { $0.append(generation) } },
-        speechWindow: { generation, capturedAt, samples, candidate in
-            windows.withLock { $0.append((generation, capturedAt, samples, candidate)) }
-        },
         speechDetection: { (16, 0.5) },
         context: try AgentContextRepository(
             agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
     try await speech.start()
+    let probe = PerceptionListeningProbe()
+    let pump = Task { for await envelope in speech.outputs { await probe.record(envelope) } }
     try await speech.receive(ListeningIntent(enabled: true).input(sessionID: root))
     try await speech.openCapture(sessionID: captureSession)
     try await speech.startInput(sessionID: captureSession)
@@ -499,19 +495,23 @@ func nativeSpeechReportsVADWindowsWithCaptureTimeAndGeneration() async throws {
                 timestamp: timestamp, capturedAt: origin.advanced(by: .seconds(timestamp))))
     }
     for _ in 0..<1000 {
-        if windows.withLock({ $0.count }) >= 40 { break }
+        if await probe.activities.contains(where: { $0.kind == .onsetCleared }) { break }
         try await Task.sleep(for: .milliseconds(2))
     }
-    let observed = windows.withLock { $0 }
-    let generation = try #require(generations.withLock { $0.first })
-    #expect(observed.count >= 40)
-    #expect(observed.prefix(40).allSatisfy { $0.0 == generation && $0.2 == 512 })
-    #expect(observed.first?.3 == true)
-    let first = try #require(observed.first?.1)
-    #expect(origin.duration(to: first) > .milliseconds(-2))
-    #expect(origin.duration(to: first) < .milliseconds(2))
+    let activities = await probe.activities
+    let kinds = activities.map(\.kind)
+    let started = try #require(kinds.firstIndex(of: .captureStarted))
+    let onset = try #require(kinds.firstIndex(of: .onsetStarted))
+    // Three speech windows never reach the sixteen-window onset, so the candidate is published and then cleared.
+    let cleared = try #require(kinds.firstIndex(of: .onsetCleared))
+    #expect(started < onset && onset < cleared)
+    #expect(!kinds.contains(.onsetConfirmed))
+    #expect(activities[started].generation.flatMap(UUID.init(uuidString:)) != nil)
+    #expect(activities.contains { $0.kind == .duplexSupport && $0.fullDuplex != nil })
     await speech.closeCapture()
     await speech.stop()
+    await pump.value
+    #expect(await probe.activities.map(\.kind).suffix(2) == [.utterancesCleared, .ended])
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["idle", "active"])
@@ -522,17 +522,13 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
     let session = UUID().uuidString
     let manager = AgentManager()
     let assistant = ObservationRecorder(id: "assistant")
-    let speechStarts = Mutex<[String]>([])
-    let speechEnds = Mutex<[String?]>([])
     let context = try AgentContextRepository(
         agent: AgentID(rawValue: "speechPerception"), scope: UUID().uuidString, state: SpeechPerceptionContextState())
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session,
-        speechEndpointActivity: { profile == "active" },
-        speechStarted: { id in speechStarts.withLock { $0.append(id) } },
-        speechEnded: { id in speechEnds.withLock { $0.append(id) } },
         speechDetection: { (3, 0.5) },
         context: context)
+    await speech.applyReplyActivity(profile == "active")
     try await manager.register(assistant, sessionID: session)
     await assistant.start()
     try await manager.register(speech, sessionID: session)
@@ -615,14 +611,11 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
         #expect(event.perception == .transcript("你好", final: true))
         #expect(value.metadata.topic == PerceptionMessage.userInputTopic)
         #expect(value.turn?.ordinal == 1)
-        #expect(speechStarts.withLock { $0 } == [value.turn?.id].compactMap { $0 })
-        #expect(speechEnds.withLock { $0 }.isEmpty)
     } else {
         Issue.record("Missing final observation")
     }
     try await speech.resumeListening()
     await speech.stop()
-    #expect(speechEnds.withLock { $0.count } == 1)
     try await outputTask.value
     let displayed = await captions.displayedText
     #expect(displayed.contains("partial"))
@@ -1073,7 +1066,13 @@ private actor PerceptionListeningProbe {
     }
     var values: [Value] = []
     var finalRoots: [String] = []
+    var activities: [SpeechActivity] = []
     func record(_ envelope: OutputEnvelope) {
+        if case .communication(let action) = envelope.output,
+            let activity = action.message.content(as: SpeechActivity.self)
+        {
+            activities.append(activity)
+        }
         if case .communication(let action) = envelope.output,
             case .transcript(_, true)? = action.message.perception
         {
@@ -1190,6 +1189,7 @@ func completedASRContinuesWithoutAcknowledgmentAndPlaybackUsesRouteCapability(fu
     _ = try await speech.setListening(enabled: true, sessionID: session)
     try await speech.openCapture(sessionID: epoch)
     await speech.setCaptureDuplex(fullDuplex)
+    await speech.applyListeningMode(fullDuplex ? .full : .half)
 
     func frame(_ speaking: Bool, sequence: UInt64) throws -> AgentInput {
         let samples = [Float](repeating: speaking ? 0.1 : 0, count: speaking ? 1536 : 12800)
@@ -1636,4 +1636,177 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(await speech.playbackSnapshot(sessionID: session).periods.isEmpty)
     await speech.stop()
     await store.shutdown()
+}
+
+/// Feeds one spoken utterance (speech, then silence) so the endpoint finishes it.
+private func speakOneUtterance(_ speech: SpeechPerceptionAgent, epoch: String, from base: UInt64 = 0) async throws {
+    let origin = ContinuousClock.now
+    func frame(_ speaking: Bool, sequence: UInt64) throws -> AgentInput {
+        let samples = [Float](repeating: speaking ? 0.1 : 0, count: speaking ? 1536 : 12800)
+        let timestamp = Double(sequence / 2) * 1.2 + (speaking ? 0 : 0.096)
+        return AgentInput(
+            id: UUID().uuidString, sessionID: epoch,
+            payload: .audio(
+                try syntheticAudioInput(
+                    samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000,
+                    sequence: sequence, timestamp: timestamp, capturedAt: origin + .seconds(timestamp))))
+    }
+    try await processMicrophoneFixture(frame(true, sequence: base), using: speech)
+    try await processMicrophoneFixture(frame(false, sequence: base + 1), using: speech)
+}
+
+private func listeningFixture() async throws -> (
+    SpeechPerceptionAgent, String, PerceptionListeningProbe, Task<Void, Never>
+) {
+    let session = UUID().uuidString
+    let epoch = UUID().uuidString
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await speech.start()
+    let probe = PerceptionListeningProbe()
+    let pump = Task { for await envelope in speech.outputs { await probe.record(envelope) } }
+    _ = try await speech.setListening(enabled: true, sessionID: session)
+    try await speech.openCapture(sessionID: epoch)
+    return (speech, epoch, probe, pump)
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func quietModeStillPublishesFinalTextBecauseTheAssistantJudgesIt() async throws {
+    let (speech, epoch, probe, pump) = try await listeningFixture()
+    await speech.applyListeningMode(.quiet)
+    try await speakOneUtterance(speech, epoch: epoch)
+    await speech.stop()
+    await pump.value
+    #expect(await probe.finalRoots.count == 1)
+    let kinds = await probe.activities.map(\.kind)
+    let started = try #require(kinds.firstIndex(of: .onsetStarted))
+    #expect(started < (try #require(kinds.firstIndex(of: .onsetConfirmed))))
+    #expect(await probe.activities.filter { $0.kind == .onsetConfirmed }.allSatisfy { $0.utterance?.isEmpty == false })
+}
+
+private func listeningModeInput(
+    _ mode: ListeningMode, session: String, source: String = "assistant", origin: SignalOrigin = .agent
+) -> AgentInput {
+    let payload = InputPayload.observation(ListeningModeSignal(mode).message())
+    let id = UUID().uuidString
+    return AgentInput(
+        id: id, sessionID: session, payload: payload,
+        metadata: InputMetadata(
+            payload: payload, source: source, incarnation: "i", origin: origin, rootID: id,
+            topic: ListeningModeSignal.channel))
+}
+
+@Test(.actionCatalog) func speechActivityAndListeningModeContractsValidateTheirPayloads() throws {
+    let contracts = try AgentContracts.communication
+    for kind in SpeechActivity.Kind.allCases {
+        let activity = SpeechActivity(
+            kind, generation: "g", utterance: "u", fullDuplex: true)
+        #expect(try contracts.validatedSize(activity.message()) > 0)
+    }
+    #expect(try contracts.validatedSize(ListeningModeSignal(.quiet).message()) > 0)
+    // A confirmed onset without an utterance identity is not a fact.
+    #expect(throws: CommunicationError.invalidPayload) {
+        try contracts.validatedSize(SpeechActivity(.onsetConfirmed).message())
+    }
+    #expect(throws: CommunicationError.invalidPayload) {
+        try contracts.validatedSize(SpeechActivity(.captureStarted).message())
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func speechActivityAndListeningModeTravelOnlyThroughGatewayEvents() async throws {
+    let policy = try CommunicationPolicy(
+        contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
+    let session = UUID().uuidString
+    let manager = AgentManager()
+    let assistant = ObservationRecorder(id: "assistant")
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(), sessionID: session,
+        interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await manager.register(assistant, sessionID: session)
+    await assistant.start()
+    try await manager.register(speech, sessionID: session)
+    let input = InputGateway(manager: manager, policy: policy)
+    let scheduler = ChannelScheduler(registry: try testActionRegistry(handlers: [:]))
+    let output = await OutputGateway(
+        manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, sink: { _ in })
+    _ = try await output.consumer(for: assistant)
+    try await speech.bind(output.messaging(for: .speechPerception))
+    try await speech.start()
+    let outputTask = Task {
+        for await envelope in fixtureOutputs(speech) { try await output.dispatch(envelope) }
+    }
+    // Perception -> Assistant: the Assistant only subscribes; it never calls the perception Agent.
+    await speech.publishSpeech(SpeechActivity(.onsetConfirmed, utterance: "u1"))
+    for _ in 0..<2000 {
+        if await assistant.inputs.contains(where: { $0.payload.speechActivity?.kind == .onsetConfirmed }) { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    let delivered = try #require(await assistant.inputs.first { $0.payload.speechActivity != nil })
+    #expect(delivered.payload.speechActivity == SpeechActivity(.onsetConfirmed, utterance: "u1"))
+    #expect(delivered.metadata.source == AgentID.speechPerception.rawValue)
+    #expect(delivered.metadata.topic == SpeechActivity.channel && delivered.sessionID == session)
+    // Assistant -> Perception: the mode arrives as a subscribed Signal from the Assistant's own endpoint.
+    let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("listening.mode"))
+    try await output.messaging(for: .assistant).publish(ListeningModeSignal(.quiet).message(), parent: parent)
+    for _ in 0..<2000 {
+        if await speech.listeningMode == .quiet { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await speech.listeningMode == .quiet)
+    // Reply activity selects the short silence endpoint and is likewise only received as a subscribed Signal.
+    try await output.messaging(for: .assistant).publish(ReplyActivitySignal(active: true).message(), parent: parent)
+    for _ in 0..<2000 {
+        if await speech.replyActive { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await speech.replyActive)
+    await speech.stop()
+    try await outputTask.value
+    await scheduler.shutdown()
+    await manager.stopAll()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func listeningModeSignalIsAppliedOnlyFromTheSubscribedAssistant() async throws {
+    let session = UUID().uuidString
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "你好", includeFinal: true), vad: EndpointVAD(),
+        sessionID: session, interactionSessionID: session, residentListening: true,
+        speechDetection: { (3, 0.5) },
+        context: try AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    try await speech.start()
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await speech.receive(listeningModeInput(.quiet, session: session, source: "writer"))
+    }
+    await #expect(throws: CommunicationError.unauthorized) {
+        try await speech.receive(listeningModeInput(.quiet, session: session, origin: .local))
+    }
+    #expect(await speech.listeningMode == .default)
+    try await speech.receive(listeningModeInput(.quiet, session: session))
+    #expect(await speech.listeningMode == .quiet)
+    await speech.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func fullModeNeedsConfirmedEchoCancellation() async throws {
+    let (speech, _, _, pump) = try await listeningFixture()
+    // The Assistant decides whether `full` is allowed; perception only follows it when the capture confirmed echo
+    // cancellation.
+    await speech.applyListeningMode(.full)
+    await speech.setCaptureDuplex(false)
+    await speech.applyListeningMode(.half)
+    await speech.setCaptureDuplex(true)
+    await speech.applyListeningMode(.full)
+    #expect(await speech.acquirePlaybackAdmission())
+    await speech.stop()
+    await pump.value
 }

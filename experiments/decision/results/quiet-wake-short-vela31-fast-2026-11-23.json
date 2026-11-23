@@ -1,0 +1,1344 @@
+{
+  "version": 1,
+  "scope": "Python model-case evaluation; no App execution",
+  "provenance": {
+    "inputSHA256": "86d39304315693981d2d79076f96891bcc6392aa2d83949acefcb7ae517f2d3f",
+    "promptsSHA256": "ae331005babf214cce32d58650c3003baffdaaa7e8cafe4bc8b8d2f6eeacc948",
+    "runnerSHA256": "020e498e565cfa52cb777187bb14c2ba9e8ad98efddeb547d7300605f245102a",
+    "model": "vela31-fast",
+    "configSHA256": null,
+    "excludedWarmups": 2,
+    "environment": {
+      "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+      "python": "3.13.13"
+    }
+  },
+  "rows": [
+    {
+      "id": "invite-zh-01",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1856719072979254,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 167.85645799245685
+    },
+    {
+      "id": "invite-zh-02",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1823044401136584,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 163.79945806693286
+    },
+    {
+      "id": "invite-zh-03",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3798876329658616,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 158.8816250441596
+    },
+    {
+      "id": "invite-zh-04",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.21758476751023742,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 169.61112502031028
+    },
+    {
+      "id": "invite-zh-05",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.18489467966666098,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 144.92874999996275
+    },
+    {
+      "id": "invite-zh-06",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.23457689390309963,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 129.4890419812873
+    },
+    {
+      "id": "invite-zh-07",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3064496082467151,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 162.23695792723447
+    },
+    {
+      "id": "invite-zh-08",
+      "language": "zh-Hans",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1843649824087173,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 167.8310000570491
+    },
+    {
+      "id": "invite-en-01",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.055185967904855485,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 84.98000004328787
+    },
+    {
+      "id": "invite-en-02",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1249082972620644,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 100.93225003220141
+    },
+    {
+      "id": "invite-en-03",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03946458695731364,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 148.90679100062698
+    },
+    {
+      "id": "invite-en-04",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.09773132366808798,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 127.88558297324926
+    },
+    {
+      "id": "invite-en-05",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.17127421698368328,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 96.52583301067352
+    },
+    {
+      "id": "invite-en-06",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3875548337276306,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 107.53558401484042
+    },
+    {
+      "id": "invite-en-07",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.05136413349998077,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 109.46462489664555
+    },
+    {
+      "id": "invite-en-08",
+      "language": "en",
+      "group": "exit_invite",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.14238507330112393,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 155.353834037669
+    },
+    {
+      "id": "call-zh-01",
+      "language": "zh-Hans",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.35464723635035844,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 204.96341690886766
+    },
+    {
+      "id": "call-zh-02",
+      "language": "zh-Hans",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.4371575602172235,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 297.6412500720471
+    },
+    {
+      "id": "call-zh-03",
+      "language": "zh-Hans",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.144889005398364,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 422.8669999865815
+    },
+    {
+      "id": "call-zh-04",
+      "language": "zh-Hans",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3071972366703062,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 319.9612080352381
+    },
+    {
+      "id": "call-zh-05",
+      "language": "zh-Hans",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1601315069616012,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 354.04145799111575
+    },
+    {
+      "id": "call-zh-06",
+      "language": "zh-Hans",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.38682417443135675,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 445.0361249037087
+    },
+    {
+      "id": "call-en-01",
+      "language": "en",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.15058471067177207,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 490.0448330445215
+    },
+    {
+      "id": "call-en-02",
+      "language": "en",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1867802884921132,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 250.74887508526444
+    },
+    {
+      "id": "call-en-03",
+      "language": "en",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9909498667771575,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 208.56420893687755
+    },
+    {
+      "id": "call-en-04",
+      "language": "en",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.20115197791639133,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 170.199790969491
+    },
+    {
+      "id": "call-en-05",
+      "language": "en",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.10340724052437868,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 153.32208306062967
+    },
+    {
+      "id": "call-en-06",
+      "language": "en",
+      "group": "exit_call",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2628778422106469,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 201.23262505512685
+    },
+    {
+      "id": "discuss-zh-01",
+      "language": "zh-Hans",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3512073043275459,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 221.21187509037554
+    },
+    {
+      "id": "discuss-zh-02",
+      "language": "zh-Hans",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.40595289673819707,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 250.48449996393174
+    },
+    {
+      "id": "discuss-zh-03",
+      "language": "zh-Hans",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.34196735802186645,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 265.3968340018764
+    },
+    {
+      "id": "discuss-zh-04",
+      "language": "zh-Hans",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3209447697945084,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 224.8055828968063
+    },
+    {
+      "id": "discuss-en-01",
+      "language": "en",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.02113457864436412,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 121.2252089753747
+    },
+    {
+      "id": "discuss-en-02",
+      "language": "en",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.026059919631745025,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 112.08616697695106
+    },
+    {
+      "id": "discuss-en-03",
+      "language": "en",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.026467316597090666,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 94.9223330244422
+    },
+    {
+      "id": "discuss-en-04",
+      "language": "en",
+      "group": "exit_discuss",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.05907602006864129,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 101.4806249877438
+    },
+    {
+      "id": "continue-zh-01",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2993471110024285,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 183.1134168896824
+    },
+    {
+      "id": "continue-zh-02",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2529437988877977,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 168.89141604769975
+    },
+    {
+      "id": "continue-zh-03",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2028631415907555,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 190.84154104348272
+    },
+    {
+      "id": "continue-zh-04",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.24336724570528628,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 193.98916698992252
+    },
+    {
+      "id": "continue-zh-05",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2582289372450519,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 170.5589999910444
+    },
+    {
+      "id": "continue-zh-06",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.231749396391924,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 157.2059999452904
+    },
+    {
+      "id": "continue-zh-07",
+      "language": "zh-Hans",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.23742127750982686,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 144.07529204618186
+    },
+    {
+      "id": "continue-en-01",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.02912621571568969,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 90.33633302897215
+    },
+    {
+      "id": "continue-en-02",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0299527408619449,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 91.66112495586276
+    },
+    {
+      "id": "continue-en-03",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.021405245030482415,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 86.4067500224337
+    },
+    {
+      "id": "continue-en-04",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.02428605006118137,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 88.50083395373076
+    },
+    {
+      "id": "continue-en-05",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03011734631169614,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 84.32395791169256
+    },
+    {
+      "id": "continue-en-06",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.040350036128326654,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 80.72779199574143
+    },
+    {
+      "id": "continue-en-07",
+      "language": "en",
+      "group": "stay_continue",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.027526141513017386,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 80.1171250641346
+    },
+    {
+      "id": "other-zh-01",
+      "language": "zh-Hans",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.4092309722099877,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 128.7511660484597
+    },
+    {
+      "id": "other-zh-02",
+      "language": "zh-Hans",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.30128091329948875,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 132.63645896222442
+    },
+    {
+      "id": "other-zh-03",
+      "language": "zh-Hans",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.35453991754593994,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 131.26604189164937
+    },
+    {
+      "id": "other-zh-04",
+      "language": "zh-Hans",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.4157117339341626,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 131.05454202741385
+    },
+    {
+      "id": "other-zh-05",
+      "language": "zh-Hans",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2928402487413424,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 133.1108750309795
+    },
+    {
+      "id": "other-zh-06",
+      "language": "zh-Hans",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.24163519028126443,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 130.41404203977436
+    },
+    {
+      "id": "other-en-01",
+      "language": "en",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.05392801553215268,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 82.25633401889354
+    },
+    {
+      "id": "other-en-02",
+      "language": "en",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.13854686880794714,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 83.72291608247906
+    },
+    {
+      "id": "other-en-03",
+      "language": "en",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03623802898272065,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 84.62837501429021
+    },
+    {
+      "id": "other-en-04",
+      "language": "en",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.027428148380470686,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 86.725625093095
+    },
+    {
+      "id": "other-en-05",
+      "language": "en",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.042486890796027584,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 93.59049994964153
+    },
+    {
+      "id": "other-en-06",
+      "language": "en",
+      "group": "stay_other_person",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.04758778029506562,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 85.18999989610165
+    },
+    {
+      "id": "self-zh-01",
+      "language": "zh-Hans",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.27711789472064796,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 121.85045797377825
+    },
+    {
+      "id": "self-zh-02",
+      "language": "zh-Hans",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.22337052684584996,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 142.64600002206862
+    },
+    {
+      "id": "self-zh-03",
+      "language": "zh-Hans",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2906990020757568,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 133.89691698830575
+    },
+    {
+      "id": "self-zh-04",
+      "language": "zh-Hans",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.36736771427527953,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 154.32954102288932
+    },
+    {
+      "id": "self-zh-05",
+      "language": "zh-Hans",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1286470871968771,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 129.80041606351733
+    },
+    {
+      "id": "self-en-01",
+      "language": "en",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0381967864194735,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 105.24229099974036
+    },
+    {
+      "id": "self-en-02",
+      "language": "en",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03589501212116989,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 104.95654190890491
+    },
+    {
+      "id": "self-en-03",
+      "language": "en",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03705263384395574,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 114.0360840363428
+    },
+    {
+      "id": "self-en-04",
+      "language": "en",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.06435902158386249,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 142.57833396550268
+    },
+    {
+      "id": "self-en-05",
+      "language": "en",
+      "group": "stay_selftalk",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.013733407917562224,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 147.87679200526327
+    },
+    {
+      "id": "hold-zh-01",
+      "language": "zh-Hans",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.13797182056950721,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 234.42845791578293
+    },
+    {
+      "id": "hold-zh-02",
+      "language": "zh-Hans",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.35499402925906537,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 171.6825000476092
+    },
+    {
+      "id": "hold-zh-03",
+      "language": "zh-Hans",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.19884665545120503,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 159.01195793412626
+    },
+    {
+      "id": "hold-zh-04",
+      "language": "zh-Hans",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.12772534265941335,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 136.65324996691197
+    },
+    {
+      "id": "hold-zh-05",
+      "language": "zh-Hans",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.23469161255227097,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 129.53029200434685
+    },
+    {
+      "id": "hold-en-01",
+      "language": "en",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.053948616043947975,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 91.39945800416172
+    },
+    {
+      "id": "hold-en-02",
+      "language": "en",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.04052538149870808,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 100.1998329302296
+    },
+    {
+      "id": "hold-en-03",
+      "language": "en",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.07912378109035254,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 89.86637508496642
+    },
+    {
+      "id": "hold-en-04",
+      "language": "en",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.22510401747511866,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 97.83287497702986
+    },
+    {
+      "id": "hold-en-05",
+      "language": "en",
+      "group": "stay_hold",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.21574256058553218,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 109.2043329263106
+    },
+    {
+      "id": "mention-zh-01",
+      "language": "zh-Hans",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1601549877851156,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 164.7979160770774
+    },
+    {
+      "id": "mention-zh-02",
+      "language": "zh-Hans",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.17207447781445867,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 178.99966705590487
+    },
+    {
+      "id": "mention-zh-03",
+      "language": "zh-Hans",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.24128373403767991,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 166.17083398159593
+    },
+    {
+      "id": "mention-zh-04",
+      "language": "zh-Hans",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.22103762907937508,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 162.45491697918624
+    },
+    {
+      "id": "mention-zh-05",
+      "language": "zh-Hans",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.32978863250477947,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 165.71225004736334
+    },
+    {
+      "id": "mention-en-01",
+      "language": "en",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.08903725354223126,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 116.34316702838987
+    },
+    {
+      "id": "mention-en-02",
+      "language": "en",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.05993193574736724,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 119.74850005935878
+    },
+    {
+      "id": "mention-en-03",
+      "language": "en",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03694632352100127,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 123.76104202121496
+    },
+    {
+      "id": "mention-en-04",
+      "language": "en",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.09190130892183328,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 126.87970802653581
+    },
+    {
+      "id": "mention-en-05",
+      "language": "en",
+      "group": "stay_mention",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0605235555225156,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 162.05933294259012
+    },
+    {
+      "id": "ambiguous-zh-01",
+      "language": "zh-Hans",
+      "group": "ambiguous",
+      "expected": "exit",
+      "scored": false,
+      "prediction": "stay",
+      "score": 0.18294351713868992,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 136.64754200726748
+    },
+    {
+      "id": "ambiguous-zh-02",
+      "language": "zh-Hans",
+      "group": "ambiguous",
+      "expected": "exit",
+      "scored": false,
+      "prediction": "stay",
+      "score": 0.37672090230691435,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 159.04537495225668
+    },
+    {
+      "id": "ambiguous-zh-03",
+      "language": "zh-Hans",
+      "group": "ambiguous",
+      "expected": "stay",
+      "scored": false,
+      "prediction": "stay",
+      "score": 0.38637892855829936,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 144.84112500213087
+    },
+    {
+      "id": "ambiguous-en-01",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "exit",
+      "scored": false,
+      "prediction": "stay",
+      "score": 0.025285743243675197,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 109.49558299034834
+    },
+    {
+      "id": "ambiguous-en-02",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "stay",
+      "scored": false,
+      "prediction": "stay",
+      "score": 0.023186659599580065,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 138.89070902951062
+    },
+    {
+      "id": "ambiguous-en-03",
+      "language": "en",
+      "group": "ambiguous",
+      "expected": "stay",
+      "scored": false,
+      "prediction": "stay",
+      "score": 0.019253416842157735,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 129.09729196690023
+    }
+  ],
+  "complete": true,
+  "summary": {
+    "count": 98,
+    "scored": 92,
+    "excluded": 6,
+    "passed": 57,
+    "errors": 0,
+    "p50MS": 136.64754200726748,
+    "p95MS": 319.9612080352381
+  },
+  "metrics": {
+    "scoredCases": 92,
+    "stayCases": 56,
+    "exitCases": 36,
+    "falseWake": 0,
+    "missedExit": 35,
+    "invalid": 0,
+    "falseWakeRate": 0.0,
+    "missedExitRate": 0.9722222222222222,
+    "accuracy": 0.6195652173913043,
+    "byGroup": {
+      "exit_invite": {
+        "count": 16,
+        "passed": 0
+      },
+      "exit_call": {
+        "count": 12,
+        "passed": 1
+      },
+      "exit_discuss": {
+        "count": 8,
+        "passed": 0
+      },
+      "stay_continue": {
+        "count": 14,
+        "passed": 14
+      },
+      "stay_other_person": {
+        "count": 12,
+        "passed": 12
+      },
+      "stay_selftalk": {
+        "count": 10,
+        "passed": 10
+      },
+      "stay_hold": {
+        "count": 10,
+        "passed": 10
+      },
+      "stay_mention": {
+        "count": 10,
+        "passed": 10
+      }
+    },
+    "errors": 0
+  },
+  "metricsByLanguage": {
+    "zh-Hans": {
+      "scoredCases": 46,
+      "stayCases": 28,
+      "exitCases": 18,
+      "falseWake": 0,
+      "missedExit": 18,
+      "invalid": 0,
+      "falseWakeRate": 0.0,
+      "missedExitRate": 1.0,
+      "accuracy": 0.6086956521739131,
+      "byGroup": {
+        "exit_invite": {
+          "count": 8,
+          "passed": 0
+        },
+        "exit_call": {
+          "count": 6,
+          "passed": 0
+        },
+        "exit_discuss": {
+          "count": 4,
+          "passed": 0
+        },
+        "stay_continue": {
+          "count": 7,
+          "passed": 7
+        },
+        "stay_other_person": {
+          "count": 6,
+          "passed": 6
+        },
+        "stay_selftalk": {
+          "count": 5,
+          "passed": 5
+        },
+        "stay_hold": {
+          "count": 5,
+          "passed": 5
+        },
+        "stay_mention": {
+          "count": 5,
+          "passed": 5
+        }
+      },
+      "errors": 0
+    },
+    "en": {
+      "scoredCases": 46,
+      "stayCases": 28,
+      "exitCases": 18,
+      "falseWake": 0,
+      "missedExit": 17,
+      "invalid": 0,
+      "falseWakeRate": 0.0,
+      "missedExitRate": 0.9444444444444444,
+      "accuracy": 0.6304347826086957,
+      "byGroup": {
+        "exit_invite": {
+          "count": 8,
+          "passed": 0
+        },
+        "exit_call": {
+          "count": 6,
+          "passed": 1
+        },
+        "exit_discuss": {
+          "count": 4,
+          "passed": 0
+        },
+        "stay_continue": {
+          "count": 7,
+          "passed": 7
+        },
+        "stay_other_person": {
+          "count": 6,
+          "passed": 6
+        },
+        "stay_selftalk": {
+          "count": 5,
+          "passed": 5
+        },
+        "stay_hold": {
+          "count": 5,
+          "passed": 5
+        },
+        "stay_mention": {
+          "count": 5,
+          "passed": 5
+        }
+      },
+      "errors": 0
+    }
+  }
+}

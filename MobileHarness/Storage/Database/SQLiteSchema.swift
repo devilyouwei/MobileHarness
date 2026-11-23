@@ -2,13 +2,14 @@ import Foundation
 internal import GRDB
 
 enum SQLiteSchema {
-    static let currentVersion = 20_261_122
+    static let currentVersion = 20_261_123
     static let statements = [
         AgentMessageRow.schemaSQL, AgentMessageRow.evidenceSchemaSQL, AssistantConversationRow.schemaSQL,
         AssistantTaskRow.schemaSQL,
         WriterWorkspaceRow.schemaSQL, AssistantMessageRow.schemaSQL, SQLiteWriterExecutionRepository.schemaSQL,
         WriterMessageRow.schemaSQL,
         ModelRequestLogRow.schemaSQL, WorkspaceFileRow.schemaSQL, MediaFileRow.schemaSQL, DeviceRow.schemaSQL,
+        ListeningDialogRow.schemaSQL,
     ]
     static func prepare(_ pool: DatabasePool, resetWriterFilesAt: URL? = nil) throws {
         let installed = try pool.read { try Int.fetchOne($0, sql: "PRAGMA user_version") ?? 0 }

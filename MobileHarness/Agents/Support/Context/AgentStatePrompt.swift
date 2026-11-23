@@ -32,14 +32,14 @@ public enum AgentStatePrompt {
 
     /// The stable system-prompt section: declared variables, their meaning and allowed values.
     /// Access is deliberately not stated; a write to a read-only variable is rejected instead.
-    static func declarations(_ schema: AgentStateSchema) throws -> String {
+    static func declarations(_ schema: AgentStateSchema, agent: String? = nil) throws -> String {
         guard !schema.declarations.isEmpty else { return "" }
         let templates = try AgentPrompts.stateContext()
         let lines = try schema.declarations.values.sorted { $0.name < $1.name }.map { declaration in
             try templates.render(
                 "stateDeclaration",
                 variables: [
-                    "name": declaration.name, "meaning": meaning(declaration),
+                    "name": declaration.name, "meaning": try meaning(declaration, agent: agent),
                     "values": declaration.type == .enum
                         ? declaration.values.joined(separator: ", ") : declaration.type == .bool ? "true, false" : "",
                 ])
@@ -47,10 +47,9 @@ public enum AgentStatePrompt {
         return try templates.render("stateDeclarations", variables: ["declarations": lines.joined(separator: "\n")])
     }
 
-    private static func meaning(_ declaration: AgentStateDeclaration) -> String {
-        guard AgentPrompts.language == "zh-Hans" else { return declaration.meaning }
-        do { return try AgentPrompts.text("Shared/Descriptions", "state." + declaration.name) } catch {
-            return declaration.meaning
-        }
+    private static func meaning(_ declaration: AgentStateDeclaration, agent: String?) throws -> String {
+        guard let agent else { return declaration.meaning }
+        return try AgentConfigurations.localizedStateMeaning(
+            agent: agent, state: declaration.name, default: declaration.meaning)
     }
 }

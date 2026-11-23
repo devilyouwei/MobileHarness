@@ -17,6 +17,7 @@ public struct DatabaseRepositories: Sendable {
     public let logs: any ModelRequestLogRepository
     public let media: any MediaRepository
     public let devices: any DeviceRepository
+    public let listeningDialogs: any ListeningDialogRepository
 
     public init(
         assistantConversations: any AssistantConversationRepository, assistantMessages: any AssistantMessageRepository,
@@ -24,8 +25,9 @@ public struct DatabaseRepositories: Sendable {
         writerMessages: any WriterMessageRepository, writerExecutions: any WriterExecutionRepository,
         agentMessages: any AgentMessageRepository, logs: any ModelRequestLogRepository, media: any MediaRepository,
         devices: any DeviceRepository,
-        workspaces: any WorkspaceRepository
+        workspaces: any WorkspaceRepository, listeningDialogs: any ListeningDialogRepository
     ) {
+        self.listeningDialogs = listeningDialogs
         self.workspaces = workspaces
         self.assistantConversations = assistantConversations
         self.assistantMessages = assistantMessages
@@ -50,6 +52,7 @@ public protocol DatabaseStorage: Sendable {
     var logs: any ModelRequestLogRepository { get throws }
     var media: any MediaRepository { get throws }
     var devices: any DeviceRepository { get throws }
+    var listeningDialogs: any ListeningDialogRepository { get throws }
     func stateSnapshot() async throws -> StorageStateSnapshot
     func start() async throws
     func stop() async throws
@@ -60,6 +63,7 @@ public enum DatabasePhase: String, CaseIterable, Sendable {
     case unknown, cold, starting, ready, stopping, stopped, failed
 }
 extension DatabaseStorage {
+    public var listeningDialogs: any ListeningDialogRepository { get throws { throw RecordStorageError.invalidRecord } }
     public func stateSnapshot() async throws -> StorageStateSnapshot {
         try Task.checkCancellation()
         return .init(

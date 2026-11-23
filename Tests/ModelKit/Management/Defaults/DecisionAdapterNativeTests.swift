@@ -23,6 +23,34 @@ func d3TextInputPreservesLastTokensAndBuildsGraphInputs(count: Int) throws {
     #expect(throws: CapabilityError.self) { try D3TextInput(tokens: [Int(Int32.max) + 1]) }
 }
 
+@Test(arguments: [3, 503, 700])
+func layaTextInputKeepsHeadAndMostRecentBodyTokens(count: Int) throws {
+    let body = Array(100...99 + count)
+    let input = try LayaTextInput(
+        question: [11], options: [[12], [13]], text: body,
+        window: 512, headMaxLength: 256, optionTextTokens: 48,
+        cls: 1, sep: 2, pad: 0, mask: 3)
+    let head: [Int32] = [1, 11, 2, 3, 12, 3, 13, 2]
+    let bodyBudget = 512 - head.count - 1
+    let retained = body.suffix(bodyBudget).map(Int32.init)
+    let length = head.count + retained.count + 1
+    #expect(input.ids == head + retained + [2] + Array(repeating: 0, count: 512 - length))
+    #expect(input.markers == [3, 5])
+    #expect(input.attentionMask == Array(repeating: 1, count: length) + Array(repeating: 0, count: 512 - length))
+}
+
+@Test(arguments: [true, false])
+func layaTextInputRejectsOversizedQuestionOrOption(oversizedQuestion: Bool) {
+    let question = Array(repeating: 11, count: oversizedQuestion ? 253 : 1)
+    let option = Array(repeating: 12, count: oversizedQuestion ? 1 : 49)
+    #expect(throws: CapabilityError.self) {
+        try LayaTextInput(
+            question: question, options: [option, [13]], text: [100],
+            window: 512, headMaxLength: 256, optionTextTokens: 48,
+            cls: 1, sep: 2, pad: 0, mask: 3)
+    }
+}
+
 private struct AdapterParityInput: Decodable {
     struct Row: Decodable {
         let model: String
@@ -194,12 +222,15 @@ func decisionNewAdaptersNativeParity() async throws {
                 #expect(prediction == item.prediction, "\(item.id)")
                 #expect(abs(score - item.score) <= 0.001, "\(item.id)")
             }
-            // Oversize content must fail rather than truncate or fabricate a boolean.
             if name == "laya" {
                 let oversized = try NoulRequest(text: String(repeating: "a ", count: 9000), instructions: "Stop?")
                 let session = try await provider.noul(oversized)
-                await #expect(throws: (any Error).self) {
-                    try await session.withCleanup { for try await _ in session.events {} }
+                try await session.withCleanup {
+                    var results: [NoulResult] = []
+                    for try await result in session.events { results.append(result) }
+                    try #require(results.count == 1)
+                    let score = try #require(results.first?.score)
+                    #expect((0...1).contains(score))
                 }
             }
             await manager.shutdown()

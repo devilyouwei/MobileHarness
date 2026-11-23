@@ -19,6 +19,7 @@ public final class SQLiteRepositories: Sendable {
     public let media: SQLiteMediaRepository
     public let workspaces: SQLiteWorkspaceRepository
     public let devices: SQLiteDeviceRepository
+    public let listeningDialogs: SQLiteListeningDialogRepository
     var lastWriteChanges: Int { database.lastWriteChanges }
     var committedWriteCount: Int { database.committedWriteCount }
     public init(
@@ -46,6 +47,7 @@ public final class SQLiteRepositories: Sendable {
         logs = SQLiteModelRequestLogRepository(database: database)
         media = SQLiteMediaRepository(database: database)
         devices = SQLiteDeviceRepository(database: database)
+        listeningDialogs = SQLiteListeningDialogRepository(database: database)
         workspaces = SQLiteWorkspaceRepository(database: database)
     }
     public static func temporary() throws -> SQLiteRepositories {

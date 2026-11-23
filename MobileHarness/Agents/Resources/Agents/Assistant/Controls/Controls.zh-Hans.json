@@ -23,6 +23,11 @@
             "name": "note", "valueType": "string", "required": false,
             "description": "被替换旧值的摘要；仅在该变量驱动某个过程（如 task）且已有值时需要",
             "constraints": "长度有限", "values": []
+          },
+          {
+            "name": "wakeCondition", "valueType": "string", "required": false,
+            "description": "仅用于 listening=quiet。概括用户指定的恢复条件，保留用户要求的原词。",
+            "constraints": "可省略，非空，最多 512 UTF-8 字节", "values": []
           }
         ]
       }

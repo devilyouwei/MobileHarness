@@ -23,6 +23,11 @@
             "name": "note", "valueType": "string", "required": false,
             "description": "Summary of the value being replaced, when that variable drives a process (such as task) and already holds a value",
             "constraints": "Bounded text", "values": []
+          },
+          {
+            "name": "wakeCondition", "valueType": "string", "required": false,
+            "description": "The user’s condition for speaking again, only for listening=quiet. Preserve any exact words the user requires.",
+            "constraints": "Optional, nonempty, at most 512 UTF-8 bytes", "values": []
           }
         ]
       }

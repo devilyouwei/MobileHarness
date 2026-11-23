@@ -3,6 +3,48 @@ import ModelKit
 import ModelKitCoreAI
 import Tokenizers
 
+struct LayaTextInput {
+    let ids: [Int32]
+    let attentionMask: [Int32]
+    let markers: [Int]
+
+    init(
+        question: [Int], options: [[Int]], text: [Int],
+        window: Int, headMaxLength: Int, optionTextTokens: Int,
+        cls: Int, sep: Int, pad: Int, mask: Int
+    ) throws {
+        let optionCount = options.reduce(0) { $0 + $1.count + 1 }
+        let questionBudget = headMaxLength - optionCount
+        guard options.allSatisfy({ $0.count <= optionTextTokens }),
+            questionBudget >= 16, question.count <= questionBudget
+        else {
+            throw CapabilityError.invalidRequest("Laya question or options exceed capacity")
+        }
+
+        var tokens = [cls] + question + [sep]
+        var markers: [Int] = []
+        for option in options {
+            markers.append(tokens.count)
+            tokens += [mask] + option
+        }
+        let textBudget = window - tokens.count - 2
+        guard textBudget >= 0 else {
+            throw CapabilityError.invalidRequest("Laya input header exceeds capacity")
+        }
+        tokens.append(sep)
+        tokens.append(contentsOf: text.suffix(textBudget))
+        tokens.append(sep)
+        let length = tokens.count
+        tokens += Array(repeating: pad, count: window - length)
+        guard tokens.allSatisfy({ Int32(exactly: $0) != nil }) else {
+            throw CapabilityError.invalidRequest("Invalid Laya input tokens")
+        }
+        ids = tokens.map(Int32.init)
+        attentionMask = Array(repeating: 1, count: length) + Array(repeating: 0, count: window - length)
+        self.markers = markers
+    }
+}
+
 @available(iOS 27, macOS 27, *)
 public actor LayaDecision: DecisionCapability {
     private let artifacts: URL
@@ -146,32 +188,15 @@ public actor LayaDecision: DecisionCapability {
                 tokenizer.encode(text: text.replacingOccurrences(of: "<mask>", with: " "), addSpecialTokens: false)
             }
             let kind = noul ? "noul" : "choice"
-            let question = encode("\(kind) question: \(instructions)")
-            let options = candidates.map { encode(" " + $0) }
-            let optionCount = options.reduce(0) { $0 + $1.count + 1 }
-            let budget = config.headMaxLength - optionCount
-            // Reject the spans the upstream builder would truncate, instead of changing caller meaning.
-            guard options.allSatisfy({ $0.count <= config.optionTextTokens }), budget >= 16,
-                question.count <= max(8, budget)
-            else {
-                throw CapabilityError.invalidRequest(
-                    "Laya question or options exceed capacity; input was not truncated")
-            }
-            var ids = [config.clsTokenID] + question + [config.sepTokenID]
-            var markers: [Int] = []
-            for option in options {
-                markers.append(ids.count)
-                ids += [config.maskTokenID] + option
-            }
-            ids += [config.sepTokenID] + encode(text) + [config.sepTokenID]
-            guard ids.count <= config.window, ids.allSatisfy({ Int32(exactly: $0) != nil }) else {
-                throw CapabilityError.invalidRequest("Laya input exceeds capacity; input was not truncated")
-            }
-            let length = ids.count
-            ids += Array(repeating: config.padTokenID, count: config.window - length)
+            let input = try LayaTextInput(
+                question: encode("\(kind) question: \(instructions)"),
+                options: candidates.map { encode(" " + $0) }, text: encode(text),
+                window: config.window, headMaxLength: config.headMaxLength,
+                optionTextTokens: config.optionTextTokens,
+                cls: config.clsTokenID, sep: config.sepTokenID, pad: config.padTokenID, mask: config.maskTokenID)
             let result = try await main.run([
-                "input_ids": .int32(ids.map(Int32.init), shape: [1, config.window]),
-                "attention_mask": .int32((0..<config.window).map { $0 < length ? 1 : 0 }, shape: [1, config.window]),
+                "input_ids": .int32(input.ids, shape: [1, config.window]),
+                "attention_mask": .int32(input.attentionMask, shape: [1, config.window]),
                 "qtype_onehot": .float32(noul ? [0, 0, 1] : [1, 0, 0], shape: [1, 3]),
             ])
             guard let logits = result["token_logits"]?.floats(), logits.count == config.window,
@@ -179,7 +204,7 @@ public actor LayaDecision: DecisionCapability {
             else {
                 throw CapabilityError.invalidRequest("Invalid Laya readout")
             }
-            let raw = markers.map { logits[$0] }
+            let raw = input.markers.map { logits[$0] }
             let p = softmax(raw)
             let sorted = p.sorted(by: >)
             let k = Float(max(2, p.count))

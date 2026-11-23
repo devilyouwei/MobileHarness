@@ -79,6 +79,12 @@ public enum AgentStateError: Error, Equatable, Sendable {
     case noteRequired(String)
     /// The variable's process cannot end and restart inside one call in the current mode.
     case replacementUnavailable(String)
+    /// A declared trigger has no registered handler.
+    case unregisteredTrigger(String)
+    /// The variable's trigger is already running; handlers are not reentrant.
+    case triggerBusy(String)
+    /// The variable's trigger rejected the change, for example a mode the platform cannot provide.
+    case rejected(String, reason: String)
 }
 
 /// Who wrote a variable. Models are limited by `access`; the host and Agent code are not.
@@ -205,23 +211,19 @@ public struct AgentStateVariables: Codable, Sendable, Equatable {
     }
 }
 
-/// Behavior bound to a variable by name. Declared in `Agent.json` as `trigger`; the handler lives in the owning Agent.
-public enum AgentStateTrigger: String, Sendable {
-    /// A change of `task` opens or closes a goal interval and compresses the history it covered.
-    case task
-}
-
 /// An Agent's declared variables, built once from `Agent.json` at configuration load.
 public struct AgentStateSchema: Sendable, Equatable {
     public static let maximumDeclarations = 16
     public let declarations: [String: AgentStateDeclaration]
     public init(_ declarations: [AgentStateDeclaration] = []) throws {
         guard declarations.count <= Self.maximumDeclarations, Set(declarations.map(\.name)).count == declarations.count,
-            declarations.allSatisfy({ $0.trigger.map { AgentStateTrigger(rawValue: $0) != nil } ?? true })
+            declarations.allSatisfy({
+                $0.trigger.map { AgentStateVariables.validName($0.replacingOccurrences(of: ".", with: "_")) } ?? true
+            })
         else { throw AgentStateError.invalidDeclaration }
         self.declarations = Dictionary(uniqueKeysWithValues: declarations.map { ($0.name, $0) })
     }
-    public func declaration(boundTo trigger: AgentStateTrigger) -> AgentStateDeclaration? {
-        declarations.values.first { $0.trigger == trigger.rawValue }
+    public func declaration(boundTo trigger: String) -> AgentStateDeclaration? {
+        declarations.values.first { $0.trigger == trigger }
     }
 }

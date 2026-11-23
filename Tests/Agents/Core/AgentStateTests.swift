@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 
 @testable import Agents
@@ -18,12 +19,14 @@ private func schema() throws -> AgentStateSchema {
     ])
 }
 
-@Test func bundledAssistantDeclaresTaskAndQuiet() throws {
+@Test func bundledAssistantDeclaresTaskAndListening() throws {
     let schema = try AgentConfigurations.stateSchema(named: "Assistant")
-    #expect(schema.declaration(boundTo: .task)?.name == "task")
+    #expect(schema.declaration(boundTo: "task")?.name == "task")
     #expect(schema.declarations["task"]?.access == .readWrite)
-    #expect(schema.declarations["quiet"]?.kind == .typed)
-    #expect(schema.declarations["quiet"]?.access == .readOnly)
+    let listening = try #require(schema.declarations["listening"])
+    #expect(listening.kind == .typed && listening.type == .enum && listening.access == .readWrite)
+    #expect(listening.values == ["half", "full", "quiet"] && listening.trigger == "listening")
+    #expect(schema.declarations["quiet"] == nil)
     for name in ["Memory", "Writer", "Photographer", "ApplicationControl", "SpeechPerception", "VisionPerception"] {
         #expect(try AgentConfigurations.stateSchema(named: name).declarations.isEmpty)
     }
@@ -42,10 +45,11 @@ func invalidDeclarationsAreRejected(json: String) {
     #expect(throws: (any Error).self) { try declaration(json) }
 }
 
-@Test func unknownTriggerAndDuplicateNamesAreRejected() throws {
+@Test func unregisteredTriggerAndDuplicateNamesAreRejected() throws {
     let unknown = try declaration(
         #"{"name":"mood","kind":"typed","access":"readWrite","type":"text","meaning":"m","trigger":"alarm"}"#)
-    #expect(throws: AgentStateError.invalidDeclaration) { try AgentStateSchema([unknown]) }
+    let schema = try AgentStateSchema([unknown])
+    #expect(throws: AgentStateError.unregisteredTrigger("alarm")) { try AgentStateTriggers().validate(schema: schema) }
     let plain = try declaration(#"{"name":"mood","kind":"typed","access":"readWrite","type":"text","meaning":"m"}"#)
     #expect(throws: AgentStateError.invalidDeclaration) { try AgentStateSchema([plain, plain]) }
 }
@@ -203,4 +207,68 @@ func invalidNamesAreRejected(name: String) throws {
             #"{"name":"energy","kind":"typed","access":"readWrite","type":"enum","values":["x"],"meaning":"e"}"#)
     ])
     #expect(throws: AgentStateError.invalidValue("energy")) { try variables.validate(schema: other) }
+}
+
+@Test func everyDeclaredTriggerNeedsARegisteredHandler() throws {
+    let schema = try schema()
+    #expect(throws: AgentStateError.unregisteredTrigger("task")) {
+        try AgentStateTriggers().validate(schema: schema)
+    }
+    try AgentStateTriggers(["task": { _ in .handled }]).validate(schema: schema)
+}
+
+@Test func variablesWithoutTriggersPublishAndTriggersSeeTheWrite() async throws {
+    let schema = try schema()
+    let seen = Mutex<[AgentStateWrite]>([])
+    let triggers = try AgentStateTriggers([
+        "task": { write in
+            seen.withLock { $0.append(write) }
+            return .handled
+        }
+    ])
+    func write(_ name: String) -> AgentStateWrite {
+        .init(
+            name: name, old: nil, new: "x", note: "n", source: .model, sessionID: "s", inputID: "i", decisionID: "d")
+    }
+    #expect(try await triggers.apply(write("energy"), schema: schema) == .publish)
+    #expect(try await triggers.apply(write("task"), schema: schema) == .handled)
+    #expect(seen.withLock { $0.map(\.name) } == ["task"])
+}
+
+@Test func aRejectingTriggerPropagatesItsErrorAndIsReleased() async throws {
+    let schema = try schema()
+    let fail = Mutex(true)
+    let triggers = try AgentStateTriggers([
+        "task": { _ in
+            if fail.withLock({ $0 }) { throw AgentStateError.rejected("task", reason: "no") }
+            return .publish
+        }
+    ])
+    let write = AgentStateWrite(
+        name: "task", old: nil, new: "g", note: nil, source: .model, sessionID: "s", inputID: "i", decisionID: nil)
+    await #expect(throws: AgentStateError.rejected("task", reason: "no")) {
+        _ = try await triggers.apply(write, schema: schema)
+    }
+    fail.withLock { $0 = false }
+    #expect(try await triggers.apply(write, schema: schema) == .publish)
+}
+
+@Test func aTriggerIsNotReentrant() async throws {
+    let schema = try schema()
+    let gate = AsyncStream<Void>.makeStream()
+    let entered = AsyncStream<Void>.makeStream()
+    let triggers = try AgentStateTriggers([
+        "task": { _ in
+            entered.continuation.yield()
+            for await _ in gate.stream { break }
+            return .handled
+        }
+    ])
+    let write = AgentStateWrite(
+        name: "task", old: nil, new: "g", note: nil, source: .model, sessionID: "s", inputID: "i", decisionID: nil)
+    let first = Task { try await triggers.apply(write, schema: schema) }
+    for await _ in entered.stream { break }
+    await #expect(throws: AgentStateError.triggerBusy("task")) { _ = try await triggers.apply(write, schema: schema) }
+    gate.continuation.yield()
+    #expect(try await first.value == .handled)
 }

@@ -18,6 +18,12 @@ final class AssistantControlLink: Sendable {
         await assistant.speechPublicationFailed(input, reason: reason)
     }
 
+    /// The host writes one of the Assistant's own variables, such as `listening`.
+    func setHostState(_ name: String, to value: String?) async throws {
+        guard let assistant = agent.withLock({ $0 }) else { throw CommunicationError.unavailableTarget }
+        try await assistant.setHostState(name, to: value)
+    }
+
     /// The host clears the foreground goal (`task`) with a summary; it is a host write, not a model call.
     func clearForegroundTask(summary: String, sessionID: String) async throws {
         guard let assistant = agent.withLock({ $0 }) else { throw CommunicationError.unavailableTarget }
@@ -101,19 +107,13 @@ extension AssistantChatWorker {
 
     // MARK: State
 
-    /// The host writes the Agent's own variables, for example `quiet` from a do-not-disturb setting. `nil` clears.
+    /// The host writes the Agent's own variables, for example `listening` from a setting. `nil` clears.
     public func setHostState(_ name: String, to value: String?) async throws {
         let schema = try AgentConfigurations.stateSchema(named: State.configurationName)
-        guard schema.declaration(boundTo: .task)?.name != name else { throw AgentStateError.unknownVariable(name) }
-        try await contextRepository.transaction { context in
-            var variables = context.state.variables
-            if let value {
-                try variables.set(name, value, source: .host, schema: schema)
-            } else {
-                try variables.clear(name, source: .host, schema: schema)
-            }
-            context.state.variables = variables
-        }
+        guard schema.declaration(boundTo: "task")?.name != name else { throw AgentStateError.unknownVariable(name) }
+        try await applyStateWrite(
+            name, value: value, note: nil, source: .host, schema: schema, sessionID: "host",
+            inputID: UUID().uuidString, decisionID: nil)
     }
 
     /// `state.get`: an own variable by short name, or any state path the context can read.
@@ -123,14 +123,20 @@ extension AssistantChatWorker {
         else { throw CommunicationError.invalidPayload }
         guard path.contains(".") else {
             guard AgentStateVariables.validName(path) else { throw AgentStateError.invalidName(path) }
-            let visible = try await contextRepository.snapshot().state.visibleVariables(session: sessionID)
-            var fields: [String: String?] = ["name": path, "value": visible.value(path)]
+            let state = try await contextRepository.snapshot().state
+            let visible = state.visibleVariables(session: sessionID)
+            var fields: [String: Any] = ["name": path, "value": visible.value(path) as Any? ?? NSNull()]
             if let entry = visible.entries[path] {
                 fields["writtenAt"] = AgentStatePrompt.time(entry.writtenAt, language: AgentPrompts.language)
+                if path == "listening" {
+                    fields["value"] = [
+                        "mode": entry.value, "wakeCondition": state.listeningWakeCondition as Any? ?? NSNull(),
+                    ]
+                }
             }
             return String(
                 decoding: try JSONSerialization.data(
-                    withJSONObject: fields.mapValues { $0 ?? NSNull() as Any }, options: [.sortedKeys]),
+                    withJSONObject: fields, options: [.sortedKeys]),
                 as: UTF8.self)
         }
         guard let stateContext else { throw CommunicationError.invalidPayload }
@@ -144,28 +150,63 @@ extension AssistantChatWorker {
         decisionID: String?
     ) async throws {
         let setting = operation == .stateSet
-        guard Set(arguments.keys).isSubset(of: setting ? ["name", "value", "note"] : ["name", "note"]),
+        guard
+            Set(arguments.keys).isSubset(of: setting ? ["name", "value", "note", "wakeCondition"] : ["name", "note"]),
             let name = arguments["name"], !setting || arguments["value"] != nil,
             arguments.values.allSatisfy({ $0.utf8.count <= 4096 })
         else { throw CommunicationError.invalidPayload }
         let schema = try AgentConfigurations.stateSchema(named: State.configurationName)
         let source: AgentStateSource = decisionID == nil ? .host : .model
         let note = arguments["note"]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        if schema.declaration(boundTo: .task)?.name == name {
-            try await writeTask(
-                setting: setting, name: name, value: arguments["value"], note: note, source: source,
-                schema: schema, sessionID: sessionID, inputID: inputID, decisionID: decisionID)
-        } else {
-            try await contextRepository.transaction { context in
-                var variables = context.state.variables
-                if setting {
-                    try variables.set(name, arguments["value"] ?? "", source: source, schema: schema, note: note)
-                } else {
-                    try variables.clear(name, source: source, schema: schema, note: note)
-                }
-                context.state.variables = variables
+        try await applyStateWrite(
+            name, value: setting ? arguments["value"] : nil, note: note, source: source, schema: schema,
+            sessionID: sessionID, inputID: inputID, decisionID: decisionID, wakeCondition: arguments["wakeCondition"])
+    }
+
+    /// The single write path for the model and the host: validate, run the variable's trigger, then publish. A
+    /// trigger that throws leaves the table unchanged.
+    private func applyStateWrite(
+        _ name: String, value: String?, note: String?, source: AgentStateSource, schema: AgentStateSchema,
+        sessionID: String, inputID: String, decisionID: String?, wakeCondition: String? = nil
+    ) async throws {
+        try AgentStateVariables.checkWritable(name, source: source, schema: schema)
+        let new = try value.map { try AgentStateVariables.normalized(name, $0, source: source, schema: schema) }
+        let condition = wakeCondition?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let condition {
+            guard name == "listening", new == ListeningMode.quiet.rawValue, !condition.isEmpty else {
+                throw AgentStateError.invalidValue(name)
             }
+            guard condition.utf8.count <= 512 else { throw AgentStateError.valueTooLong(name) }
+            guard condition != QuietExitJudge.literalPrefix else { throw AgentStateError.invalidValue(name) }
         }
+        let old = try await contextRepository.snapshot().state.variables.value(name)
+        let write = AgentStateWrite(
+            name: name, old: old, new: new, note: note, source: source, sessionID: sessionID, inputID: inputID,
+            decisionID: decisionID, wakeCondition: condition)
+        guard try await stateTriggers.apply(write, schema: schema) == .publish else { return }
+        try await contextRepository.transaction { context in
+            var variables = context.state.variables
+            if name == "listening" {
+                if new != ListeningMode.quiet.rawValue || old != new || condition != nil {
+                    context.state.listeningWakeCondition = condition
+                }
+            }
+            if let new {
+                try variables.set(name, new, source: source, schema: schema, note: note)
+            } else {
+                try variables.clear(name, source: source, schema: schema, note: note)
+            }
+            context.state.variables = variables
+        }
+    }
+
+    /// The `task` trigger handler: the goal record owns the value, so nothing is published afterwards.
+    func taskTrigger(_ write: AgentStateWrite) async throws -> AgentStateTriggerOutcome {
+        let schema = try AgentConfigurations.stateSchema(named: State.configurationName)
+        try await writeTask(
+            setting: write.new != nil, name: write.name, value: write.new, note: write.note, source: write.source,
+            schema: schema, sessionID: write.sessionID, inputID: write.inputID, decisionID: write.decisionID)
+        return .handled
     }
 
     /// The `task` trigger: setting opens a goal interval, clearing (or replacing) closes it with a summary and compresses

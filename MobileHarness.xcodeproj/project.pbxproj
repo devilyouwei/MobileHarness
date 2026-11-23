@@ -104,6 +104,7 @@
 		02938B3D11B3AF2EA1C798C2 /* MobileHarness/ModelKit/Support/Management/ArtifactDownloadTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Management/ArtifactDownloadTransport.swift; sourceTree = SOURCE_ROOT; };
 		02CCF12BCC4E262D26354DB9 /* MobileHarness/Actions/Speech/Playback/PlaybackActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Speech/Playback/PlaybackActions.swift; sourceTree = SOURCE_ROOT; };
 		A9B80D9CB4E84585A7E25F06 /* MobileHarness/Agents/Assistant/Input/AssistantInterrupt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Input/AssistantInterrupt.swift; sourceTree = SOURCE_ROOT; };
+		11B8439510FA8159CCB53B2F /* MobileHarness/Agents/Assistant/Input/AssistantListeningSignal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Input/AssistantListeningSignal.swift; sourceTree = SOURCE_ROOT; };
 		030F9B6E8105611E7D166CA0 /* MobileHarness/Agents/Assistant/Workflow/AssistantSessionControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Workflow/AssistantSessionControl.swift; sourceTree = SOURCE_ROOT; };
 		033921DB57B8F2B4CE6B88D5 /* MobileHarness/Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text; path = MobileHarness/Resources/PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
 		03AAD66C0054208C42F650D3 /* MobileHarness/ModelKit/Speech/TTS/SpeechSynthesisCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Speech/TTS/SpeechSynthesisCapability.swift; sourceTree = SOURCE_ROOT; };
@@ -239,6 +240,8 @@
 		2CE1471CEDE4426FC229BD5B /* MobileHarness/Actions/Support/Contracts/DeviceConnectionFacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/DeviceConnectionFacts.swift; sourceTree = SOURCE_ROOT; };
 		2CFC5702120108203BE26341 /* MobileHarness/Agents/Support/Context/AgentStateContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Context/AgentStateContext.swift; sourceTree = SOURCE_ROOT; };
 		7A91C0DE5F2B4A6D8E1C3F01 /* MobileHarness/Agents/Support/Context/AgentStateVariables.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Context/AgentStateVariables.swift; sourceTree = SOURCE_ROOT; };
+		F5EDF69DA185122D25DCE0E1 /* MobileHarness/Agents/Support/Context/ListeningMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Context/ListeningMode.swift; sourceTree = SOURCE_ROOT; };
+		216852CBC1E7A43DD11B3A2A /* MobileHarness/Agents/Support/Context/AgentStateTriggers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Context/AgentStateTriggers.swift; sourceTree = SOURCE_ROOT; };
 		7A91C0DE5F2B4A6D8E1C3F02 /* MobileHarness/Agents/Support/Context/AgentStatePrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Context/AgentStatePrompt.swift; sourceTree = SOURCE_ROOT; };
 		2D157138DC68F243760F03B1 /* Tests/Gateway/Input/DeviceInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Gateway/Input/DeviceInputTests.swift; sourceTree = SOURCE_ROOT; };
 		2D44B104EC71048FB5ED3B46 /* MobileHarness/Actions/NexArm/Motion/NexArmSimpleActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/NexArm/Motion/NexArmSimpleActions.swift; sourceTree = SOURCE_ROOT; };
@@ -314,11 +317,14 @@
 		47E28FC6D5D1140A49851528 /* MobileHarness/Agents/ApplicationControl/ApplicationEnvironmentInputs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/ApplicationControl/ApplicationEnvironmentInputs.swift; sourceTree = SOURCE_ROOT; };
 		47F7C357EE69543B7BC4EDE3 /* MobileHarness/Agents/Resources/Agents/VisionPerception/Agent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/VisionPerception/Agent.json; sourceTree = SOURCE_ROOT; };
 		47F9A067336DB25F00F0B2E0 /* MobileHarness/Agents/SpeechPerception/SpeechPerceptionAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/SpeechPerceptionAgent.swift; sourceTree = SOURCE_ROOT; };
+		E496067424FB9074B11F8DDB /* MobileHarness/Agents/Assistant/Input/ListeningCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Input/ListeningCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		3AD863AB93FC99B18157B48D /* MobileHarness/Agents/Assistant/Input/QuietExitJudge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Input/QuietExitJudge.swift; sourceTree = SOURCE_ROOT; };
 		48134E52CF1C0A1CF7F92247 /* MobileHarness/Agents/Support/Core/AgentInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/AgentInput.swift; sourceTree = SOURCE_ROOT; };
 		4832129A7E807EF9F35F23C1 /* MobileHarness/Agents/SpeechPerception/AudioDetectionAgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/SpeechPerception/AudioDetectionAgentSession.swift; sourceTree = SOURCE_ROOT; };
 		49700296F5A58923C850A4CD /* Tests/PlatformKit/Audio/PCMResamplerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/PlatformKit/Audio/PCMResamplerTests.swift; sourceTree = SOURCE_ROOT; };
 		4A211CE834E48E6E713A747E /* MobileHarness/Actions/Support/Contracts/AudioDetectionReadiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/AudioDetectionReadiness.swift; sourceTree = SOURCE_ROOT; };
 		4AA74FB9D6E39393B58815D7 /* MobileHarness/Agents/Support/Communication/PerceptionMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Communication/PerceptionMessage.swift; sourceTree = SOURCE_ROOT; };
+		E005B8B4F953F0F56A327144 /* MobileHarness/Agents/Support/Communication/SpeechActivityMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Communication/SpeechActivityMessage.swift; sourceTree = SOURCE_ROOT; };
 		4AB72D3D37000185EFCAA26D /* MobileHarness/Actions/System/Provider/ProviderSettingsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/Provider/ProviderSettingsClient.swift; sourceTree = SOURCE_ROOT; };
 		4B3B8223B75A8F17C2B1C520 /* MobileHarness/Actions/Support/Contracts/ContainerContextValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ContainerContextValue.swift; sourceTree = SOURCE_ROOT; };
 		4B6363F69115CB26B9205DEB /* MobileHarness/ModelKit/Support/Management/ModelManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Management/ModelManager.swift; sourceTree = SOURCE_ROOT; };
@@ -401,6 +407,8 @@
 		67EB1A335E60484475A6133A /* MobileHarness/PlatformKit/Audio/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/PlatformKit/Audio/README.md; sourceTree = SOURCE_ROOT; };
 		6856FBB4AA8D3FC36EA00FB6 /* MobileHarness/ModelKit/Speech/ASR/Apple/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/ModelKit/Speech/ASR/Apple/README.md; sourceTree = SOURCE_ROOT; };
 		686506DB6C601AC8D86B3DAC /* MobileHarness/Agents/Resources/Agents/SpeechPerception/Agent.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/SpeechPerception/Agent.json; sourceTree = SOURCE_ROOT; };
+		B4002D26643047CD4BF0CEE0 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		4A3F7E5EAC1FE45FE4D6DF00 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.json; sourceTree = SOURCE_ROOT; };
 		68C0CA879728745E1744D627 /* MobileHarness/Agents/Support/Core/Input/AudioInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Input/AudioInput.swift; sourceTree = SOURCE_ROOT; };
 		6907B3334337A9D5718D4EBF /* Tests/ModelKit/Core/InferenceTaskControlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ModelKit/Core/InferenceTaskControlTests.swift; sourceTree = SOURCE_ROOT; };
 		696DC5B29556C63692FC64DA /* MobileHarness/Actions/Support/Contracts/ActionReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionReport.swift; sourceTree = SOURCE_ROOT; };
@@ -890,6 +898,7 @@
 		D5F91FB2C73C87974F4ECD4C /* Tests/Agents/Core/AgentArchitectureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/AgentArchitectureTests.swift; sourceTree = SOURCE_ROOT; };
 		549FF70F97F7171AFEE17B83 /* Tests/Agents/Core/AgentContainerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/AgentContainerTests.swift; sourceTree = SOURCE_ROOT; };
 		5464A90C8BA29E235E6A58BE /* Tests/Agents/Core/AgentSpecialistTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/AgentSpecialistTests.swift; sourceTree = SOURCE_ROOT; };
+		EE3375D305C51BF846AB1E51 /* Tests/Agents/Core/AgentStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/AgentStateTests.swift; sourceTree = SOURCE_ROOT; };
 		A581109E322E0E6ADCB57EC2 /* Tests/Agents/Core/AgentTaskSkillTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/AgentTaskSkillTests.swift; sourceTree = SOURCE_ROOT; };
 		087429E074E718445F72A10E /* Tests/Agents/Core/BehaviorTranslationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/BehaviorTranslationTests.swift; sourceTree = SOURCE_ROOT; };
 		70B0740E6D11C08F9E56B24F /* Tests/Agents/Core/CommunicationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Core/CommunicationTests.swift; sourceTree = SOURCE_ROOT; };
@@ -947,6 +956,7 @@
 		1E3ADEFCCEC5C5BFBF3921E7 /* Tests/Agents/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Tests/Agents/README.md; sourceTree = SOURCE_ROOT; };
 		79F6833D28E63EF29CB35706 /* Tests/Agents/SpeechPerception/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Tests/Agents/SpeechPerception/README.md; sourceTree = SOURCE_ROOT; };
 		58498A9CE0CF1CD73F33E8E9 /* Tests/Agents/SpeechPerception/SoundSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/SpeechPerception/SoundSourceTests.swift; sourceTree = SOURCE_ROOT; };
+		862ECF5EDA6ABEDCE197379D /* Tests/Agents/Assistant/ListeningModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Assistant/ListeningModeTests.swift; sourceTree = SOURCE_ROOT; };
 		3FCA83FC10EEE4A87C8199B8 /* Tests/Agents/SpeechPerception/SpeechEnhancementWorkflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/SpeechPerception/SpeechEnhancementWorkflowTests.swift; sourceTree = SOURCE_ROOT; };
 		BDEF096996342220DB1C0801 /* Tests/Agents/Support/ContainerExecutionFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Support/ContainerExecutionFixtures.swift; sourceTree = SOURCE_ROOT; };
 		24AF3F589F52324D60E1BE8C /* Tests/Agents/Support/DirectInputSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/Agents/Support/DirectInputSupport.swift; sourceTree = SOURCE_ROOT; };
@@ -1370,7 +1380,21 @@
 		1F01319DEDB204EAFEEB8A37 /* MobileHarness/Agents/Resources/Agents/Shared/ActionCatalog.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/ActionCatalog.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		C094BF454EB3976460DC5A9F /* MobileHarness/Agents/Resources/Agents/Shared/AgentCatalog.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/AgentCatalog.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		27D06F37B635A01C75590DED /* MobileHarness/Agents/Resources/Agents/Shared/CommunicationContext.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/CommunicationContext.zh-Hans.json; sourceTree = SOURCE_ROOT; };
-		F484BDC9F98BA95C4E46C885 /* MobileHarness/Agents/Resources/Agents/Shared/Descriptions.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/Descriptions.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		83E153A741E2934A6E0AD0B1 /* MobileHarness/Agents/Resources/Agents/ApplicationControl/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/ApplicationControl/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		80F99FFD8BC3D6CCD8209F78 /* MobileHarness/Agents/Resources/Agents/Assistant/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Assistant/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		D3C930540305F1FB9D7A6202 /* MobileHarness/Agents/Resources/Agents/Memory/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Memory/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		C8235C1E386BEDDC6E8F362E /* MobileHarness/Agents/Resources/Agents/Photographer/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Photographer/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		E064A09722FB3851125FC803 /* MobileHarness/Agents/Resources/Agents/SpeechPerception/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/SpeechPerception/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		77867856ADC45FFB40B0CF4C /* MobileHarness/Agents/Resources/Agents/VisionPerception/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/VisionPerception/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		BE5A747B8A0392486418B1AF /* MobileHarness/Agents/Resources/Agents/Writer/Agent.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Writer/Agent.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		DFD207812B752AE2936F5104 /* MobileHarness/Agents/Resources/Skills/ApplicationControl/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/ApplicationControl/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		CCD5D955E2DA7F9AECC0213B /* MobileHarness/Agents/Resources/Skills/BasicInteraction/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/BasicInteraction/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		B040CC9DDD018F3231F6B100 /* MobileHarness/Agents/Resources/Skills/HistoryQuery/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/HistoryQuery/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		D39724AE3A23BB496399EC5D /* MobileHarness/Agents/Resources/Skills/Photography/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/Photography/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		695486312E9BB406605D608C /* MobileHarness/Agents/Resources/Skills/RobotInteraction/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/RobotInteraction/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		BDC6881404C448284B2D131C /* MobileHarness/Agents/Resources/Skills/WebBrowsing/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/WebBrowsing/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		52070E6F66119ECE1E4FF377 /* MobileHarness/Agents/Resources/Skills/WriterFileEditing/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/WriterFileEditing/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
+		B36C5CCC8CB95BDFC7D2916C /* MobileHarness/Agents/Resources/Skills/WriterWorkspace/Skill.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Skills/WriterWorkspace/Skill.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		891CAF902A2F884577F86542 /* MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.zh-Hans.json; sourceTree = SOURCE_ROOT; };
 		E664F3244F0580922218709F /* MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.zh-Hans.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.zh-Hans.md; sourceTree = SOURCE_ROOT; };
 		69FEF80249E2B564B7373245 /* MobileHarness/Agents/Resources/Agents/Shared/StateContext.zh-Hans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Shared/StateContext.zh-Hans.json; sourceTree = SOURCE_ROOT; };
@@ -1782,6 +1806,7 @@
 				6B8F2D1E4CA05B7392E1D2F3 /* MobileHarness/Agents/Support/Communication/AgentImplementations.swift */,
 				0F843ADC9EFC1EF71CF80700 /* MobileHarness/Agents/Support/Communication/AgentTasks.swift */,
 				4AA74FB9D6E39393B58815D7 /* MobileHarness/Agents/Support/Communication/PerceptionMessage.swift */,
+				E005B8B4F953F0F56A327144 /* MobileHarness/Agents/Support/Communication/SpeechActivityMessage.swift */,
 				41F39965304D96B0FBEFA698 /* MobileHarness/Agents/Support/Communication/PoseObservation.swift */,
 				C93C3F76B99AB85EA609A70F /* MobileHarness/Agents/Support/Communication/README.md */,
 				F5D5C6D562FB7C3148CAEDF9 /* MobileHarness/Agents/Support/Communication/SoundSourceObservation.swift */,
@@ -3085,6 +3110,8 @@
 				B22F8D9C021DAC48E285F407 /* MobileHarness/Agents/Support/Context/AgentFixedTaskCoordinator.swift */,
 				2CFC5702120108203BE26341 /* MobileHarness/Agents/Support/Context/AgentStateContext.swift */,
 				7A91C0DE5F2B4A6D8E1C3F01 /* MobileHarness/Agents/Support/Context/AgentStateVariables.swift */,
+				F5EDF69DA185122D25DCE0E1 /* MobileHarness/Agents/Support/Context/ListeningMode.swift */,
+				216852CBC1E7A43DD11B3A2A /* MobileHarness/Agents/Support/Context/AgentStateTriggers.swift */,
 				7A91C0DE5F2B4A6D8E1C3F02 /* MobileHarness/Agents/Support/Context/AgentStatePrompt.swift */,
 				832B462F32120652B694A305 /* MobileHarness/Agents/Support/Context/AgentTaskSkillState.swift */,
 				9CAB269A7CB58933F8202D69 /* MobileHarness/Agents/Support/Context/README.md */,
@@ -3309,6 +3336,7 @@
 				F1FF0F32A8806E8E81CBE0AA /* Tests/Agents/Core/AgentConfigurationTests.swift */,
 				549FF70F97F7171AFEE17B83 /* Tests/Agents/Core/AgentContainerTests.swift */,
 				5464A90C8BA29E235E6A58BE /* Tests/Agents/Core/AgentSpecialistTests.swift */,
+				EE3375D305C51BF846AB1E51 /* Tests/Agents/Core/AgentStateTests.swift */,
 				A581109E322E0E6ADCB57EC2 /* Tests/Agents/Core/AgentTaskSkillTests.swift */,
 				087429E074E718445F72A10E /* Tests/Agents/Core/BehaviorTranslationTests.swift */,
 				70B0740E6D11C08F9E56B24F /* Tests/Agents/Core/CommunicationTests.swift */,
@@ -3340,6 +3368,7 @@
 			children = (
 				79F6833D28E63EF29CB35706 /* Tests/Agents/SpeechPerception/README.md */,
 				58498A9CE0CF1CD73F33E8E9 /* Tests/Agents/SpeechPerception/SoundSourceTests.swift */,
+				862ECF5EDA6ABEDCE197379D /* Tests/Agents/Assistant/ListeningModeTests.swift */,
 				3FCA83FC10EEE4A87C8199B8 /* Tests/Agents/SpeechPerception/SpeechEnhancementWorkflowTests.swift */,
 				F64FF8B74AF8D86090F7CDCD /* Tests/Agents/SpeechPerception/VoiceTests.swift */,
 			);
@@ -4311,6 +4340,9 @@
 				30C2B5A7A1F14E4C8E3BF999 /* MobileHarness/Agents/Assistant/Input/AssistantInputBatch.swift */,
 				108EA0410652EAC3804B4996 /* MobileHarness/Agents/Assistant/Input/AssistantInputDecision.swift */,
 				A9B80D9CB4E84585A7E25F06 /* MobileHarness/Agents/Assistant/Input/AssistantInterrupt.swift */,
+				11B8439510FA8159CCB53B2F /* MobileHarness/Agents/Assistant/Input/AssistantListeningSignal.swift */,
+				3AD863AB93FC99B18157B48D /* MobileHarness/Agents/Assistant/Input/QuietExitJudge.swift */,
+				E496067424FB9074B11F8DDB /* MobileHarness/Agents/Assistant/Input/ListeningCoordinator.swift */,
 				259974B62591A6115A605E5E /* MobileHarness/Agents/Assistant/Input/AssistantChatInput.swift */,
 			);
 			name = Input;
@@ -4421,6 +4453,8 @@
 				8D6FA9F05C56F7EBDFAE1183 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/InputDecision.json */,
 				5C8B7BBF618A8F79E93F4F58 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/InputDecision.zh-Hans.json */,
 				C1570F19F40EF0CB3879EEDB /* MobileHarness/Agents/Resources/Agents/Assistant/Input/InputProtocol.json */,
+				B4002D26643047CD4BF0CEE0 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.zh-Hans.json */,
+				4A3F7E5EAC1FE45FE4D6DF00 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/QuietExit.json */,
 				905048FEB965D15AE5BB2774 /* MobileHarness/Agents/Resources/Agents/Assistant/Input/InputProtocol.zh-Hans.json */,
 			);
 			name = Input;
@@ -4467,7 +4501,21 @@
 				C094BF454EB3976460DC5A9F /* MobileHarness/Agents/Resources/Agents/Shared/AgentCatalog.zh-Hans.json */,
 				2617BD3A6BC40BC98C05D830 /* MobileHarness/Agents/Resources/Agents/Shared/CommunicationContext.json */,
 				27D06F37B635A01C75590DED /* MobileHarness/Agents/Resources/Agents/Shared/CommunicationContext.zh-Hans.json */,
-				F484BDC9F98BA95C4E46C885 /* MobileHarness/Agents/Resources/Agents/Shared/Descriptions.zh-Hans.json */,
+				83E153A741E2934A6E0AD0B1 /* MobileHarness/Agents/Resources/Agents/ApplicationControl/Agent.zh-Hans.json */,
+				80F99FFD8BC3D6CCD8209F78 /* MobileHarness/Agents/Resources/Agents/Assistant/Agent.zh-Hans.json */,
+				D3C930540305F1FB9D7A6202 /* MobileHarness/Agents/Resources/Agents/Memory/Agent.zh-Hans.json */,
+				C8235C1E386BEDDC6E8F362E /* MobileHarness/Agents/Resources/Agents/Photographer/Agent.zh-Hans.json */,
+				E064A09722FB3851125FC803 /* MobileHarness/Agents/Resources/Agents/SpeechPerception/Agent.zh-Hans.json */,
+				77867856ADC45FFB40B0CF4C /* MobileHarness/Agents/Resources/Agents/VisionPerception/Agent.zh-Hans.json */,
+				BE5A747B8A0392486418B1AF /* MobileHarness/Agents/Resources/Agents/Writer/Agent.zh-Hans.json */,
+				DFD207812B752AE2936F5104 /* MobileHarness/Agents/Resources/Skills/ApplicationControl/Skill.zh-Hans.json */,
+				CCD5D955E2DA7F9AECC0213B /* MobileHarness/Agents/Resources/Skills/BasicInteraction/Skill.zh-Hans.json */,
+				B040CC9DDD018F3231F6B100 /* MobileHarness/Agents/Resources/Skills/HistoryQuery/Skill.zh-Hans.json */,
+				D39724AE3A23BB496399EC5D /* MobileHarness/Agents/Resources/Skills/Photography/Skill.zh-Hans.json */,
+				695486312E9BB406605D608C /* MobileHarness/Agents/Resources/Skills/RobotInteraction/Skill.zh-Hans.json */,
+				BDC6881404C448284B2D131C /* MobileHarness/Agents/Resources/Skills/WebBrowsing/Skill.zh-Hans.json */,
+				52070E6F66119ECE1E4FF377 /* MobileHarness/Agents/Resources/Skills/WriterFileEditing/Skill.zh-Hans.json */,
+				B36C5CCC8CB95BDFC7D2916C /* MobileHarness/Agents/Resources/Skills/WriterWorkspace/Skill.zh-Hans.json */,
 				283C39956B73E04A5E833F36 /* MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.json */,
 				891CAF902A2F884577F86542 /* MobileHarness/Agents/Resources/Agents/Shared/ExecutionFeedback.zh-Hans.json */,
 				E6C824E20E6C9D2BD1776CD0 /* MobileHarness/Agents/Resources/Agents/Shared/OutputProtocol.md */,

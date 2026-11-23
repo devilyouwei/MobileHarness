@@ -202,6 +202,7 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
 - [Mac 本地 Decision 多分类对照](Decision-Model-Mac-Comparison.md)记录全双工多分类的模型、提示词和时延对照。
+- [quiet 退出判定评估](Quiet-Exit-Evaluation.md)记录最新一句话结束 quiet 的 92 条中英用例在 D3、Vela、Laya、Apple 系统模型与云端 qwen3.8-flash 上的准确率、误唤醒与时延，并含简化为“是否要求唤醒”是非问句的提示词变体。
 - [Mac 本地 Decision 打断意图二分类实验](Decision-Binary-Interrupt-Mac-Comparison.md)记录 D3 Edge 与 Vela3 Fast 的三波对照，包括单句、中英提示与 noul／choice、历史上下文。
 - [Decision prompt language split](Decision-Model-Mac-Comparison.md#decision-prompt-language-split) compares the current English and Chinese prompts with the pre-split mixed prompt using native D3 and the application adoption policy.
 - [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。

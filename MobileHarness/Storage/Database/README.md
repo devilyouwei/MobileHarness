@@ -29,6 +29,7 @@ AssistantRecordStore 注入本侧会话、消息、任务摘要和日志端口�
 | [ModelRequestLog](ModelRequestLog/README.md) / model_request_log | 可删除 HTTP 请求/响应、图片、参数和 generation meta |
 | [MediaFiles](MediaFiles/README.md) / media_files | 独立相册媒体及清理状态 |
 | [Devices](#devices) / devices | 原生设备身份、选择与重连 |
+| [ListeningDialogs](ListeningDialogs/README.md) / listening_dialogs | `quiet` 退出判定的逐次追踪记录，有界、只追加 |
 
 ## Assistant 链路
 

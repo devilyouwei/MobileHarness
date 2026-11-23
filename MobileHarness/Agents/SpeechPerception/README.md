@@ -57,7 +57,10 @@ flowchart LR
  AS["Assistant"]:::agent
  end
  A -->|"user.input.speech.v1（partial）／final · user.input"| G
- G -->|"user.input.speech.v1（final）"| AS
+ A -->|"perception.speech.activity.v1"| G
+ G -->|"user.input.speech.v1（final）· perception.speech.activity.v1"| AS
+ AS -->|"agent.listening.mode.v1"| G
+ G -->|"agent.listening.mode.v1"| A
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -71,7 +74,7 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
-SpeechPerception 在 user.input 主题发布 user.input.speech.v1（partial） 和 user.input.speech.v1（final）。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。声源诊断观察 sound.source。
+SpeechPerception 在 user.input 主题发布 user.input.speech.v1（partial） 和 user.input.speech.v1（final）。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。另发布 perception.speech.activity.v1（采集、起声与 utterance 事实），并订阅 Assistant 的 agent.listening.mode.v1 与 agent.reply.activity.v1（回复活动，用于选择较短的静音端点）。声源诊断观察 sound.source。
 
 ## 内部结构与执行链
 
@@ -145,9 +148,9 @@ flowchart TB
 | UI.VoiceState.setVoiceState | Internal hearing/processing/listening display, no device control |
 | Speech.Listening.update | Internal policy Action for the actual resident producer/root session |
 
-Publication is one-way. Subscriber rejection is isolated from inference. Output protocol and context failures remain local errors. Internal presentation completion confirms state acceptance. The output buffer retains the oldest 32 items and throws queueFull on overflow. The audio FIFO rejects the new packet on overflow before advancing sequence or time. Evidence retains 256 summaries with counted eviction. Final text uses the interaction session. Audio and partial transcripts retain the capture session. Confirmed onset reports an opaque utterance ID to the Assistant; empty or failed recognition and capture shutdown retire it. A nonempty final remains tracked until Assistant admits it or publication fails. Output-consumer failure explicitly retires affected tracking and remains reported.
+Publication is one-way. Subscriber rejection is isolated from inference. Output protocol and context failures remain local errors. Internal presentation completion confirms state acceptance. The output buffer retains the oldest 32 items and throws queueFull on overflow. The audio FIFO rejects the new packet on overflow before advancing sequence or time. Evidence retains 256 summaries with counted eviction. Final text uses the interaction session. Audio and partial transcripts retain the capture session. Confirmed onset publishes an opaque utterance ID in `onsetConfirmed`; empty or failed recognition and capture shutdown retire it with `utteranceEnded`/`utterancesCleared`. A nonempty final remains tracked by the subscriber until it admits it or publication fails. Output-consumer failure explicitly retires affected tracking and remains reported.
 
-The segmenter also reports each processed VAD score's sample count, capture-time offset and current onset-candidate state to the Assistant through the root-bound, capture-generation-fenced callback. Assistant uses windows whose PlatformKit capture timestamp is after interruption cleanup for its one-shot 40-window speech probe. VPIO currently timestamps at the native callback, so that boundary is approximate for a buffer captured across cleanup. A candidate at the boundary remains pending until it confirms or clears; confirmed onset transfers ownership to the utterance/final admission boundary. Capture stop, VAD recovery and output-consumer failure retire the capture observation; successful VAD recreation restores it. No PCM or transcript is sent through this observation interface.
+Speech facts leave as `perception.speech.activity.v1` Signals on the `perception.speech.activity` channel (see [Assistant input](../Assistant/Input/README.md#speech-activity-and-listening-signals) for the subscriber). SpeechPerception publishes transitions, not per-window values: `captureStarted`/`captureStopped` with the capture generation, `duplexSupport`, `onsetStarted` when the first onset-candidate window appears, `onsetCleared` when the candidate drops before confirmation, `onsetConfirmed` with the utterance ID, `utteranceEnded` for an utterance retired without final text (empty or failed recognition, failed final publication), `utterancesCleared` on pause, capture close and stop, and `ended` when the role stops. Publication goes through the role's output stream like any communication: failures are logged and never retried, and the role does not know or wait for subscribers. The container lets the output pump drain for up to two seconds on session end so the closing facts publish. A nonempty final stays tracked by the subscriber until it admits the text or publication fails. No PCM or transcript is carried by these Signals.
 
 ## 聆听、取消与完成
 
@@ -156,6 +159,18 @@ The segmenter also reports each processed VAD score's sample count, capture-time
 最终文本发布后，感知重置识别器并结束本轮。全双工路线持续接纳音频，并按播放状态调整起声门槛；受限路线由实际播放准入暂停识别，播放完成或取消后通过执行端恢复。重置校验采集会话和代际，新播放准入可阻止旧恢复开放识别。
 
 startInput 只订阅当前已开启采集代。回复半双工暂停保留该订阅并丢弃未获准入的帧；设备关闭时取消空闲取帧、加入当前包，完整 close/stop 先取消识别，再加入原生任务、获取模型和发布者。恢复最多 32 个可取消当前包等待者，只等待已接纳工作，不承载 PCM。UI 回执确认策略接纳；原生停机和播放终态由执行服务单独确认。
+
+## 聆听模式 `listening`
+
+`listening` 变量（`full` 默认、`half`、`quiet`）及其判断归 [Assistant](../Assistant/Input/README.md#listening-and-quiet) 所有。感知角色订阅 Assistant 发布的 `agent.listening.mode.v1`（`agent.listening` 频道，来源仅 `assistant`，会话为交互会话），在 `applyListeningMode` 中采纳，不思考、不持有语言模型，也不按 `quiet` 分支：最终文本始终发布。
+
+| 模式 | 感知角色行为 |
+| --- | --- |
+| `half` | 路线不支持回声消除时的回退，或用户要求；播放期间由播放准入暂停识别，播放结束后恢复。 |
+| `full` | 采集代际已确认回声消除（`capture.supportsFullDuplex`）时才使用全双工接纳：播放期间继续接纳并按播放状态调整起声门槛。能力由 `duplexSupport` Signal 报告，是否允许 `full` 由 Assistant 决定。 |
+| `quiet` | 仅影响灵动岛标题（“安静聆听中”）；识别与发布不变，Assistant 决定该句不进入对话。 |
+
+新采集代发布 `captureStarted` 后，Assistant 回灌当前模式（Signal 不补发）；采集尚未收到模式时按默认 `full`（仍需采集确认回声消除才使用全双工接纳）。
 
 ## 声源算法
 

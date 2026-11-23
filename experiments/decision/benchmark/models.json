@@ -57,5 +57,31 @@
     ],
     "graph": "int8/qwen2.5-1.5b-instruct-int8.aimodel",
     "graphSHA256": "307bbb99df39c7856d74f9e27a6692f246ce1a2a9f5e296125731c061aff3517"
+  },
+  "qwen3.5-0.8b": {
+    "directory": "Qwen3.5-0.8B",
+    "declaration": {
+      "kind": "huggingface",
+      "repoId": "mlboydaisuke/qwen3.5-0.8B-CoreAI",
+      "revision": "8440bd8812719288c6369ad570948e450cee5092",
+      "allowPatterns": [
+        "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/**"
+      ]
+    },
+    "requiredFiles": [
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/qwen3_5_0_8b_decode_int8hu_block32_sym.aimodel/main.mlirb",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/qwen3_5_0_8b_decode_int8hu_block32_sym.aimodel/main.hash",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/qwen3_5_0_8b_decode_int8hu_block32_sym.aimodel/metadata.json",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/metadata.json",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/tokenizer.json",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/tokenizer_config.json",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/vocab.json",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/merges.txt",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/chat_template.jinja",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/added_tokens.json",
+      "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/tokenizer/special_tokens_map.json"
+    ],
+    "graph": "gpu-pipelined-b2/qwen3_5_0_8b_decode_int8hu_block32_sym/qwen3_5_0_8b_decode_int8hu_block32_sym.aimodel",
+    "graphSHA256": "024a342dc67a0969995568636d66d7fc3dc22ef8feb97df23cf9c18662aec05f"
   }
 }

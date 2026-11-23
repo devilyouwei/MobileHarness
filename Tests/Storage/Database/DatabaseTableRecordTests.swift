@@ -18,7 +18,7 @@ import Testing
                 "assistant_conversations", "assistant_tasks", "assistant_messages", "writer_workspaces",
                 "writer_messages", "writer_executions",
                 "workspace_files", "agent_messages", "model_request_log", "media_files", "devices",
-                "invocation_evidence",
+                "invocation_evidence", "listening_dialogs",
             ])
         var conversation = AssistantConversationRow(createdAt: 1)
         try conversation.insert(db)

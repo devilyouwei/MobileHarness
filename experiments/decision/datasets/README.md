@@ -43,5 +43,6 @@
 - [defined-intent-experiment-prompts.json](defined-intent-experiment-prompts.json)
 - [gemma-decision-cases.json](gemma-decision-cases.json)
 - [history-binary-experiment-cases.json](history-binary-experiment-cases.json)
+- [quiet-exit-cases-2026-11-23.json](quiet-exit-cases-2026-11-23.json)：quiet 退出判定的手写中英用例，含 6 条不计分的边界用例
 - [multi-noul-experiment-cases.json](multi-noul-experiment-cases.json)
 - [multi-noul-experiment-prompts.json](multi-noul-experiment-prompts.json)

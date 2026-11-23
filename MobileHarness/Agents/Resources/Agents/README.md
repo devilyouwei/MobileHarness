@@ -10,7 +10,7 @@ Assistant 是唯一面向用户的对话 Agent；摄影、历史查询、应用�
 
 ## 文件组织
 
-Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified Chinese. Localized prose uses the same template keys, variables and protocol identifiers. `Descriptions.zh-Hans.json` supplements the canonical Agent and Skill declarations, and `Writer/Tools.zh-Hans.json` the Writer-owned native tools, with translated model-facing descriptions. Action translations belong to [Actions/Resources](../../../Actions/Resources/README.md).
+Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified Chinese. Localized prose uses the same template keys, variables and protocol identifiers. Each owner's `Agent.zh-Hans.json` and `Skill.zh-Hans.json` supplement its canonical declarations, and `Writer/Tools.zh-Hans.json` the Writer-owned native tools, with translated model-facing descriptions. Action translations belong to [Actions/Resources](../../../Actions/Resources/README.md).
 
 | 文件 | 作用与要求 |
 | --- | --- |
@@ -21,6 +21,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `Shared/ControlCatalog.json` | `# AGENT CONTROLS` 段：control 声明排版加所有者使用指南。仅有 control 的 Agent 渲染。 |
 | `Shared/StateContext.json` | 状态 system 消息（`# STATE`）的模板：`frame`、`## CURRENT STATE`、`## CURRENT STATE IMAGES`、`## AGENT STATE`，以及系统提示中 `# STATE VARIABLES` 的声明排版。 |
 | `<AgentName>/Agent.json` | 必需。v11 身份、角色自有公开 description、通信权限和基础 Skill。 |
+| `<AgentName>/Agent.zh-Hans.json` | 可选。该角色自己的简体中文文本，`templates` 键为 `description`（公开介绍）和 `state.<name>`（自有状态说明）；缺失的键回退 Agent.json 的英文。 |
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
 | `Assistant/InputDecision.json` and its Simplified Chinese sibling | Localized Decision action definitions and templates for execution/playback state (including unknown playback), the pending question, history, buffered user input and the quoted latest-input question, plus cloud tool prose. Dialog text retains its original language. |
@@ -57,10 +58,12 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `kind` | `typed` 或 `semantic`。 |
 | `access` | `readWrite`（模型可写）或 `readOnly`（仅 Agent 代码或宿主可写）。不在提示词中告知，模型写 `readOnly` 变量会被拒绝并继续 ReACT。 |
 | `type` | `bool`、`enum`（需 `values`，≤ 16 项、唯一）或 `text`。 |
-| `meaning` | 进入系统提示的英文说明，≤ 1 KiB；中文说明按 `state.<name>` 写入 Shared/Descriptions.zh-Hans.json，缺失回退英文。 |
-| `trigger` | 可选，绑定的 Swift Trigger 名，目前只有 `task`；未知名称拒绝加载。 |
+| `meaning` | 进入系统提示的英文说明，≤ 1 KiB；中文说明按 `state.<name>` 写入声明所在 Agent 的 `Agent.zh-Hans.json`，缺失回退英文。 |
+| `trigger` | 可选，绑定的 Trigger 名（格式同变量名）。处理器由所属 Agent 注册，未注册的名字在 Agent 启动时报配置错误。 |
 
-同名声明、未知字段、缺失必填字段拒绝加载。Assistant 要求存在绑定 `task` Trigger 的声明，否则启动失败。Assistant 当前声明 `task`（semantic、readWrite、绑定 `task`）与 `quiet`（typed bool、readOnly，由宿主写入，静默主动播报）。语义与实现见 [Assistant controls](../../Assistant/Controls/README.md#state-writes) 和 [Context](../../Support/Context/README.md#agent-state-variables)。
+同名声明、未知字段、缺失必填字段拒绝加载。Assistant 要求存在绑定 `task` Trigger 的声明，否则启动失败。Assistant 当前声明 `task`（semantic、readWrite、绑定 `task`）与 `listening`（typed enum `half`/`full`/`quiet`、readWrite、绑定 `listening`）。语义与实现见 [Assistant controls](../../Assistant/Controls/README.md#state-writes) 和 [Context](../../Support/Context/README.md#agent-state-variables)。
+
+Assistant 的 `state.set` 控制声明提供 `wakeCondition`，仅供进入 quiet 时记录用户约定。中英文 `Input/QuietExit*.json` 各自拥有默认唤醒和按约定唤醒的独立提示。
 
 ### signals 字段
 
@@ -71,7 +74,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `publications` | `{channel, protocol}` 声明本角色可发布的协议；启动校验实际生产代码及订阅配对，允许无订阅者。频道不携带协议版本，不由协议名推导。 |
 | `subscriptions` | `{channel, protocol, sources, events?}`；来源为实际运行时 Agent ID，events 可筛选同一协议的变体。 |
 
-SpeechPerception 发布 `user.input.speech` / `user.input.speech.v1`，变体为 partial/final；Assistant 只订阅 final。姿态和声源分别绑定 `perception.vision.pose`、`perception.audio.source`。ApplicationControl 发布 `agent.interruption` / `agent.interruption.v1`，Assistant 的确定性处理器消费，不进入普通 Decision。
+SpeechPerception 发布 `user.input.speech` / `user.input.speech.v1`，变体为 partial/final；Assistant 只订阅 final。SpeechPerception 另发布 `perception.speech.activity` / `perception.speech.activity.v1`（采集、起声与 utterance 事实），Assistant 订阅；Assistant 发布 `agent.listening` / `agent.listening.mode.v1`（当前 `listening` 值），SpeechPerception 订阅；Assistant 另发布 `agent.reply` / `agent.reply.activity.v1`（同会话回复活动），同样由 SpeechPerception 订阅。姿态和声源分别绑定 `perception.vision.pose`、`perception.audio.source`。ApplicationControl 发布 `agent.interruption` / `agent.interruption.v1`，Assistant 的确定性处理器消费，不进入普通 Decision。
 
 Writer、Memory、Photographer、ApplicationControl 启用 `agent.task.v1`，包含 submit/update/answer/status/cancel。代码目录声明正文能力；当前模型可见的文本适配器为 Writer，其他角色消费自身的类型化 scoped 正文。任务进度与终态通过 `agent.task.events.v1` 在 `agent.task` 频道按任务身份订阅，Assistant 从启动装配起静态订阅 Writer 的 agent.task 频道，按任务/session 跟踪返回；任务结束只清理跟踪，停止角色才关闭常驻频道。Writer 等任务执行角色通过 publications 声明 agent.task / agent.task.events.v1，实际按需发布，不能触发对方订阅。启动校验订阅来源配置及匹配的 publication，并验证双方真实代码能力；不要求双方在线，允许 publication 没有订阅者。任务恢复/消费失败由消费角色诊断。请求直接返回类型化 Reply；publish 只确认接纳。配置不包含发送者/接收者配对白名单。
 
