@@ -30,6 +30,43 @@ python3 experiments/decision/evaluate_quiet_exit.py --config experiments/decisio
 
 报告 JSON 同时含总体 `metrics` 与中英分开的 `metricsByLanguage`。`--prompts quiet-wake-short-prompts.json` 选择最短问句（`template` 单条 user 消息）。`--prompts quiet-wake-prompts.json` 选择简化的是非问句变体（文件中 `answer` 为 `boolean`，生成式后端答 true/false）。
 
-报告写入 [docs/validation](../../docs/validation/Quiet-Exit-Evaluation.md)；离线回归见 [test_evaluate_quiet_exit.py](test_evaluate_quiet_exit.py)。
+新版提示词快照 [quiet-exit-current-prompts-2026-11-25.json](quiet-exit-current-prompts-2026-11-25.json) 使用 version 2。它支持无条件和语义约定两条分支，生成式后端只接受完整的单词 verdict，原生后端读取同一证据的布尔问句。无条件请求的正文为一句话，有约定时正文只含 `latestUtterance` 和 `wakeCondition`。`literal:` 由 App 直接匹配，实验模型输入只覆盖语义约定。
+
+```bash
+python3 experiments/decision/evaluate_quiet_exit.py --model d3-edge \
+  --input experiments/decision/datasets/quiet-exit-current-cases-2026-11-25.json \
+  --prompts experiments/decision/quiet-exit-current-prompts-2026-11-25.json \
+  --limit 64 --warmup 2 --timeout 30 \
+  --output experiments/decision/results/quiet-exit-current-d3-edge-rerun.json
+```
+
+方法与结果见 [新版对照](../../docs/validation/Quiet-Exit-Decision-2026-11-25.md) 和 [历史对照](../../docs/validation/Quiet-Exit-Evaluation.md)。离线回归见 [test_evaluate_quiet_exit.py](test_evaluate_quiet_exit.py)。
+
+## Zipformer 打断口令回放
+
+[evaluate_zipformer_kws.py](evaluate_zipformer_kws.py) 用冻结的 16 kHz PCM 和实验词表回放
+打断口令。`--provider coreml` 直接运行 Hugging Mac 发布的三个 FP32 Core ML ML Program
+和随制品发布的流式宿主。回放音频需从仓库外提供。首次运行按[固定提交与哈希清单](zipformer-coreml-model.json)下载，
+后续复用 [Models/ZipformerKWS](../../Models/README.md) 的已校验制品。运行需要
+`numpy`、`coremltools==9.0` 和 `kaldi-native-fbank==1.23.3`。
+
+```bash
+python3 experiments/decision/evaluate_zipformer_kws.py \
+  --input /path/to/frozen-zipformer-audio.zip \
+  --provider coreml --chunk 8 --blanks 0 \
+  --output experiments/decision/results/zipformer-hugging-mac-coreml-rerun.json
+```
+
+原生 Core ML 默认用 `CPU_ONLY`，可用 `--compute-unit ALL` 对照。`--models` 可指向
+同一已发布版本的完整本地制品目录，仍会逐文件校验。命中延迟按音频时间轴统计，
+解码 P95 统计触发原生 encoder 窗口的 PCM 包处理时间。见
+[发布版回放](../../docs/validation/Zipformer-Hugging-Mac-Release.md)。
+
+历史对照继续使用 `--provider cpu` 或 `--provider coreml-ep`，配合
+`--models /path/to/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20` 及
+`--chunk 8` 或 `--chunk 16`。两者使用 sherpa-onnx 2.0.3，历史口径和结果见
+[Core ML 对照](../../docs/validation/Zipformer-Apple-CoreML-Comparison-2026-11-25.md)。
+
+[tune_zipformer_interrupt.py](tune_zipformer_interrupt.py) 采集分块、识别阈值和起声门限的开发或留出结果。[score_zipformer_interrupt_tail.py](score_zipformer_interrupt_tail.py) 用已收采样重算尾部静音门限和句尾口令延迟。[旁路候选](zipformer-interrupt-observer-2026-11-25.json) 固定 ONNX 权重、词表和配置，筛选与复核见[配置评估](../../docs/validation/Zipformer-Interrupt-Config-2026-11-25.md)。
 
 方法和结论写入 [docs/validation](../../docs/validation/README.md)，Python 验证与真实模型测量分别报告。

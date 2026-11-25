@@ -20,6 +20,8 @@
 
 [用户相册与记忆](product/User-Album-Memory-Plan.md) 包含“用户”板块内的两个独立页面：摄影任务媒体相册，以及周期性增量整理的日记式记忆。两项均待实施。
 
+[闹钟与倒计时](product/Alarms-and-Timers.md)涵盖通过 Assistant 设置闹钟和倒计时，由 iOS 到期提醒。
+
 ## 技术与产品交叉需求
 
 | 需求 | 未实现范围 |

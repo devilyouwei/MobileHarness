@@ -1,0 +1,2004 @@
+{
+  "status": "complete",
+  "variants": [
+    {
+      "chunk": 8,
+      "settings": {
+        "max_active_paths": 4,
+        "keywords_score": 1.0,
+        "keywords_threshold": 0.25,
+        "num_trailing_blanks": 0,
+        "provider": "coreml",
+        "compute_unit": "CPU_ONLY"
+      },
+      "loadMS": 1092.624958,
+      "rows": [
+        {
+          "id": "zh-1-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.32,
+                0.4,
+                0.48,
+                0.64,
+                0.72,
+                0.84,
+                0.88
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 890.0,
+          "detectionDelayMS": 230.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.344
+        },
+        {
+          "id": "zh-1-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.32,
+                0.44,
+                0.52,
+                0.68,
+                0.72,
+                0.88,
+                0.92
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 930.0,
+          "detectionDelayMS": 350.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.484
+        },
+        {
+          "id": "zh-1-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.24,
+                0.36,
+                0.48,
+                0.56,
+                0.72,
+                0.8,
+                0.92,
+                0.96
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 970.0,
+          "detectionDelayMS": 310.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.484
+        },
+        {
+          "id": "zh-1-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.24,
+                0.36,
+                0.52,
+                0.64,
+                0.76,
+                0.84,
+                0.96,
+                1.0
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1010.0,
+          "detectionDelayMS": 270.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.859
+        },
+        {
+          "id": "zh-1-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.16,
+                0.2,
+                0.32,
+                0.4,
+                0.56,
+                0.64,
+                0.8,
+                0.84
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 900.0,
+          "detectionDelayMS": 220.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.469
+        },
+        {
+          "id": "zh-1-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.16,
+                0.24,
+                0.36,
+                0.48,
+                0.6,
+                0.68,
+                0.84,
+                0.88
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 940.0,
+          "detectionDelayMS": 180.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.931
+        },
+        {
+          "id": "zh-1-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.16,
+                0.32,
+                0.4,
+                0.52,
+                0.64,
+                0.72,
+                0.88,
+                0.92
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 980.0,
+          "detectionDelayMS": 300.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.687
+        },
+        {
+          "id": "zh-1-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.16,
+                0.36,
+                0.48,
+                0.56,
+                0.68,
+                0.8,
+                0.92,
+                1.0
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1020.0,
+          "detectionDelayMS": 260.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.524
+        },
+        {
+          "id": "zh-1-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2310.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.062
+        },
+        {
+          "id": "zh-1-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2350.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.123
+        },
+        {
+          "id": "zh-1-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2390.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.063
+        },
+        {
+          "id": "zh-1-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2430.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 1.973
+        },
+        {
+          "id": "zh-1-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.36,
+                0.4,
+                0.56,
+                0.64,
+                0.76,
+                0.84,
+                1.0,
+                1.04
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2170.0,
+          "detectionDelayMS": -890.0,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.257
+        },
+        {
+          "id": "zh-1-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.4,
+                0.44,
+                0.6,
+                0.68,
+                0.8,
+                0.88,
+                1.04,
+                1.08
+              ],
+              "inputFedMS": 1440.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2210.0,
+          "detectionDelayMS": -770.0,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.459
+        },
+        {
+          "id": "zh-1-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.44,
+                0.48,
+                0.64,
+                0.72,
+                0.84,
+                0.92,
+                1.08,
+                1.16
+              ],
+              "inputFedMS": 1440.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2250.0,
+          "detectionDelayMS": -810.0,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.167
+        },
+        {
+          "id": "zh-1-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-playback",
+              "tokenTimesSeconds": [
+                0.48,
+                0.52,
+                0.64,
+                0.72,
+                0.88,
+                0.96,
+                1.12,
+                1.16
+              ],
+              "inputFedMS": 1440.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2290.0,
+          "detectionDelayMS": -850.0,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.165
+        },
+        {
+          "id": "zh-1-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                1.12,
+                1.16,
+                1.32,
+                1.44,
+                1.52,
+                1.6400000000000001,
+                1.76,
+                1.8
+              ],
+              "inputFedMS": 2080.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3460.0,
+          "detectionDelayMS": -1380.0,
+          "decodeCalls": 28,
+          "decodeP95MS": 2.151
+        },
+        {
+          "id": "zh-1-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                1.12,
+                1.2,
+                1.36,
+                1.44,
+                1.56,
+                1.6400000000000001,
+                1.72,
+                1.76
+              ],
+              "inputFedMS": 2080.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3500.0,
+          "detectionDelayMS": -1420.0,
+          "decodeCalls": 28,
+          "decodeP95MS": 2.04
+        },
+        {
+          "id": "zh-1-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                1.16,
+                1.28,
+                1.4000000000000001,
+                1.48,
+                1.6,
+                1.68,
+                1.84,
+                1.8800000000000001
+              ],
+              "inputFedMS": 2240.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3540.0,
+          "detectionDelayMS": -1300.0,
+          "decodeCalls": 28,
+          "decodeP95MS": 2.615
+        },
+        {
+          "id": "zh-1-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                1.2,
+                1.28,
+                1.44,
+                1.52,
+                1.6400000000000001,
+                1.76,
+                1.8800000000000001,
+                1.92
+              ],
+              "inputFedMS": 2240.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3580.0,
+          "detectionDelayMS": -1340.0,
+          "decodeCalls": 28,
+          "decodeP95MS": 2.439
+        },
+        {
+          "id": "zh-1-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2150.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.321
+        },
+        {
+          "id": "zh-1-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2190.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.151
+        },
+        {
+          "id": "zh-1-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2230.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.215
+        },
+        {
+          "id": "zh-1-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2270.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.314
+        },
+        {
+          "id": "zh-2-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.08,
+                0.2,
+                0.32,
+                0.4,
+                0.52,
+                0.56,
+                0.72,
+                0.76
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 760.0,
+          "detectionDelayMS": 360.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.382
+        },
+        {
+          "id": "zh-2-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.24,
+                0.36,
+                0.44,
+                0.56,
+                0.64,
+                0.76,
+                0.8
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 800.0,
+          "detectionDelayMS": 320.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.068
+        },
+        {
+          "id": "zh-2-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.32,
+                0.4,
+                0.48,
+                0.56,
+                0.68,
+                0.8,
+                0.84
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 840.0,
+          "detectionDelayMS": 280.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.335
+        },
+        {
+          "id": "zh-2-stop-talking",
+          "expected": "zh-stop-talking",
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.2,
+                0.32,
+                0.48,
+                0.52,
+                0.6,
+                0.72,
+                0.84,
+                0.88
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 880.0,
+          "detectionDelayMS": 240.0,
+          "decodeCalls": 14,
+          "decodeP95MS": 2.154
+        },
+        {
+          "id": "zh-2-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 770.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.252
+        },
+        {
+          "id": "zh-2-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 810.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.805
+        },
+        {
+          "id": "zh-2-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 850.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 13,
+          "decodeP95MS": 3.05
+        },
+        {
+          "id": "zh-2-stop-playback",
+          "expected": "zh-stop-playback",
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 890.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 14,
+          "decodeP95MS": 2.516
+        },
+        {
+          "id": "zh-2-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2000.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.163
+        },
+        {
+          "id": "zh-2-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2040.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.119
+        },
+        {
+          "id": "zh-2-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2080.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.169
+        },
+        {
+          "id": "zh-2-hold",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2120.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 21,
+          "decodeP95MS": 2.291
+        },
+        {
+          "id": "zh-2-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1790.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.106
+        },
+        {
+          "id": "zh-2-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1830.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 1.952
+        },
+        {
+          "id": "zh-2-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1870.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.049
+        },
+        {
+          "id": "zh-2-negation",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1910.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.496
+        },
+        {
+          "id": "zh-2-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.88,
+                0.92,
+                1.12,
+                1.16,
+                1.24,
+                1.36,
+                1.48,
+                1.56
+              ],
+              "inputFedMS": 1920.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2830.0,
+          "detectionDelayMS": -910.0,
+          "decodeCalls": 26,
+          "decodeP95MS": 2.462
+        },
+        {
+          "id": "zh-2-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.92,
+                1.0,
+                1.12,
+                1.2,
+                1.28,
+                1.36,
+                1.52,
+                1.6
+              ],
+              "inputFedMS": 1920.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2870.0,
+          "detectionDelayMS": -950.0,
+          "decodeCalls": 26,
+          "decodeP95MS": 2.446
+        },
+        {
+          "id": "zh-2-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                0.96,
+                1.04,
+                1.16,
+                1.24,
+                1.32,
+                1.44,
+                1.56,
+                1.6400000000000001
+              ],
+              "inputFedMS": 1920.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2910.0,
+          "detectionDelayMS": -990.0,
+          "decodeCalls": 26,
+          "decodeP95MS": 2.321
+        },
+        {
+          "id": "zh-2-quote",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "zh-stop-talking",
+              "tokenTimesSeconds": [
+                1.0,
+                1.12,
+                1.2,
+                1.28,
+                1.36,
+                1.48,
+                1.6400000000000001,
+                1.68
+              ],
+              "inputFedMS": 1920.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2950.0,
+          "detectionDelayMS": -1030.0,
+          "decodeCalls": 27,
+          "decodeP95MS": 2.28
+        },
+        {
+          "id": "zh-2-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1650.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 18,
+          "decodeP95MS": 2.093
+        },
+        {
+          "id": "zh-2-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1690.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.154
+        },
+        {
+          "id": "zh-2-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1730.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.367
+        },
+        {
+          "id": "zh-2-unlisted",
+          "expected": null,
+          "language": "zh",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1770.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.277
+        },
+        {
+          "id": "en-1-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.08,
+                0.2,
+                0.32,
+                0.4,
+                0.48,
+                0.64,
+                0.72,
+                0.8,
+                0.84
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 900.0,
+          "detectionDelayMS": 220.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.646
+        },
+        {
+          "id": "en-1-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.24,
+                0.36,
+                0.44,
+                0.52,
+                0.64,
+                0.72,
+                0.84,
+                0.88
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 940.0,
+          "detectionDelayMS": 180.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.357
+        },
+        {
+          "id": "en-1-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.28,
+                0.4,
+                0.48,
+                0.56,
+                0.68,
+                0.76,
+                0.88,
+                0.92
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 980.0,
+          "detectionDelayMS": 300.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.294
+        },
+        {
+          "id": "en-1-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.2,
+                0.32,
+                0.44,
+                0.52,
+                0.56,
+                0.72,
+                0.84,
+                0.92,
+                0.96
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1020.0,
+          "detectionDelayMS": 260.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.369
+        },
+        {
+          "id": "en-1-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 650.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 11,
+          "decodeP95MS": 3.034
+        },
+        {
+          "id": "en-1-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 690.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 11,
+          "decodeP95MS": 2.319
+        },
+        {
+          "id": "en-1-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 730.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 11,
+          "decodeP95MS": 2.814
+        },
+        {
+          "id": "en-1-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 770.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 11,
+          "decodeP95MS": 2.488
+        },
+        {
+          "id": "en-1-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1920.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 18,
+          "decodeP95MS": 2.18
+        },
+        {
+          "id": "en-1-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1960.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 18,
+          "decodeP95MS": 2.255
+        },
+        {
+          "id": "en-1-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2000.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.531
+        },
+        {
+          "id": "en-1-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2040.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.355
+        },
+        {
+          "id": "en-1-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.68,
+                0.76,
+                0.84,
+                0.92,
+                1.0,
+                1.16,
+                1.24,
+                1.32,
+                1.36
+              ],
+              "inputFedMS": 1600.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1430.0,
+          "detectionDelayMS": 170.0,
+          "decodeCalls": 15,
+          "decodeP95MS": 2.682
+        },
+        {
+          "id": "en-1-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.72,
+                0.8,
+                0.88,
+                0.96,
+                1.04,
+                1.16,
+                1.28,
+                1.36,
+                1.4000000000000001
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1470.0,
+          "detectionDelayMS": 290.0,
+          "decodeCalls": 15,
+          "decodeP95MS": 2.457
+        },
+        {
+          "id": "en-1-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.76,
+                0.84,
+                0.96,
+                1.0,
+                1.04,
+                1.2,
+                1.32,
+                1.4000000000000001,
+                1.44
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1510.0,
+          "detectionDelayMS": 250.0,
+          "decodeCalls": 16,
+          "decodeP95MS": 2.512
+        },
+        {
+          "id": "en-1-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.8,
+                0.88,
+                1.0,
+                1.04,
+                1.12,
+                1.28,
+                1.36,
+                1.44,
+                1.48
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1550.0,
+          "detectionDelayMS": 210.0,
+          "decodeCalls": 16,
+          "decodeP95MS": 2.418
+        },
+        {
+          "id": "en-1-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.6,
+                0.68,
+                0.8,
+                0.84,
+                0.92,
+                1.04,
+                1.16,
+                1.24,
+                1.28
+              ],
+              "inputFedMS": 1600.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2740.0,
+          "detectionDelayMS": -1140.0,
+          "decodeCalls": 23,
+          "decodeP95MS": 2.304
+        },
+        {
+          "id": "en-1-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.64,
+                0.72,
+                0.8,
+                0.88,
+                0.96,
+                1.12,
+                1.2,
+                1.28,
+                1.32
+              ],
+              "inputFedMS": 1600.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2780.0,
+          "detectionDelayMS": -1180.0,
+          "decodeCalls": 24,
+          "decodeP95MS": 2.514
+        },
+        {
+          "id": "en-1-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.68,
+                0.76,
+                0.84,
+                0.92,
+                1.0,
+                1.12,
+                1.24,
+                1.32,
+                1.36
+              ],
+              "inputFedMS": 1600.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2820.0,
+          "detectionDelayMS": -1220.0,
+          "decodeCalls": 24,
+          "decodeP95MS": 2.195
+        },
+        {
+          "id": "en-1-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.72,
+                0.8,
+                0.88,
+                0.96,
+                1.04,
+                1.16,
+                1.24,
+                1.36,
+                1.4000000000000001
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2860.0,
+          "detectionDelayMS": -1100.0,
+          "decodeCalls": 24,
+          "decodeP95MS": 2.429
+        },
+        {
+          "id": "en-1-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1630.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 17,
+          "decodeP95MS": 2.972
+        },
+        {
+          "id": "en-1-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1670.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 17,
+          "decodeP95MS": 2.857
+        },
+        {
+          "id": "en-1-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1710.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 17,
+          "decodeP95MS": 2.725
+        },
+        {
+          "id": "en-1-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1750.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 18,
+          "decodeP95MS": 2.42
+        },
+        {
+          "id": "en-2-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.2,
+                0.32,
+                0.4,
+                0.48,
+                0.6,
+                0.72,
+                0.84,
+                0.88
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 950.0,
+          "detectionDelayMS": 170.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.598
+        },
+        {
+          "id": "en-2-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.24,
+                0.36,
+                0.44,
+                0.48,
+                0.64,
+                0.76,
+                0.88,
+                0.92
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 990.0,
+          "detectionDelayMS": 290.0,
+          "decodeCalls": 12,
+          "decodeP95MS": 2.786
+        },
+        {
+          "id": "en-2-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.16,
+                0.28,
+                0.4,
+                0.48,
+                0.56,
+                0.68,
+                0.76,
+                0.88,
+                0.92
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1030.0,
+          "detectionDelayMS": 250.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 3.153
+        },
+        {
+          "id": "en-2-stop-talking",
+          "expected": "en-stop-talking",
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.2,
+                0.32,
+                0.44,
+                0.52,
+                0.56,
+                0.72,
+                0.84,
+                0.96,
+                1.0
+              ],
+              "inputFedMS": 1280.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1070.0,
+          "detectionDelayMS": 210.0,
+          "decodeCalls": 13,
+          "decodeP95MS": 2.987
+        },
+        {
+          "id": "en-2-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [],
+          "estimatedSpeechEndMS": 610.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 10,
+          "decodeP95MS": 2.681
+        },
+        {
+          "id": "en-2-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-please-stop",
+              "tokenTimesSeconds": [
+                0.16,
+                0.24,
+                0.28,
+                0.36,
+                0.44,
+                0.52,
+                0.64,
+                0.72
+              ],
+              "inputFedMS": 960.0
+            }
+          ],
+          "estimatedSpeechEndMS": 650.0,
+          "detectionDelayMS": 310.0,
+          "decodeCalls": 11,
+          "decodeP95MS": 2.795
+        },
+        {
+          "id": "en-2-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-please-stop",
+              "tokenTimesSeconds": [
+                0.16,
+                0.28,
+                0.32,
+                0.4,
+                0.48,
+                0.56,
+                0.68,
+                0.76
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 690.0,
+          "detectionDelayMS": 430.0,
+          "decodeCalls": 11,
+          "decodeP95MS": 2.644
+        },
+        {
+          "id": "en-2-please-stop",
+          "expected": "en-please-stop",
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [
+            {
+              "keyword": "en-please-stop",
+              "tokenTimesSeconds": [
+                0.16,
+                0.32,
+                0.36,
+                0.44,
+                0.52,
+                0.6,
+                0.72,
+                0.84
+              ],
+              "inputFedMS": 1120.0
+            }
+          ],
+          "estimatedSpeechEndMS": 730.0,
+          "detectionDelayMS": 390.0,
+          "decodeCalls": 11,
+          "decodeP95MS": 2.758
+        },
+        {
+          "id": "en-2-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2090.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.946
+        },
+        {
+          "id": "en-2-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2130.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.242
+        },
+        {
+          "id": "en-2-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2170.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.379
+        },
+        {
+          "id": "en-2-hold",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2210.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 20,
+          "decodeP95MS": 2.389
+        },
+        {
+          "id": "en-2-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.72,
+                0.8,
+                0.88,
+                0.96,
+                1.0,
+                1.16,
+                1.24,
+                1.36,
+                1.44
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1500.0,
+          "detectionDelayMS": 260.0,
+          "decodeCalls": 16,
+          "decodeP95MS": 2.533
+        },
+        {
+          "id": "en-2-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.76,
+                0.84,
+                0.92,
+                1.0,
+                1.04,
+                1.2,
+                1.28,
+                1.4000000000000001,
+                1.44
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1540.0,
+          "detectionDelayMS": 220.0,
+          "decodeCalls": 16,
+          "decodeP95MS": 2.651
+        },
+        {
+          "id": "en-2-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.8,
+                0.88,
+                0.96,
+                1.04,
+                1.08,
+                1.2,
+                1.32,
+                1.44,
+                1.48
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1580.0,
+          "detectionDelayMS": 180.0,
+          "decodeCalls": 16,
+          "decodeP95MS": 2.838
+        },
+        {
+          "id": "en-2-negation",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.84,
+                0.88,
+                1.0,
+                1.08,
+                1.12,
+                1.28,
+                1.36,
+                1.52,
+                1.56
+              ],
+              "inputFedMS": 1920.0
+            }
+          ],
+          "estimatedSpeechEndMS": 1620.0,
+          "detectionDelayMS": 300.0,
+          "decodeCalls": 16,
+          "decodeP95MS": 2.623
+        },
+        {
+          "id": "en-2-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.64,
+                0.72,
+                0.8,
+                0.88,
+                0.92,
+                1.04,
+                1.2,
+                1.32,
+                1.36
+              ],
+              "inputFedMS": 1600.0
+            }
+          ],
+          "estimatedSpeechEndMS": 2970.0,
+          "detectionDelayMS": -1370.0,
+          "decodeCalls": 25,
+          "decodeP95MS": 2.525
+        },
+        {
+          "id": "en-2-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.68,
+                0.76,
+                0.84,
+                0.92,
+                0.96,
+                1.12,
+                1.2,
+                1.36,
+                1.4000000000000001
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3010.0,
+          "detectionDelayMS": -1250.0,
+          "decodeCalls": 25,
+          "decodeP95MS": 2.428
+        },
+        {
+          "id": "en-2-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.72,
+                0.8,
+                0.88,
+                0.96,
+                1.0,
+                1.16,
+                1.24,
+                1.36,
+                1.4000000000000001
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3050.0,
+          "detectionDelayMS": -1290.0,
+          "decodeCalls": 25,
+          "decodeP95MS": 2.596
+        },
+        {
+          "id": "en-2-quote",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": false,
+          "detections": [
+            {
+              "keyword": "en-stop-talking",
+              "tokenTimesSeconds": [
+                0.76,
+                0.84,
+                0.96,
+                1.0,
+                1.04,
+                1.2,
+                1.32,
+                1.4000000000000001,
+                1.44
+              ],
+              "inputFedMS": 1760.0
+            }
+          ],
+          "estimatedSpeechEndMS": 3090.0,
+          "detectionDelayMS": -1330.0,
+          "decodeCalls": 26,
+          "decodeP95MS": 2.39
+        },
+        {
+          "id": "en-2-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 0,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1910.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 18,
+          "decodeP95MS": 2.446
+        },
+        {
+          "id": "en-2-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 40,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1950.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 18,
+          "decodeP95MS": 2.313
+        },
+        {
+          "id": "en-2-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 80,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 1990.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.547
+        },
+        {
+          "id": "en-2-unlisted",
+          "expected": null,
+          "language": "en",
+          "offsetMS": 120,
+          "correct": true,
+          "detections": [],
+          "estimatedSpeechEndMS": 2030.0,
+          "detectionDelayMS": null,
+          "decodeCalls": 19,
+          "decodeP95MS": 2.578
+        }
+      ],
+      "metrics": {
+        "replays": 96,
+        "correct": 59,
+        "accuracy": 0.6145833333333334,
+        "positive": 32,
+        "correctlyDetected": 23,
+        "missedOrWrong": 9,
+        "negative": 64,
+        "falseInterrupts": 28,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 270.0,
+        "detectionP95MS": 390.0,
+        "decodeP50MS": 1.917,
+        "decodeP95MS": 2.491,
+        "decodeCalls": 1705
+      },
+      "weightSHA256": {
+        "decoder.mlpackage/Data/com.apple.CoreML/model.mlmodel": "9a1bd003f15d9f119254ed296121ea422cad01eb2f20d7fb8766217bc98d6457",
+        "decoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin": "6fa02ba294163a17c1c34beeb19a07b31e42a5e9590544be147931cfdea658dd",
+        "decoder.mlpackage/Manifest.json": "083d93544fe3840fd7453d290e23f01b300dced2843e64bc5ffcc1e745a7c2d5",
+        "encoder.mlpackage/Data/com.apple.CoreML/model.mlmodel": "0507959451be7afc226e7c8a0aeb2c17429ded2fcf51c826baee7cbd5af92086",
+        "encoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin": "03182c99ce026d52a0439b7b2022904393f7e13f119cc30c93cb847809d3836e",
+        "encoder.mlpackage/Manifest.json": "3d45bb9d02b3ab48c5ee5e363b681cfb207b54965dfb32421eedffbb78ab23ee",
+        "joiner.mlpackage/Data/com.apple.CoreML/model.mlmodel": "d46064f8c50fb19fc0a424d4fc5b70371e901ba50e3abb55df7fa7ae9343bf7d",
+        "joiner.mlpackage/Data/com.apple.CoreML/weights/weight.bin": "9749ec82dbb6f66f4e64d72516c8fd32fae39bfd412b61d41e81c6a41b9500e6",
+        "joiner.mlpackage/Manifest.json": "0a211d8d49d4b5e7a60954ca14a44d1cfd4a4b2f1428460ddaf1055c745d27e9",
+        "tokens.txt": "2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0"
+      }
+    }
+  ],
+  "dataSHA256": "017155c7299e72078df9b3601f68d9b64f62bda2cfb3d2db4c714f55e09511e7",
+  "runnerSHA256": "ae3a079d02782e795870f27638804148ca57ac36eded9c9bd88639910a3afa4a",
+  "warmupsPerConfiguration": 2,
+  "keywordSHA256": "7d0021169406e2d53b4e0d0489568299e77f436eac9714a96373ac46046d535d",
+  "python": "3.13.13",
+  "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+  "packages": {
+    "coremltools": "9.0",
+    "kaldi-native-fbank": "1.23.3",
+    "numpy": "2.4.6"
+  },
+  "modelSource": "https://huggingface.co/hugging-mac/zipformer-kws-zh-en-3m-coreml",
+  "modelRevision": "46d5bc5be5acf590afdb8349d89bb2533f01ce48",
+  "modelSpecSHA256": "1030d7a6916f3a7ff1700d40b531a558a5090010eb0f96e05c9bd153dce6fda3",
+  "adapterSHA256": "881427c87958432e72c3587f52786e9f5e99589841ffa707ad63d35cc72d3789",
+  "timingScope": "PCM packet time with at least one native encoder window"
+}

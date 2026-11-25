@@ -44,5 +44,7 @@
 - [gemma-decision-cases.json](gemma-decision-cases.json)
 - [history-binary-experiment-cases.json](history-binary-experiment-cases.json)
 - [quiet-exit-cases-2026-11-23.json](quiet-exit-cases-2026-11-23.json)：quiet 退出判定的手写中英用例，含 6 条不计分的边界用例
+- [quiet-exit-current-cases-2026-11-25.json](quiet-exit-current-cases-2026-11-25.json)：64 条新编中英用例，覆盖默认邀请、明确授权、直接称名与语义约定
+- Zipformer 回放音频来自外部 ZIP，仓库保留实验配置与结果。重跑时通过 `--input` 指向仓库外的文件。历史回放使用 24 条合成语句，两组留出各使用 48 条。
 - [multi-noul-experiment-cases.json](multi-noul-experiment-cases.json)
 - [multi-noul-experiment-prompts.json](multi-noul-experiment-prompts.json)

@@ -24,6 +24,8 @@ public protocol ListeningModeControlling: Sendable {
     func apply(_ mode: ListeningMode, source: AgentStateSource, wakeCondition: String?) async throws
     /// An utterance recognized while in `quiet`; it is judged instead of entering the conversation.
     func receiveQuiet(_ text: String, _ input: AgentInput)
+    /// Retires any pending quiet judgment when the Assistant stops.
+    func cancelJudgment()
     /// A new capture started and has not seen the current mode.
     func republish() async
     /// What the current capture reported about echo cancellation.
@@ -38,6 +40,7 @@ extension ListeningModeControlling {
     }
     public var mode: ListeningMode { .default }
     public func receiveQuiet(_ text: String, _ input: AgentInput) {}
+    public func cancelJudgment() {}
     public func republish() async {}
     public func captureDuplex(_ supported: Bool) async {}
     public func perceptionEnded() async {}

@@ -316,14 +316,7 @@ import StorageFiles
                         })
                 },
                 chatProvider: { [languageModels] in languageModels },
-                quietTiers: [
-                    QuietModelTier(
-                        name: "system", modelID: "apple-system",
-                        chat: { [languageModels] in try await languageModels.localChatModel("apple-system").capability }
-                    ),
-                    QuietModelTier(
-                        name: "configured", modelID: "assistant-selected", chat: { [languageModels] in languageModels }),
-                ], language: language)
+                language: language)
         }
         public func bindExecution(_ binding: AgentExecutionBinding, facilities: AgentGatewayCapabilities) throws {
             guard !lifecycle.isStopped else { throw AgentContainerError.stopped }

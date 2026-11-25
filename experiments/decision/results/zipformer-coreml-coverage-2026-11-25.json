@@ -1,0 +1,390 @@
+{
+  "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+  "runtime": "1.24.4",
+  "providers": [
+    "CoreMLExecutionProvider",
+    "AzureExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "models": {
+    "encoder-NeuralNetwork": {
+      "graph": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/encoder-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "format": "NeuralNetwork",
+      "fixtures": 8,
+      "outputMaxAbsError": {
+        "encoder_out": 0.08799552917480469,
+        "new_cached_key_0": 0.023913323879241943,
+        "new_cached_nonlin_attn_0": 0.1797688901424408,
+        "new_cached_val1_0": 0.2056572437286377,
+        "new_cached_val2_0": 0.244490385055542,
+        "new_cached_conv1_0": 0.3009819984436035,
+        "new_cached_conv2_0": 0.16759657859802246,
+        "new_cached_key_1": 0.05188898369669914,
+        "new_cached_nonlin_attn_1": 0.08144891262054443,
+        "new_cached_val1_1": 0.12209618091583252,
+        "new_cached_val2_1": 0.21098530292510986,
+        "new_cached_conv1_1": 0.2660503387451172,
+        "new_cached_conv2_1": 0.30308961868286133,
+        "new_cached_key_2": 0.035736724734306335,
+        "new_cached_nonlin_attn_2": 0.11255896091461182,
+        "new_cached_val1_2": 0.16854476928710938,
+        "new_cached_val2_2": 0.30471134185791016,
+        "new_cached_conv1_2": 0.21475112438201904,
+        "new_cached_conv2_2": 0.24242925643920898,
+        "new_cached_key_3": 0.027857542037963867,
+        "new_cached_nonlin_attn_3": 0.06688356399536133,
+        "new_cached_val1_3": 0.08251631259918213,
+        "new_cached_val2_3": 0.20891332626342773,
+        "new_cached_conv1_3": 0.2425694465637207,
+        "new_cached_conv2_3": 0.2670060396194458,
+        "new_cached_key_4": 0.034325212240219116,
+        "new_cached_nonlin_attn_4": 0.05266299843788147,
+        "new_cached_val1_4": 0.1269136667251587,
+        "new_cached_val2_4": 0.10135066509246826,
+        "new_cached_conv1_4": 0.22973155975341797,
+        "new_cached_conv2_4": 0.11978960037231445,
+        "new_cached_key_5": 0.045108944177627563,
+        "new_cached_nonlin_attn_5": 0.05475699529051781,
+        "new_cached_val1_5": 0.15388022363185883,
+        "new_cached_val2_5": 0.16316938400268555,
+        "new_cached_conv1_5": 0.24048066139221191,
+        "new_cached_conv2_5": 0.3678362965583801,
+        "new_embed_states": 0.024438858032226562,
+        "new_processed_lens": 0.0
+      },
+      "kernelEvents": {
+        "CPUExecutionProvider": 19120,
+        "CoreMLExecutionProvider": 1200
+      },
+      "strictCoreML": false,
+      "strictError": "[ONNXRuntimeError] : 1 : FAIL : This session contains graph nodes that are assigned to the default CPU EP, but fallback to CPU EP has been explicitly disabled by the user."
+    },
+    "encoder-MLProgram": {
+      "graph": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/encoder-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "format": "MLProgram",
+      "fixtures": 8,
+      "outputMaxAbsError": {
+        "encoder_out": 0.0859677791595459,
+        "new_cached_key_0": 0.028467118740081787,
+        "new_cached_nonlin_attn_0": 0.1579049974679947,
+        "new_cached_val1_0": 0.18853962421417236,
+        "new_cached_val2_0": 0.21433204412460327,
+        "new_cached_conv1_0": 0.2230210304260254,
+        "new_cached_conv2_0": 0.22760963439941406,
+        "new_cached_key_1": 0.04610617458820343,
+        "new_cached_nonlin_attn_1": 0.0701143741607666,
+        "new_cached_val1_1": 0.13485002517700195,
+        "new_cached_val2_1": 0.2519851326942444,
+        "new_cached_conv1_1": 0.21680927276611328,
+        "new_cached_conv2_1": 0.18719244003295898,
+        "new_cached_key_2": 0.04444849491119385,
+        "new_cached_nonlin_attn_2": 0.08367413282394409,
+        "new_cached_val1_2": 0.12302064895629883,
+        "new_cached_val2_2": 0.26819562911987305,
+        "new_cached_conv1_2": 0.26759636402130127,
+        "new_cached_conv2_2": 0.2755122184753418,
+        "new_cached_key_3": 0.03274288773536682,
+        "new_cached_nonlin_attn_3": 0.04826211929321289,
+        "new_cached_val1_3": 0.10162198543548584,
+        "new_cached_val2_3": 0.15646862983703613,
+        "new_cached_conv1_3": 0.4501032829284668,
+        "new_cached_conv2_3": 0.230787992477417,
+        "new_cached_key_4": 0.0312311053276062,
+        "new_cached_nonlin_attn_4": 0.05845087766647339,
+        "new_cached_val1_4": 0.10201764106750488,
+        "new_cached_val2_4": 0.12625336647033691,
+        "new_cached_conv1_4": 0.14244318008422852,
+        "new_cached_conv2_4": 0.10741949081420898,
+        "new_cached_key_5": 0.035411179065704346,
+        "new_cached_nonlin_attn_5": 0.06492865085601807,
+        "new_cached_val1_5": 0.13765239715576172,
+        "new_cached_val2_5": 0.17350220680236816,
+        "new_cached_conv1_5": 0.19512534141540527,
+        "new_cached_conv2_5": 0.42876338958740234,
+        "new_embed_states": 1.430511474609375e-05,
+        "new_processed_lens": 0.0
+      },
+      "kernelEvents": {
+        "CoreMLExecutionProvider": 1576,
+        "CPUExecutionProvider": 14952
+      },
+      "strictCoreML": false,
+      "strictError": "[ONNXRuntimeError] : 1 : FAIL : This session contains graph nodes that are assigned to the default CPU EP, but fallback to CPU EP has been explicitly disabled by the user."
+    },
+    "decoder-NeuralNetwork": {
+      "graph": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/decoder-epoch-13-avg-2-chunk-8-left-64.onnx",
+      "format": "NeuralNetwork",
+      "fixtures": 8,
+      "outputMaxAbsError": {
+        "decoder_out": 0.0
+      },
+      "kernelEvents": {
+        "CPUExecutionProvider": 88,
+        "CoreMLExecutionProvider": 8
+      },
+      "strictCoreML": false,
+      "strictError": "[ONNXRuntimeError] : 1 : FAIL : This session contains graph nodes that are assigned to the default CPU EP, but fallback to CPU EP has been explicitly disabled by the user."
+    },
+    "decoder-MLProgram": {
+      "graph": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/decoder-epoch-13-avg-2-chunk-8-left-64.onnx",
+      "format": "MLProgram",
+      "fixtures": 8,
+      "outputMaxAbsError": {
+        "decoder_out": 0.0
+      },
+      "kernelEvents": {
+        "CPUExecutionProvider": 88,
+        "CoreMLExecutionProvider": 8
+      },
+      "strictCoreML": false,
+      "strictError": "[ONNXRuntimeError] : 1 : FAIL : This session contains graph nodes that are assigned to the default CPU EP, but fallback to CPU EP has been explicitly disabled by the user."
+    },
+    "joiner-NeuralNetwork": {
+      "graph": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/joiner-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "format": "NeuralNetwork",
+      "fixtures": 8,
+      "outputMaxAbsError": {
+        "logit": 3.814697265625e-06
+      },
+      "kernelEvents": {
+        "CoreMLExecutionProvider": 16,
+        "CPUExecutionProvider": 24
+      },
+      "strictCoreML": false,
+      "strictError": "[ONNXRuntimeError] : 1 : FAIL : This session contains graph nodes that are assigned to the default CPU EP, but fallback to CPU EP has been explicitly disabled by the user."
+    },
+    "joiner-MLProgram": {
+      "graph": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20/joiner-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "format": "MLProgram",
+      "fixtures": 8,
+      "outputMaxAbsError": {
+        "logit": 3.814697265625e-06
+      },
+      "kernelEvents": {
+        "CoreMLExecutionProvider": 16,
+        "CPUExecutionProvider": 16
+      },
+      "strictCoreML": false,
+      "strictError": "[ONNXRuntimeError] : 1 : FAIL : This session contains graph nodes that are assigned to the default CPU EP, but fallback to CPU EP has been explicitly disabled by the user."
+    }
+  },
+  "cacheFiles": 2837,
+  "cachedCoreMLModels": {
+    "mlmodel": 400,
+    "mlpackage": 0,
+    "mlmodelc": 353
+  },
+  "profilingScriptSHA256": "c6c4dd675b9afea6b48d88444dc861d241a65fe67abd1f17219c2ca9f1f2f492",
+  "standalone": {
+    "source": {
+      "url": "https://huggingface.co/MigoXV/icefall-kws-zipformer-zh-en-3M-2025-12-20",
+      "revision": "0e33d140e0543a03bddf77dbbaad84ef6f4b3ef1",
+      "files": {
+        "alignment.json": "47c4ede86ee9966d8137414937446b1196d000fd67f3d008dcda0fa00d35bc50",
+        "config.json": "c6e5634c68ab9ef115b3ec2ce5acbdcf655bb6cd7e26cc80bf8d8ff4909037c9",
+        "configuration_kws_zipformer.py": "dd92a836724f18512657d8f1ac5b2de546c9fe6834c278b22667148c81770c2a",
+        "decoder.py": "a9aeeeef278f4e5357d4e49253d24f5f1c60df88cfcb623ccbd01481dc1503ce",
+        "joiner.py": "1d21984dc95d05adbc9a2bf0be14b8567b36b58536c8bac2d864b02d24f934fc",
+        "model.py": "7424d50b930b16cf3213566ae6fd4a50101f6614afc0605cf103ada324c8d740",
+        "model.safetensors": "3cf361e82d9655ded223ad6a11f916a3479dc484276de6a571b59bbbad63f1f8",
+        "scaling.py": "6356af346bdb69d0864b77870bc53cb1152c84e65ca7c4053f1adccb0c54cf38",
+        "subsampling.py": "ac5df7cb952368ffb8abdbc07a2878ca5ed0c1b005191d526be8c011a823202f",
+        "zipformer.py": "3d071f5b6046807f344a7aaae1e0641c6f65a628bf2e6c077d17f2d416d6e9a9"
+      }
+    },
+    "conversionScriptSHA256": "5f3230e3f1e242c364e74a44acb17d3ca3e46d5b75b6677004284fac3bcfb923",
+    "conversionEnvironment": {
+      "torch": "2.15.0",
+      "coremltools": "9.0",
+      "numpy": "2.4.6"
+    },
+    "graphs": {
+      "encoder": {
+        "ComputeUnit.CPU_ONLY": {
+          "maxAbsError": {
+            "encoder_out": 2.86102294921875e-06,
+            "new_cached_key_0": 1.9073486328125e-06,
+            "new_cached_nonlin_attn_0": 7.957220077514648e-06,
+            "new_cached_val1_0": 6.794929504394531e-06,
+            "new_cached_val2_0": 8.106231689453125e-06,
+            "new_cached_conv1_0": 7.62939453125e-06,
+            "new_cached_conv2_0": 7.867813110351562e-06,
+            "new_cached_key_1": 1.519918441772461e-06,
+            "new_cached_nonlin_attn_1": 3.7550926208496094e-06,
+            "new_cached_val1_1": 5.0067901611328125e-06,
+            "new_cached_val2_1": 7.167458534240723e-06,
+            "new_cached_conv1_1": 1.239776611328125e-05,
+            "new_cached_conv2_1": 8.344650268554688e-06,
+            "new_cached_key_2": 1.1026859283447266e-06,
+            "new_cached_nonlin_attn_2": 4.023313522338867e-06,
+            "new_cached_val1_2": 4.291534423828125e-06,
+            "new_cached_val2_2": 6.198883056640625e-06,
+            "new_cached_conv1_2": 7.867813110351562e-06,
+            "new_cached_conv2_2": 8.106231689453125e-06,
+            "new_cached_key_3": 9.98377799987793e-07,
+            "new_cached_nonlin_attn_3": 1.5795230865478516e-06,
+            "new_cached_val1_3": 3.337860107421875e-06,
+            "new_cached_val2_3": 5.0067901611328125e-06,
+            "new_cached_conv1_3": 1.049041748046875e-05,
+            "new_cached_conv2_3": 7.569789886474609e-06,
+            "new_cached_key_4": 1.3709068298339844e-06,
+            "new_cached_nonlin_attn_4": 1.5497207641601562e-06,
+            "new_cached_val1_4": 3.248453140258789e-06,
+            "new_cached_val2_4": 4.351139068603516e-06,
+            "new_cached_conv1_4": 9.059906005859375e-06,
+            "new_cached_conv2_4": 3.814697265625e-06,
+            "new_cached_key_5": 1.3709068298339844e-06,
+            "new_cached_nonlin_attn_5": 1.996755599975586e-06,
+            "new_cached_val1_5": 5.0067901611328125e-06,
+            "new_cached_val2_5": 5.245208740234375e-06,
+            "new_cached_conv1_5": 6.67572021484375e-06,
+            "new_cached_conv2_5": 7.331371307373047e-06,
+            "new_embed_states": 1.9073486328125e-05,
+            "new_processed_lens": 0.0
+          },
+          "executionMS": [
+            1.389708,
+            1.338125,
+            1.317292,
+            1.307667,
+            1.444875,
+            1.365,
+            1.358167,
+            1.315792
+          ]
+        },
+        "ComputeUnit.ALL": {
+          "maxAbsError": {
+            "encoder_out": 1.8477439880371094e-06,
+            "new_cached_key_0": 1.6242265701293945e-06,
+            "new_cached_nonlin_attn_0": 6.690621376037598e-06,
+            "new_cached_val1_0": 5.4836273193359375e-06,
+            "new_cached_val2_0": 7.62939453125e-06,
+            "new_cached_conv1_0": 1.049041748046875e-05,
+            "new_cached_conv2_0": 9.059906005859375e-06,
+            "new_cached_key_1": 1.7136335372924805e-06,
+            "new_cached_nonlin_attn_1": 3.874301910400391e-06,
+            "new_cached_val1_1": 4.0531158447265625e-06,
+            "new_cached_val2_1": 8.875969797372818e-06,
+            "new_cached_conv1_1": 1.239776611328125e-05,
+            "new_cached_conv2_1": 5.364418029785156e-06,
+            "new_cached_key_2": 1.0635703802108765e-06,
+            "new_cached_nonlin_attn_2": 2.7418136596679688e-06,
+            "new_cached_val1_2": 4.0531158447265625e-06,
+            "new_cached_val2_2": 6.198883056640625e-06,
+            "new_cached_conv1_2": 4.76837158203125e-06,
+            "new_cached_conv2_2": 5.7220458984375e-06,
+            "new_cached_key_3": 8.940696716308594e-07,
+            "new_cached_nonlin_attn_3": 1.9073486328125e-06,
+            "new_cached_val1_3": 2.384185791015625e-06,
+            "new_cached_val2_3": 6.9141387939453125e-06,
+            "new_cached_conv1_3": 8.58306884765625e-06,
+            "new_cached_conv2_3": 6.198883056640625e-06,
+            "new_cached_key_4": 9.98377799987793e-07,
+            "new_cached_nonlin_attn_4": 1.9073486328125e-06,
+            "new_cached_val1_4": 3.0994415283203125e-06,
+            "new_cached_val2_4": 3.5762786865234375e-06,
+            "new_cached_conv1_4": 6.67572021484375e-06,
+            "new_cached_conv2_4": 3.337860107421875e-06,
+            "new_cached_key_5": 1.1324882507324219e-06,
+            "new_cached_nonlin_attn_5": 2.5331974029541016e-06,
+            "new_cached_val1_5": 3.919005393981934e-06,
+            "new_cached_val2_5": 3.337860107421875e-06,
+            "new_cached_conv1_5": 6.198883056640625e-06,
+            "new_cached_conv2_5": 7.62939453125e-06,
+            "new_embed_states": 2.765655517578125e-05,
+            "new_processed_lens": 0.0
+          },
+          "executionMS": [
+            5.225291,
+            5.110166,
+            5.0815,
+            4.98975,
+            5.10625,
+            4.994041,
+            4.144625,
+            4.066541
+          ]
+        }
+      },
+      "decoder": {
+        "ComputeUnit.CPU_ONLY": {
+          "maxAbsError": {
+            "decoder_out": 1.1920928955078125e-06
+          },
+          "executionMS": [
+            0.065375,
+            0.049375,
+            0.048958,
+            0.044292,
+            0.0455,
+            0.039875,
+            0.039708,
+            0.043958
+          ]
+        },
+        "ComputeUnit.ALL": {
+          "maxAbsError": {
+            "decoder_out": 1.9073486328125e-06
+          },
+          "executionMS": [
+            0.050833,
+            0.043542,
+            0.044209,
+            0.039833,
+            0.037875,
+            0.037375,
+            0.036792,
+            0.036959
+          ]
+        }
+      },
+      "joiner": {
+        "ComputeUnit.CPU_ONLY": {
+          "maxAbsError": {
+            "logit": 4.76837158203125e-06
+          },
+          "executionMS": [
+            0.062666,
+            0.047334,
+            0.043,
+            0.045,
+            0.044,
+            0.040083,
+            0.039209,
+            0.039125
+          ]
+        },
+        "ComputeUnit.ALL": {
+          "maxAbsError": {
+            "logit": 5.7220458984375e-06
+          },
+          "executionMS": [
+            0.051417,
+            0.042708,
+            0.039625,
+            0.038625,
+            0.038208,
+            0.037125,
+            0.036375,
+            0.036334
+          ]
+        }
+      }
+    },
+    "files": {
+      "decoder-parity.json": "16e4720c4c2ff1bc57a09412a79653dee66d119b6d763f11c25331c358c62243",
+      "decoder.mlpackage/Data/com.apple.CoreML/model.mlmodel": "2cdc71c5a1fe763ad5327c20f5a890ec8e6b1b1f5cd4e414e552d3d00c716256",
+      "decoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin": "6fa02ba294163a17c1c34beeb19a07b31e42a5e9590544be147931cfdea658dd",
+      "decoder.mlpackage/Manifest.json": "dea313487393ece73f7642931cd675fc196317ba31b797c474eebdd5a8129a96",
+      "encoder-parity.json": "4fb9420d2db260f2be651165fdce8b60c238381d04e0db2b3fc8068ade0d77d2",
+      "encoder.mlpackage/Data/com.apple.CoreML/model.mlmodel": "515304eef1ab5afd932913b8ce0b973e0dda24beb2430335674fd7d6cc61251c",
+      "encoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin": "057bc0587ef2efb6cd0c36be08b57c9a1d4e8e3776b4ffd20e86738cf506c97c",
+      "encoder.mlpackage/Manifest.json": "71a549287d61a7429f0c7ec68824424210eb58a0d02975a93ef2ef7a9a03674d",
+      "joiner-parity.json": "857e323d6a80bc4a6f083422eb3bae8c643f7c08393a6e796b60f87afa16bcc0",
+      "joiner.mlpackage/Data/com.apple.CoreML/model.mlmodel": "82b51b61f68e8502bcd33dae4c6794ab9a994fa7839e02062e2e616c782ffbc6",
+      "joiner.mlpackage/Data/com.apple.CoreML/weights/weight.bin": "9749ec82dbb6f66f4e64d72516c8fd32fae39bfd412b61d41e81c6a41b9500e6",
+      "joiner.mlpackage/Manifest.json": "9b60efe8abe276b33318ea8f16116d82afc36431f7197b449a00f07ed5e57dee"
+    }
+  }
+}

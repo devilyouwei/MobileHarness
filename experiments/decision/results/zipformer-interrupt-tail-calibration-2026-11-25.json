@@ -1,0 +1,601 @@
+{
+  "inputSHA256": "18ed469be26ebcc1929d61a5759169537139254908ff1e415cbaa9cd99ec149c",
+  "scriptSHA256": "c1e2d03352d4a3b9b5e39965fd84983364f93ed7836fab56aed3444089d66bd3",
+  "earlierCalibrationSHA256": null,
+  "thresholds": {
+    "rms": 0.006,
+    "frameMS": 10
+  },
+  "variants": [
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.45,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 200,
+        "minimumSilentTailMS": 0
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 127,
+        "accuracy": 0.6614583333333334,
+        "positive": 64,
+        "correctlyDetected": 19,
+        "missedOrWrong": 45,
+        "negative": 128,
+        "falseInterrupts": 20,
+        "detectedBy100MS": 4,
+        "detectionP50MS": 250.0,
+        "detectionP95MS": 380.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 380.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 15,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "40e7395e18169726b4549366fc88d7ebd869f8cd7b6b0f0518308bd4c2fbed6b"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.45,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 200,
+        "minimumSilentTailMS": 40
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 16,
+        "missedOrWrong": 48,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 1,
+        "detectionP50MS": 260.0,
+        "detectionP95MS": 380.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 380.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 15,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "40e7395e18169726b4549366fc88d7ebd869f8cd7b6b0f0518308bd4c2fbed6b"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.45,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 200,
+        "minimumSilentTailMS": 80
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 16,
+        "missedOrWrong": 48,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 1,
+        "detectionP50MS": 260.0,
+        "detectionP95MS": 380.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 380.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 15,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "40e7395e18169726b4549366fc88d7ebd869f8cd7b6b0f0518308bd4c2fbed6b"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.45,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 200,
+        "minimumSilentTailMS": 120
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 16,
+        "missedOrWrong": 48,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 1,
+        "detectionP50MS": 260.0,
+        "detectionP95MS": 380.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 380.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 15,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "40e7395e18169726b4549366fc88d7ebd869f8cd7b6b0f0518308bd4c2fbed6b"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.45,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 200,
+        "minimumSilentTailMS": 160
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 138,
+        "accuracy": 0.71875,
+        "positive": 64,
+        "correctlyDetected": 14,
+        "missedOrWrong": 50,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 1,
+        "detectionP50MS": 260.0,
+        "detectionP95MS": 380.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 380.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 13,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "40e7395e18169726b4549366fc88d7ebd869f8cd7b6b0f0518308bd4c2fbed6b"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.45,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 200,
+        "minimumSilentTailMS": 200
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 136,
+        "accuracy": 0.7083333333333334,
+        "positive": 64,
+        "correctlyDetected": 12,
+        "missedOrWrong": 52,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 280.0,
+        "detectionP95MS": 380.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 380.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 12,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "40e7395e18169726b4549366fc88d7ebd869f8cd7b6b0f0518308bd4c2fbed6b"
+    },
+    {
+      "config": {
+        "chunk": 16,
+        "threshold": 0.35,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 120,
+        "minimumSilentTailMS": 0
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 128,
+        "accuracy": 0.6666666666666666,
+        "positive": 64,
+        "correctlyDetected": 22,
+        "missedOrWrong": 42,
+        "negative": 128,
+        "falseInterrupts": 22,
+        "detectedBy100MS": 6,
+        "detectionP50MS": 260.0,
+        "detectionP95MS": 530.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 570.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 16,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "bf9adfa416f94c3c0f0718cf60b91ec8f63f3dd8fa80119f7f7fd3abcb92049f"
+    },
+    {
+      "config": {
+        "chunk": 16,
+        "threshold": 0.35,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 120,
+        "minimumSilentTailMS": 40
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 16,
+        "missedOrWrong": 48,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 330.0,
+        "detectionP95MS": 570.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 570.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 16,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "bf9adfa416f94c3c0f0718cf60b91ec8f63f3dd8fa80119f7f7fd3abcb92049f"
+    },
+    {
+      "config": {
+        "chunk": 16,
+        "threshold": 0.35,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 120,
+        "minimumSilentTailMS": 80
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 16,
+        "missedOrWrong": 48,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 330.0,
+        "detectionP95MS": 570.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 570.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 16,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "bf9adfa416f94c3c0f0718cf60b91ec8f63f3dd8fa80119f7f7fd3abcb92049f"
+    },
+    {
+      "config": {
+        "chunk": 16,
+        "threshold": 0.35,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 120,
+        "minimumSilentTailMS": 120
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 16,
+        "missedOrWrong": 48,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 330.0,
+        "detectionP95MS": 570.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 570.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 16,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "bf9adfa416f94c3c0f0718cf60b91ec8f63f3dd8fa80119f7f7fd3abcb92049f"
+    },
+    {
+      "config": {
+        "chunk": 16,
+        "threshold": 0.35,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 120,
+        "minimumSilentTailMS": 160
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 138,
+        "accuracy": 0.71875,
+        "positive": 64,
+        "correctlyDetected": 14,
+        "missedOrWrong": 50,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 340.0,
+        "detectionP95MS": 570.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 570.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 14,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "bf9adfa416f94c3c0f0718cf60b91ec8f63f3dd8fa80119f7f7fd3abcb92049f"
+    },
+    {
+      "config": {
+        "chunk": 16,
+        "threshold": 0.35,
+        "boost": 1.0,
+        "feedSamples": 160,
+        "maximumKeywordStartAfterSpeechMS": 120,
+        "minimumSilentTailMS": 200
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 136,
+        "accuracy": 0.7083333333333334,
+        "positive": 64,
+        "correctlyDetected": 12,
+        "missedOrWrong": 52,
+        "negative": 128,
+        "falseInterrupts": 4,
+        "detectedBy100MS": 0,
+        "detectionP50MS": 380.0,
+        "detectionP95MS": 570.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 570.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 12,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "bf9adfa416f94c3c0f0718cf60b91ec8f63f3dd8fa80119f7f7fd3abcb92049f"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.25,
+        "boost": 1.0,
+        "feedSamples": 512,
+        "maximumKeywordStartAfterSpeechMS": null,
+        "minimumSilentTailMS": 0
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 113,
+        "accuracy": 0.5885416666666666,
+        "positive": 64,
+        "correctlyDetected": 45,
+        "missedOrWrong": 19,
+        "negative": 128,
+        "falseInterrupts": 60,
+        "detectedBy100MS": 21,
+        "detectionP50MS": 170.0,
+        "detectionP95MS": 390.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 410.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 24,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.25,
+        "boost": 1.0,
+        "feedSamples": 512,
+        "maximumKeywordStartAfterSpeechMS": null,
+        "minimumSilentTailMS": 40
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 30,
+        "missedOrWrong": 34,
+        "negative": 128,
+        "falseInterrupts": 18,
+        "detectedBy100MS": 6,
+        "detectionP50MS": 270.0,
+        "detectionP95MS": 410.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 410.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 24,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.25,
+        "boost": 1.0,
+        "feedSamples": 512,
+        "maximumKeywordStartAfterSpeechMS": null,
+        "minimumSilentTailMS": 80
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 30,
+        "missedOrWrong": 34,
+        "negative": 128,
+        "falseInterrupts": 18,
+        "detectedBy100MS": 6,
+        "detectionP50MS": 270.0,
+        "detectionP95MS": 410.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 410.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 24,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.25,
+        "boost": 1.0,
+        "feedSamples": 512,
+        "maximumKeywordStartAfterSpeechMS": null,
+        "minimumSilentTailMS": 120
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 141,
+        "accuracy": 0.734375,
+        "positive": 64,
+        "correctlyDetected": 30,
+        "missedOrWrong": 34,
+        "negative": 128,
+        "falseInterrupts": 17,
+        "detectedBy100MS": 6,
+        "detectionP50MS": 270.0,
+        "detectionP95MS": 410.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 410.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 24,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.25,
+        "boost": 1.0,
+        "feedSamples": 512,
+        "maximumKeywordStartAfterSpeechMS": null,
+        "minimumSilentTailMS": 160
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 141,
+        "accuracy": 0.734375,
+        "positive": 64,
+        "correctlyDetected": 29,
+        "missedOrWrong": 35,
+        "negative": 128,
+        "falseInterrupts": 16,
+        "detectedBy100MS": 6,
+        "detectionP50MS": 290.0,
+        "detectionP95MS": 410.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 410.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 23,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+    },
+    {
+      "config": {
+        "chunk": 8,
+        "threshold": 0.25,
+        "boost": 1.0,
+        "feedSamples": 512,
+        "maximumKeywordStartAfterSpeechMS": null,
+        "minimumSilentTailMS": 200
+      },
+      "metrics": {
+        "replays": 192,
+        "correct": 140,
+        "accuracy": 0.7291666666666666,
+        "positive": 64,
+        "correctlyDetected": 27,
+        "missedOrWrong": 37,
+        "negative": 128,
+        "falseInterrupts": 15,
+        "detectedBy100MS": 6,
+        "detectionP50MS": 290.0,
+        "detectionP95MS": 410.0,
+        "decodeP50MS": null,
+        "decodeP95MS": null,
+        "decodeCalls": 0,
+        "phraseEndP95MS": 410.0,
+        "phraseEndPositive": 32,
+        "phraseEndCorrect": 21,
+        "phraseEndDetectedBy100MS": 0
+      },
+      "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+    }
+  ],
+  "observations": [],
+  "selected": {
+    "config": {
+      "chunk": 8,
+      "threshold": 0.25,
+      "boost": 1.0,
+      "feedSamples": 512,
+      "maximumKeywordStartAfterSpeechMS": null,
+      "minimumSilentTailMS": 160
+    },
+    "metrics": {
+      "replays": 192,
+      "correct": 141,
+      "accuracy": 0.734375,
+      "positive": 64,
+      "correctlyDetected": 29,
+      "missedOrWrong": 35,
+      "negative": 128,
+      "falseInterrupts": 16,
+      "detectedBy100MS": 6,
+      "detectionP50MS": 290.0,
+      "detectionP95MS": 410.0,
+      "decodeP50MS": null,
+      "decodeP95MS": null,
+      "decodeCalls": 0,
+      "phraseEndP95MS": 410.0,
+      "phraseEndPositive": 32,
+      "phraseEndCorrect": 23,
+      "phraseEndDetectedBy100MS": 0
+    },
+    "traceSHA256": "7e1532d67fe4c71f4c7189d3cece21100a05f5cfb8b978361bc8bbfdf6d9ec38"
+  }
+}

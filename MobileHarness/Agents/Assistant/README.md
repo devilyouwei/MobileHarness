@@ -58,7 +58,7 @@ The root keeps the Agent entry, container, execution session and processing asse
 | [AssistantInterrupt.swift](Input/AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
 | [AssistantListeningSignal.swift](Input/AssistantListeningSignal.swift) | `agent.listening.mode.v1` / `agent.reply.activity.v1` messages and their publication. |
 | [ListeningCoordinator.swift](Input/ListeningCoordinator.swift) / [QuietExitJudge.swift](Input/QuietExitJudge.swift) | `listening` Trigger handler, `quiet` exit judgment and its record. |
-| [AssistantInputDecision.swift](Input/AssistantInputDecision.swift) | Frozen current reply and latest user input, localized interruption question, ModelKit noul invocation, independent bounded classification queue, targeted signal submission and log values. |
+| [AssistantInputDecision.swift](Input/AssistantInputDecision.swift) | Settings-selected Decision model, bounded inference for interrupt and quiet wake, and targeted interrupt settlement. |
 | [AssistantInputBatch.swift](Input/AssistantInputBatch.swift) | Trusted source timeline, batch text, source-line markers and input prompt access. |
 | [AssistantStateBindings.swift](State/AssistantStateBindings.swift) | Business-only exact-path State adaptation. |
 | [AssistantSpeechOutput.swift](Output/AssistantSpeechOutput.swift) | AssistantSpeechProducing contract, audio-handle production and synthesis/playback presentation. |
@@ -100,7 +100,7 @@ Public Agent introductions are limited to 8,192 bytes and filtered by actual del
 
 System instructions are limited to 64 KiB. Current Assistant Skills expose XML Actions and no native request tools; the native-call machinery remains available for controlled fixtures. Writer owns its independent native tool workflow. Already dispatched requests and recorded evidence are not rewritten when Skills or language change.
 
-Assistant/Prompts.json owns execution evidence, Task-history prefixes, peer-task coordination (`taskQuestion`, `taskEventsHeading`, `taskEvent`, `taskNotice`) and default reply language. InputProtocol.json owns input guidance and canonical timeline markers. InputDecision.json and its zh-Hans sibling own localized boolean interruption questions. Shared RequestContext templates render fresh State and image manifests. InputDecisionOutcome's UI log projection stays in Assistant; generic runtime logs retain their existing AppLanguage injection.
+Assistant/Prompts.json owns execution evidence, Task-history prefixes, peer-task coordination (`taskQuestion`, `taskEventsHeading`, `taskEvent`, `taskNotice`) and default reply language. InputProtocol.json owns input guidance and canonical timeline markers. InputDecision.json and its zh-Hans sibling own localized boolean interruption questions. QuietExit resources own the separate default and conditioned wake questions. Shared RequestContext templates render fresh State and image manifests. InputDecisionOutcome's UI log projection stays in Assistant; generic runtime logs retain their existing AppLanguage injection.
 
 ## State, goal and Skill lifecycle
 

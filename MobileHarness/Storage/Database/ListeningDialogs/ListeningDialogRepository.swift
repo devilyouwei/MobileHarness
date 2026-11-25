@@ -12,7 +12,7 @@ public struct ListeningDialogRecord: Sendable, Equatable {
     public let text: String
     public let decision: Decision
     public let reason: String?
-    /// `system` (Apple) or `configured` (the Assistant's selected model); `nil` when no tier answered.
+    /// `local` or `cloud` for the selected Decision source, `literal` for direct matching, nil on failure. Older rows retain historical source values.
     public let modelTier: String?
     public let modelID: String?
     public let latencyMS: Int

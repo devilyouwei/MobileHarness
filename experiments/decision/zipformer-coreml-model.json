@@ -1,0 +1,63 @@
+{
+  "repository": "hugging-mac/zipformer-kws-zh-en-3m-coreml",
+  "revision": "46d5bc5be5acf590afdb8349d89bb2533f01ce48",
+  "chunk": 8,
+  "files": {
+    "LICENSE": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "NOTICE": {
+      "bytes": 911,
+      "sha256": "d80c69a2c0f084103f70a9f21b00e49196fa0311a41c63edbbc471253d34a0fd"
+    },
+    "decoder.mlpackage/Data/com.apple.CoreML/model.mlmodel": {
+      "bytes": 6005,
+      "sha256": "9a1bd003f15d9f119254ed296121ea422cad01eb2f20d7fb8766217bc98d6457"
+    },
+    "decoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin": {
+      "bytes": 758080,
+      "sha256": "6fa02ba294163a17c1c34beeb19a07b31e42a5e9590544be147931cfdea658dd"
+    },
+    "decoder.mlpackage/Manifest.json": {
+      "bytes": 617,
+      "sha256": "083d93544fe3840fd7453d290e23f01b300dced2843e64bc5ffcc1e745a7c2d5"
+    },
+    "encoder.mlpackage/Data/com.apple.CoreML/model.mlmodel": {
+      "bytes": 342798,
+      "sha256": "0507959451be7afc226e7c8a0aeb2c17429ded2fcf51c826baee7cbd5af92086"
+    },
+    "encoder.mlpackage/Data/com.apple.CoreML/weights/weight.bin": {
+      "bytes": 11017792,
+      "sha256": "03182c99ce026d52a0439b7b2022904393f7e13f119cc30c93cb847809d3836e"
+    },
+    "encoder.mlpackage/Manifest.json": {
+      "bytes": 617,
+      "sha256": "3d45bb9d02b3ab48c5ee5e363b681cfb207b54965dfb32421eedffbb78ab23ee"
+    },
+    "joiner.mlpackage/Data/com.apple.CoreML/model.mlmodel": {
+      "bytes": 1413,
+      "sha256": "d46064f8c50fb19fc0a424d4fc5b70371e901ba50e3abb55df7fa7ae9343bf7d"
+    },
+    "joiner.mlpackage/Data/com.apple.CoreML/weights/weight.bin": {
+      "bytes": 337920,
+      "sha256": "9749ec82dbb6f66f4e64d72516c8fd32fae39bfd412b61d41e81c6a41b9500e6"
+    },
+    "joiner.mlpackage/Manifest.json": {
+      "bytes": 617,
+      "sha256": "0a211d8d49d4b5e7a60954ca14a44d1cfd4a4b2f1428460ddaf1055c745d27e9"
+    },
+    "manifest.json": {
+      "bytes": 10568,
+      "sha256": "adb23b49edd7b6a20fb9a2c479ba1a2d33d5275d0704775066fc00d5435fc063"
+    },
+    "spotter.py": {
+      "bytes": 11146,
+      "sha256": "8b273dc967e03bbd9b5e47b83d5329983e02cf3c683204fe959425e7231f5766"
+    },
+    "tokens.txt": {
+      "bytes": 1928,
+      "sha256": "2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0"
+    }
+  }
+}

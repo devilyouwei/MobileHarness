@@ -26,7 +26,6 @@
 
 与最初草案相比的实际取舍：
 
-- 判定通道只有两层：`system`（Apple 系统模型）与 `configured`（Assistant 当前所选模型，本地自定义或云端），不单列第三层。
 - `listening_dialogs` 用 `session_id` 而非 `conversation_id`，没有 episode 关闭记录；episode 由首条与末条记录隐含。
 - 没有新增 PlatformKit 接口：回声消除能力沿用采集代际已有的 `supportsFullDuplex`。
 - `full` 在采集开始前被接受，采集确认不支持时协调器写回 `half` 并报告；已知不支持时直接拒绝。
@@ -46,8 +45,13 @@
 
 - Assistant 的 `state.set` 接收仅适用于 `listening=quiet` 的可选 `wakeCondition`。模型可归纳用户的条件，但保留关键词、否定和明确授权要求。缺少特殊条件时沿用默认唤醒规则。
 - Assistant 私有 State 只保存当前 quiet 轮次的 `wakeCondition`。任何离开 quiet 的写入清空它，State 分页与 `state.get` 此时显示 null。去除内部宿主写入的唤醒句参数。
-- 真机 00:03 的记录显示主模型曾遗漏“除非喊名字”，另一轮 Apple 模型则对“你是谁？”返回 exit，理由却说未获许可。控制资源要求保留“直到”和“除非”条件。具体关键词使用同一个字段内的 `literal:` 格式，由 QuietExitJudge 直接在 ASR 文本中匹配。开放式语义约定仍交给模型，提示词只要求单词 verdict，运行时拒绝带解释或其他内容的结果并按既有顺序回退。
+- 真机 00:03 的记录显示主模型曾遗漏“除非喊名字”，另一轮 Apple 模型则对“你是谁？”返回 exit，理由却说未获许可。控制资源要求保留“直到”和“除非”条件。具体关键词使用同一个字段内的 `literal:` 格式，由 QuietExitJudge 直接在 ASR 文本中匹配。开放式语义约定使用 Decision 的布尔判定。
 - 显式条件优先于普通招呼。原模式恢复后，同一句 ASR 交回普通对话。SQLite 继续保存逐句判定，字面匹配标记为本地规则。Swift 回归覆盖关键词误触、语义输出矛盾、恢复后的 State 清空以及原有默认路由。
+
+### 共用 Decision 模型
+
+- Agent Runtime 为 interrupt 和 quiet 退出共用 Settings 所选的 Decision 服务。保留语义布尔提问和字面匹配、原模式恢复及退出句回交。退出判定失败时保持 quiet。新记录在现有表结构下标为 `local`、`cloud` 或 `literal`。
+- Settings 的 Agent Models 在 Decision 条目上标明 Interrupt 和 Awake 两个场景，继续使用既有选择与保存入口。运行契约见 [Assistant 输入](../../../MobileHarness/Agents/Assistant/Input/README.md#listening-and-quiet)与 [Settings](../../../MobileHarness/UI/Settings/README.md)。
 
 ## 待完成
 
@@ -55,11 +59,11 @@
 | --- | --- |
 | 默认聆听模式设置 | 设置页持久化 `half` / `full` 默认值（`quiet` 不作默认），启动时写入 `listening`。当前固定为 `full`。涉及设置模型、Actions 偏好服务、ApplicationControl 与设置页，需单独计划。 |
 | 勿扰联动 | 设计勿扰来源后，开启时宿主写 `quiet` 并禁止判定通道退出。 |
-| 判定准确率实验 | 退出判定已有[评估](../../validation/Quiet-Exit-Evaluation.md)（D3、Vela、Laya、Apple、云端 qwen3.8-flash）。未完成：进入语句判定、真实 ASR 文本、提示词变体。`experiments/assistant/assistant-evaluation.json` 的系统提示快照仍含旧 `quiet` 变量。 |
+| 判定准确率实验 | 退出判定已有[历史评估](../../validation/Quiet-Exit-Evaluation.md)和[新版提示评估](../../validation/Quiet-Exit-Decision-2026-11-25.md)。未完成：进入语句判定、真实 ASR 文本。`experiments/assistant/assistant-evaluation.json` 的系统提示快照仍含旧 `quiet` 变量。 |
 | 名字唤醒 | 名字成为状态机的一部分后再做匹配；当前任何称呼都可唤醒。 |
 | 真机验收 | 全双工回声消除与打断、半双工闸门、`quiet` 误唤醒与漏唤醒、Apple 系统模型与已下载本地模型的实际延迟。未在真机或真实模型上运行。 |
 
 ## 验收
 
-- 已通过自动化测试（见 [验证记录](../../validation/Validation-History.md)）：枚举校验、Trigger 注册与不重入、处理器拒绝不发布、`quiet` 路由、`full` 能力检查、判定降级与超时、新句取代、连续失败保持 `quiet`、退出恢复进入前模式、会话结束复位、`listening_dialogs` 存取与容量淘汰。
+- 已通过自动化测试（见 [验证记录](../../validation/Validation-History.md)）：枚举校验、Trigger 注册与不重入、处理器拒绝不发布、`quiet` 路由、`full` 能力检查、历史判定路径的降级与超时、新句取代、连续失败保持 `quiet`、退出恢复进入前模式、会话结束复位、`listening_dialogs` 存取与容量淘汰。
 - 实验归 `experiments/`，不放入 Tests；真机验收单独记录，缺失时不得描述为已通过。

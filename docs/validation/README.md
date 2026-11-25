@@ -207,6 +207,11 @@ refactor, Agent-only model recording, current-file recovery and automated/build/
 - [D3 Edge Core AI](D3-Edge-CoreAI.md)：本机 Core AI/PyTorch/Swift 对照、全双工文本三分类、性能与实验性发布证据。
 - [Mac 本地 Decision 多分类对照](Decision-Model-Mac-Comparison.md)记录全双工多分类的模型、提示词和时延对照。
 - [quiet 退出判定评估](Quiet-Exit-Evaluation.md)记录最新一句话结束 quiet 的 92 条中英用例在 D3、Vela、Laya、Apple 系统模型与云端 qwen3.8-flash 上的准确率、误唤醒与时延，并含简化为“是否要求唤醒”是非问句的提示词变体。
+- [新版 quiet 提示词的本地 Decision 对照](Quiet-Exit-Decision-2026-11-25.md)使用新编的 64 条中英用例，分别评估默认邀请、明确授权、直接称名和语义约定。
+- [中英 Zipformer KWS 的 Apple ONNX 基线](Zipformer-Apple-ONNX-Baseline-2026-11-25.md)记录 Mac 上两个流式分块制品的命中、误触发和回放时延。
+- [中英 Zipformer 的 Core ML 与 ONNX 对照](Zipformer-Apple-CoreML-Comparison-2026-11-25.md)记录同音频上的独立 Core ML 转换、执行提供者分区、准确性和 p95。
+- [Hugging Mac Zipformer Core ML 发布版回放](Zipformer-Hugging-Mac-Release.md)记录固定制品、下载校验及冻结音频复测。
+- [Zipformer 快速打断配置筛选](Zipformer-Interrupt-Config-2026-11-25.md)记录声学参数、因果门限、两批独立复核及旁路候选。
 - [Mac 本地 Decision 打断意图二分类实验](Decision-Binary-Interrupt-Mac-Comparison.md)记录 D3 Edge 与 Vela3 Fast 的三波对照，包括单句、中英提示与 noul／choice、历史上下文。
 - [Decision prompt language split](Decision-Model-Mac-Comparison.md#decision-prompt-language-split) compares the current English and Chinese prompts with the pre-split mixed prompt using native D3 and the application adoption policy.
 - [小参数生成模型的 Core AI 对照](Decision-Model-Mac-Comparison.md#小参数生成模型的-core-ai-对照)记录 0.6B 至 1.54B 制品在 100 条中英全双工探测上的分类、延迟和提示词复测。

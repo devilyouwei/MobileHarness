@@ -10,6 +10,8 @@ import evaluate_quiet_exit as quiet
 HERE = Path(__file__).resolve().parent
 PROMPTS = json.loads((HERE / 'quiet-exit-prompts.json').read_text())
 DATASET = json.loads((HERE / 'datasets' / 'quiet-exit-cases-2026-11-23.json').read_text())
+CURRENT_PROMPTS = json.loads((HERE / 'quiet-exit-current-prompts-2026-11-25.json').read_text())
+CURRENT_DATASET = json.loads((HERE / 'datasets' / 'quiet-exit-current-cases-2026-11-25.json').read_text())
 
 
 class Chat:
@@ -45,7 +47,7 @@ class QuietExitTests(unittest.TestCase):
         self.assertEqual(chat.messages[1]['content'], cases[0]['sentence'])
         self.assertNotIn(cases[0]['group'], json.dumps(chat.messages))
 
-    def test_answers_parse_like_the_app(self):
+    def test_historical_answers_allow_explanations(self):
         self.assertEqual(quiet.parse_answer('exit'), ('exit', None))
         self.assertEqual(quiet.parse_answer('  Stay. '), ('stay', None))
         self.assertEqual(quiet.parse_answer('exit: the user invites me'), ('exit', 'the user invites me'))
@@ -82,6 +84,31 @@ class QuietExitTests(unittest.TestCase):
         self.assertEqual(json.loads(text), dict(latest_user_sentence='So then I went home.'))
         self.assertEqual(question, dict(type='noul', instructions=PROMPTS['decision']['en']))
         self.assertFalse(asyncio.run(quiet.evaluate_case(case, PROMPTS, native=Native(.9)))['passed'])
+
+    def test_current_default_sends_only_sentence_and_tie_stays(self):
+        case = quiet.load_cases(CURRENT_DATASET)[0]
+        native = Native(.5)
+        row = asyncio.run(quiet.evaluate_case(case, CURRENT_PROMPTS, native=native))
+        self.assertEqual(row['prediction'], 'stay')
+        self.assertEqual(native.call, (case['sentence'], {
+            'type': 'noul', 'instructions': CURRENT_PROMPTS['decision'][case['language']]['instructions'],
+        }))
+
+    def test_current_conditioned_request_contains_only_condition_and_utterance(self):
+        case = next(c for c in quiet.load_cases(CURRENT_DATASET) if 'wakeCondition' in c)
+        native = Native(.9)
+        chat = Chat('  EXIT  ')
+        self.assertEqual(asyncio.run(quiet.evaluate_case(case, CURRENT_PROMPTS, chat=chat))['prediction'], 'exit')
+        asyncio.run(quiet.evaluate_case(case, CURRENT_PROMPTS, native=native))
+        self.assertEqual(chat.messages[0]['content'], CURRENT_PROMPTS['chat'][case['language']]['conditioned'])
+        self.assertEqual(native.call[1]['instructions'], CURRENT_PROMPTS['decision'][case['language']]['conditioned'])
+        self.assertEqual(native.call[0], chat.messages[1]['content'])
+        self.assertEqual(json.loads(native.call[0]), {
+            'wakeCondition': case['wakeCondition'], 'latestUtterance': case['sentence'],
+        })
+        for answer in ('exit because they called', 'stay.', 'true'):
+            row = asyncio.run(quiet.evaluate_case(case, CURRENT_PROMPTS, chat=Chat(answer)))
+            self.assertEqual(row['issues'], ['invalidAnswer'])
 
     def test_metrics_separate_false_wakes_from_missed_exits_and_skip_ambiguous(self):
         rows = [

@@ -1,6 +1,8 @@
 import AgentCore
 import Foundation
 import ModelKit
+import ModelKitDefaults
+import ModelKitRuntime
 import StorageSQLite
 import StorageTasks
 import Synchronization
@@ -34,8 +36,44 @@ private final class ScriptedChat: ChatCapability, Sendable {
 }
 private enum QuietTestFailure: Error { case failed, exhausted }
 
-private func tier(_ name: String, _ chat: ScriptedChat) -> QuietModelTier {
-    QuietModelTier(name: name, modelID: name + "-model", chat: { chat })
+private final class ScriptedDecision: ModelDecisionProviding, Sendable {
+    private let script: Mutex<[Result<Bool, QuietTestFailure>]>
+    private let received = Mutex<[NoulRequest]>([])
+    private let delay: Duration
+
+    init(_ script: [Result<Bool, QuietTestFailure>], delay: Duration = .zero) {
+        self.script = Mutex(script)
+        self.delay = delay
+    }
+
+    var requests: [NoulRequest] { received.withLock { $0 } }
+    var availability: CapabilityAvailability { .available }
+    func load() {}
+    func warmup() {}
+    func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) {}
+    func unload() {}
+    func status() -> ModelState { .ready }
+    func choice(_ request: DecisionRequest) throws -> InferenceSession<DecisionResult> {
+        throw CapabilityError.invalidRequest("Expected a boolean Decision request")
+    }
+    func noul(_ request: NoulRequest) async throws -> InferenceSession<NoulResult> {
+        received.withLock { $0.append(request) }
+        let next = script.withLock { $0.isEmpty ? .failure(.exhausted) : $0.removeFirst() }
+        if delay > .zero { try await Task.sleep(for: delay) }
+        let pair = InferenceSession<NoulResult>.make(
+            context: request.context, limits: try StreamLimits(), estimatedBytes: { _ in 16 })
+        try pair.emitter.yield(NoulResult(value: next.get()))
+        pair.emitter.finish()
+        return pair.session
+    }
+}
+
+private func localDecision(_ model: ScriptedDecision, cloud: ScriptedChat? = nil, timeout: Duration = .seconds(2))
+    -> AssistantInputDecision
+{
+    AssistantInputDecision(
+        local: model, configuration: { (true, cloud.map { chat in { @Sendable in chat } }) },
+        timeout: timeout, localTimeout: timeout)
 }
 
 private func quietInput() throws -> AgentInput {
@@ -52,44 +90,57 @@ private func until(_ condition: @Sendable () async -> Bool) async throws {
     Issue.record("Timed out waiting for a condition")
 }
 
-@Test(arguments: [("exit", QuietJudgement.Decision.exit), ("  STAY  ", .stay)])
-func exitAnswersAcceptOnlyTheVerdict(answer: String, decision: QuietJudgement.Decision) throws {
-    #expect(try QuietExitJudge.parse(answer) == decision)
-}
+@Test(.actionCatalog) func quietAndInterruptReadTheSameDecisionSelection() async throws {
+    let first = ScriptedDecision([.success(false), .success(true)])
+    let second = ScriptedDecision([.success(false), .success(false)])
+    let selected = Mutex("first")
+    let service = AssistantInputDecision(
+        localModel: { $0 == "first" ? first : second },
+        selectedConfiguration: { (selected.withLock { $0 }, nil) })
+    let judge = QuietExitJudge(decision: service)
+    let input = try quietInput()
 
-@Test(arguments: ["", "maybe", "I think exit", "1", "exit 用户未明确允许开口，仅询问身份", "stay."])
-func anythingElseIsNotAnAnswer(answer: String) {
-    #expect(throws: QuietExitError.invalidAnswer) { try QuietExitJudge.parse(answer) }
-}
-
-@Test(.actionCatalog) func judgeFallsThroughTiersInOrderAndReportsTheOneThatAnswered() async throws {
-    let judge = QuietExitJudge(tiers: [
-        tier("system", ScriptedChat([.success("exit 用户未明确允许开口")])),
-        tier("configured", ScriptedChat([.success("stay")])),
-    ])
-    let result = try await judge.judge("好了，你可以说话了")
-    #expect(result.decision == .stay && result.tier == "configured" && result.modelID == "configured-model")
-}
-
-@Test(.actionCatalog) func judgeFailsWhenEveryTierFailsOrAnswersBadly() async throws {
-    let judge = QuietExitJudge(tiers: [
-        tier("system", ScriptedChat([.success("hmm")])), tier("configured", ScriptedChat([.failure(.failed)])),
-    ])
-    do {
-        _ = try await judge.judge("x")
-        Issue.record("Expected failure")
-    } catch QuietExitError.unavailable(let failures) {
-        #expect(failures.count == 2)
+    for (id, expected) in [("first", QuietJudgement.Decision.exit), ("second", .stay)] {
+        selected.withLock { $0 = id }
+        let interrupt = await service.classify(
+            InputDecisionSnapshot(input: input, text: "Hold on.", currentAssistantReply: "My answer is…"))
+        #expect(interrupt.route == .local(modelID: id) && interrupt.modelResult == false)
+        let awake = try await judge.judge("Go ahead.", context: .init(requestID: id + ".awake"))
+        #expect(awake.decision == expected && awake.tier == "local" && awake.modelID == id)
     }
+    for model in [first, second] {
+        try #require(model.requests.count == 2)
+        #expect(model.requests[0].text.contains("current_assistant_reply"))
+        #expect(model.requests[1].text == "Go ahead.")
+        #expect(model.requests[1].instructions.contains("inviting you to talk again"))
+    }
+    await service.stop()
 }
 
-@Test(.actionCatalog) func judgeTimesOutASlowTierAndTriesTheNext() async throws {
-    let judge = QuietExitJudge(
-        tiers: [
-            tier("system", ScriptedChat([.success("exit")], delay: .seconds(30))),
-            tier("configured", ScriptedChat([.success("stay")])),
-        ], timeout: .milliseconds(100))
-    #expect(try await judge.judge("x").tier == "configured")
+@Test(.actionCatalog) func quietUsesTheSelectedCloudDecision() async throws {
+    let cloud = ScriptedChat([.success("true")])
+    let service = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { cloud })
+    let judge = QuietExitJudge(decision: service)
+    let result = try await judge.judge("Go ahead.", context: .init(requestID: "cloud.awake"))
+    #expect(result.tier == "cloud" && result.decision == .exit)
+    let request = try #require(cloud.requests.first)
+    #expect(request.context.requestID == "cloud.awake")
+    #expect(request.messages.first?.content.contains("Return only the JSON boolean true or false.") == true)
+    await service.stop()
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func quietFailureOrTimeoutDoesNotTryAnotherModel(timesOut: Bool) async throws {
+    let local = ScriptedDecision(
+        [.failure(.failed)], delay: timesOut ? .seconds(30) : .zero)
+    let cloud = ScriptedChat([.success("true")])
+    let service = localDecision(local, cloud: cloud, timeout: .milliseconds(300))
+    let judge = QuietExitJudge(decision: service)
+    await #expect(throws: CapabilityError.self) {
+        try await judge.judge("Go ahead.", context: .init(requestID: "failure.awake"))
+    }
+    #expect(local.requests.count == 1 && cloud.requests.isEmpty)
+    await service.stop()
 }
 
 private final class ModeWrites: Sendable {
@@ -101,9 +152,10 @@ private final class ModeWrites: Sendable {
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func quietEpisodeEndsOnExitReturnsToThePreviousModeAndRecordsEveryJudgment() async throws {
     let repositories = try SQLiteRepositories.temporary()
-    let chat = ScriptedChat([.success("stay"), .success("exit")])
+    let decision = ScriptedDecision([.success(false), .success(true)])
     let coordinator = ListeningCoordinator(
-        judge: QuietExitJudge(tiers: [tier("system", chat)]), dialogs: repositories.listeningDialogs, sessionID: "s")
+        judge: QuietExitJudge(decision: localDecision(decision)), dialogs: repositories.listeningDialogs, sessionID: "s"
+    )
     let writes = ModeWrites()
     let published = ModeWrites()
     let released = Mutex<[String]>([])
@@ -131,7 +183,8 @@ func quietEpisodeEndsOnExitReturnsToThePreviousModeAndRecordsEveryJudgment() asy
     #expect(published.modes == [.full, .quiet, .full])
     let rows = try await repositories.listeningDialogs.recentListeningDialogs(limit: 10).reversed()
     #expect(rows.map(\.decision) == [.stay, .exit])
-    #expect(Set(rows.map(\.episodeID)).count == 1 && rows.allSatisfy { $0.modelTier == "system" })
+    #expect(Set(rows.map(\.episodeID)).count == 1)
+    #expect(rows.allSatisfy { $0.modelTier == "local" && $0.modelID == "d3-edge" })
     #expect(rows.map(\.text) == ["我想一想", "好了，你可以跟我说话了"])
     // Speech after the episode no longer reaches the judge.
     coordinator.receiveQuiet("还在吗", try quietInput())
@@ -143,9 +196,10 @@ func quietEpisodeEndsOnExitReturnsToThePreviousModeAndRecordsEveryJudgment() asy
 func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async throws {
     let condition = literal ? "literal:秦始皇" : "Wait for 秦始皇"
     let repositories = try SQLiteRepositories.temporary()
-    let judge = ScriptedChat([.success("stay"), .success("exit")])
+    let judge = ScriptedDecision([.success(false), .success(true)])
+    let decision = localDecision(judge)
     let coordinator = ListeningCoordinator(
-        judge: QuietExitJudge(tiers: [tier("system", judge)]),
+        judge: QuietExitJudge(decision: decision),
         dialogs: repositories.listeningDialogs, sessionID: "s")
     let context = try AgentContextRepository(
         agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
@@ -156,7 +210,7 @@ func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async th
         .success("I can speak again."),
     ])
     let agent = try AssistantAgent(
-        stateContext: try publicStateFixture(), fullDuplex: true, speechSessionID: "s",
+        stateContext: try publicStateFixture(), inputDecision: decision, fullDuplex: true, speechSessionID: "s",
         chat: model, listening: coordinator, context: context)
     let speech = try await bindSpeechRequests(agent)
     let interruptions = Mutex(0)
@@ -201,13 +255,11 @@ func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async th
     #expect(try await context.snapshot().work["wake"]?.state == .completed)
     let rows = try await repositories.listeningDialogs.recentListeningDialogs(limit: 10)
     #expect(rows.map(\.decision) == [.exit, .stay])
-    #expect(rows.map(\.modelTier) == (literal ? ["literal", "literal"] : ["system", "system"]))
+    #expect(rows.map(\.modelTier) == (literal ? ["literal", "literal"] : ["local", "local"]))
     #expect(judge.requests.count == (literal ? 0 : 2))
     for (request, text) in zip(judge.requests, ["你是谁？", "秦始皇"]) {
-        #expect(request.messages.map(\.role) == [.system, .user])
-        #expect(request.messages.first?.content.contains("satisfies the agreement") == true)
-        let user = try #require(request.messages.last?.content)
-        let fields = try JSONDecoder().decode([String: String].self, from: Data(user.utf8))
+        #expect(request.instructions.contains("satisfy the agreement"))
+        let fields = try JSONDecoder().decode([String: String].self, from: Data(request.text.utf8))
         #expect(fields == ["wakeCondition": condition, "latestUtterance": text])
     }
     let afterWake = await agent.stateVariables().first { $0.path == "agents.assistant.listening" }
@@ -224,9 +276,8 @@ func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async th
 func aNewerUtteranceReplacesAnUnfinishedJudgment() async throws {
     let repositories = try SQLiteRepositories.temporary()
     let coordinator = ListeningCoordinator(
-        judge: QuietExitJudge(tiers: [
-            tier("system", ScriptedChat([.success("stay"), .success("stay")], delay: .milliseconds(300)))
-        ]),
+        judge: QuietExitJudge(
+            decision: localDecision(ScriptedDecision([.success(false), .success(false)], delay: .milliseconds(300)))),
         dialogs: repositories.listeningDialogs, sessionID: "s")
     coordinator.bind(cancelReply: {}, writeMode: { _ in })
     try await coordinator.apply(.quiet, source: .model)
@@ -244,7 +295,7 @@ func judgeFailuresStayInQuietAreRecordedAndSurfacedOnce() async throws {
     let repositories = try SQLiteRepositories.temporary()
     let reports = Mutex<[String]>([])
     let coordinator = ListeningCoordinator(
-        judge: QuietExitJudge(tiers: [tier("system", ScriptedChat([]))]), dialogs: repositories.listeningDialogs,
+        judge: QuietExitJudge(decision: localDecision(ScriptedDecision([]))), dialogs: repositories.listeningDialogs,
         sessionID: "s", report: { message in reports.withLock { $0.append(message) } })
     coordinator.bind(cancelReply: {}, writeMode: { _ in })
     try await coordinator.apply(.quiet, source: .host)
@@ -289,7 +340,7 @@ func judgeFailuresStayInQuietAreRecordedAndSurfacedOnce() async throws {
 func endingTheSessionCancelsTheJudgmentAndReturnsToTheDefaultMode() async throws {
     let repositories = try SQLiteRepositories.temporary()
     let coordinator = ListeningCoordinator(
-        judge: QuietExitJudge(tiers: [tier("system", ScriptedChat([.success("stay")], delay: .seconds(30)))]),
+        judge: QuietExitJudge(decision: localDecision(ScriptedDecision([.success(false)], delay: .seconds(30)))),
         dialogs: repositories.listeningDialogs, sessionID: "s")
     let writes = ModeWrites()
     coordinator.bind(

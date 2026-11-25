@@ -78,6 +78,8 @@ recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或�
 
 Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Agents/Resources/Agents](../../Resources/Agents/README.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（`task` 与 `listening`）。
 
+[ListeningModeControlling](ListeningMode.swift) 连接模式 Trigger、感知事实和 Assistant 生命周期。Assistant 停止时通过 `cancelJudgment` 淘汰待完成的唤醒判定。判定与推理清理由 [Assistant Input](../../Assistant/Input/README.md#listening-and-quiet) 拥有。
+
 - **写入**：`set` / `clear` 校验名称（小写字母开头，小写字母、数字、下划线，≤ 32 字节）、写入者（`model` 不能写 `readOnly`，`host` 只能写已声明项）、类型（`bool`/`enum`/`text`，写入前规范化）与单值 ≤ 1 KiB；任何失败抛出且变量不变。清除未设置的变量无变化。重新写入同值只更新时间。
 - **容量**：已声明变量不被淘汰；自由变量最多 32 个、名称与值合计 ≤ 8 KiB，超出时不报错，按写入先后淘汰最早者。
 - **时间与排序**：每次写入记录时间；`ordered` 按写入时间升序。`showing` 返回叠加了他处持有值的副本（例如当前目标 `task`），仅用于渲染与读取，不写入表。

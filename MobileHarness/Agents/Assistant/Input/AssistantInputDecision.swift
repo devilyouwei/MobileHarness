@@ -208,9 +208,15 @@ public actor AssistantInputDecision {
         await preparation?.value
     }
     public func classify(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
+        await classify(receivedAt: snapshot.receivedAt) { try snapshot.request() }
+    }
+
+    func classify(
+        receivedAt: ContinuousClock.Instant, request: @Sendable () throws -> NoulRequest
+    ) async -> InputDecisionOutcome {
         await AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
             let evidence = Mutex<InferenceMetadata?>(nil)
-            var result = await classifyInput(snapshot) { metadata in
+            var result = await classifyInput(receivedAt: receivedAt, request: request) { metadata in
                 if metadata.model != nil || metadata.startedAt != nil { evidence.withLock { $0 = metadata } }
             }
             result.inference = evidence.withLock { $0 }
@@ -220,7 +226,7 @@ public actor AssistantInputDecision {
     }
 
     private func classifyInput(
-        _ snapshot: InputDecisionSnapshot,
+        receivedAt: ContinuousClock.Instant, request: @Sendable () throws -> NoulRequest,
         capture: @escaping @Sendable (InferenceMetadata) -> Void
     ) async -> InputDecisionOutcome {
         let requests = Mutex<[String]>([])
@@ -234,7 +240,7 @@ public actor AssistantInputDecision {
                 requests: requests.withLock { $0 }, failure: failure, modelName: selectedModelName.withLock { $0 })
         }
         guard !stopped, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
-        let deadline = snapshot.receivedAt.advanced(by: timeout)
+        let deadline = receivedAt.advanced(by: timeout)
         guard ContinuousClock.now < deadline else {
             return failedOutcome("Classification timed out", failure: .timedOut)
         }
@@ -249,7 +255,7 @@ public actor AssistantInputDecision {
         selectedModelName.withLock { $0 = route.localID }
         let prompt: NoulRequest
         do {
-            prompt = try snapshot.request()
+            prompt = try request()
         } catch {
             await reportFailure(.request)
             return failedOutcome("Could not prepare Decision request: \(error.localizedDescription)", failure: .request)
@@ -295,7 +301,7 @@ public actor AssistantInputDecision {
             case .selected(let action):
                 await report("Local \(selectedModelName.withLock { $0 } ?? id)")
                 return outcome(
-                    action, route: localRoute, snapshot: snapshot, requests: requests.withLock { $0 },
+                    action, route: localRoute, requests: requests.withLock { $0 },
                     modelName: selectedModelName.withLock { $0 })
             case .failed(let reason, let failure):
                 if !stopped, !Task.isCancelled { await reportFailure(failure) }
@@ -333,7 +339,7 @@ public actor AssistantInputDecision {
                         return Self.supersededOutcome(requests: requests.withLock { $0 }, modelName: modelName)
                     case .selected(let action):
                         return outcome(
-                            action, route: localRoute, snapshot: snapshot, requests: requests.withLock { $0 },
+                            action, route: localRoute, requests: requests.withLock { $0 },
                             modelName: selectedModelName.withLock { $0 })
                     case .failed(let reason, let failure):
                         localFailureReason = reason
@@ -386,7 +392,7 @@ public actor AssistantInputDecision {
         }
         if case .selected(let action) = result {
             return outcome(
-                action, route: .cloud, snapshot: snapshot, requests: requests.withLock { $0 },
+                action, route: .cloud, requests: requests.withLock { $0 },
                 modelName: selectedModelName.withLock { $0 })
         }
         if stopped || Task.isCancelled { return failedOutcome("Classification cancelled") }
@@ -420,8 +426,7 @@ public actor AssistantInputDecision {
         }
     }
     private func outcome(
-        _ value: Bool, route: InputDecisionOutcome.Route, snapshot: InputDecisionSnapshot,
-        requests: [String], modelName: String?
+        _ value: Bool, route: InputDecisionOutcome.Route, requests: [String], modelName: String?
     ) -> InputDecisionOutcome {
         .init(route: route, modelResult: value, reason: nil, requests: requests, modelName: modelName)
     }

@@ -2,6 +2,14 @@
 
 本文件是按日期追加的跨模块验证日志。每节中的版本、数字、失败与未执行范围只对应该轮，不作为当前设计；专项模型和硬件样本在 [验证索引](README.md) 所列报告中拥有正文。相同运行的摘要与专项报告不能算作两次独立验收。
 
+## 2026-11-25 — 打断与 quiet 唤醒共用 Decision
+
+- 14 项 quiet 相关 Swift 测试、11 项 interrupt 与 Decision 调度回归通过。覆盖共用本地模型选择、切换选择、云端路由、失败与超时、字面匹配、最新句替换与退出后恢复对话。测试使用模型替身。
+- 改动的 Swift 文件严格格式检查、8 项工程工具 Python 测试、plist 和 diff 检查通过。生产的中英文布尔提示与 [新版实验快照](Quiet-Exit-Decision-2026-11-25.md) 的原生 Decision 问句逐字匹配。
+- `./scripts/build-ios.sh` 的五个 Simulator scheme 构建通过。主 App 的 Agent/Skill、Live Activity 和本地化资源校验通过，打包 UI 的英文和简体中文字符串包含两个 Decision 用途标签。
+- `./scripts/check.sh` 在既有 State Value codec 与 Xcode 本地化资源归类检查处停止。定向回归独立执行。真机 UI、实际 ASR 和真实模型下的应用端行为本轮未执行。
+- 签名版 `0.1.0 (2026112501)` 通过签名和打包资源校验，已原位更新配对的 iPhone 17 Pro。安装回执和独立设备应用清单均确认新版本，旧版本为 `2026112305`。日志为 `/tmp/mh-awake-device-2026112501.log`、`/tmp/mh-awake-device-install-2026112501.json` 和 `/tmp/mh-awake-device-after-2026112501.json`。
+
 ## 2026-11-24 — quiet 关键词规则与状态收尾
 
 - 真机构建 2026112304 的 SQLite 只读快照通过 `quick_check`。00:03 的两轮中，一次普通对话模型 `qwen3.8-flash` 漏写“除非喊名字”约定。另一次正确写入“秦始皇”，Apple 系统模型仍对“你是谁？”返回 exit，理由写的是未明确允许开口。

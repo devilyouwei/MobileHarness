@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "identifier": "zipformer-zh-en-interrupt-observer-2026-11-25",
+  "use": "observe_only",
+  "actionOnMatch": "report_candidate",
+  "finalInterrupt": "existing_final_asr_decision",
+  "model": {
+    "id": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20",
+    "format": "onnx",
+    "artifactURL": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2",
+    "archiveSHA256": "68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6",
+    "componentFiles": {
+      "encoder": "encoder-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "decoder": "decoder-epoch-13-avg-2-chunk-8-left-64.onnx",
+      "joiner": "joiner-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "tokens": "tokens.txt"
+    },
+    "componentSHA256": {
+      "tokens": "2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0",
+      "encoder": "2ca84d6bfe73e1ea3c9c49f600f7cad1c9ddd423c53c906b8bfe802444dd78d5",
+      "decoder": "63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21",
+      "joiner": "190d4067b4cc20b72a42a1916e69d92052000fb7051a427ebb1bc72a69207dc1"
+    },
+    "sourceCheckpointSHA256": "62188d073aaf7ec33f85a2c1e1f2a75751658743daeb203f17241ec3bf4ff6eb",
+    "safetensorsRevision": "0e33d140e0543a03bddf77dbbaad84ef6f4b3ef1",
+    "safetensorsURL": "https://huggingface.co/MigoXV/icefall-kws-zipformer-zh-en-3M-2025-12-20/tree/0e33d140e0543a03bddf77dbbaad84ef6f4b3ef1",
+    "safetensorsSHA256": "3cf361e82d9655ded223ad6a11f916a3479dc484276de6a571b59bbbad63f1f8"
+  },
+  "runtime": {
+    "sampleRate": 16000,
+    "channels": 1,
+    "cpuThreads": 1,
+    "maxActivePaths": 4,
+    "blankParameter": 0,
+    "featureFrameCount": 29,
+    "decodeFrameStep": 16,
+    "keywordTokens": "x iān b ié sh uō l e @zh-stop-talking\nt íng zh ǐ b ō b ào @zh-stop-playback\nS T AA1 P T AO1 K IH0 NG @en-stop-talking\nP L IY1 Z S T AA1 P @en-please-stop\n"
+  },
+  "detection": {
+    "policy": "first_hit_only",
+    "silenceGateRMS": 0.006,
+    "silenceGateWindowMS": 10,
+    "audio": "already_received_pcm_at_first_hit",
+    "ifSilenceGateFails": "defer_to_final_asr"
+  },
+  "selected": {
+    "config": {
+      "chunk": 8,
+      "threshold": 0.25,
+      "boost": 1.0,
+      "feedSamples": 512,
+      "maximumKeywordStartAfterSpeechMS": null,
+      "minimumSilentTailMS": 160
+    }
+  },
+  "verification": {
+    "confirmationDataSHA256": "b7974d464f6c8692539bcead518cf0e33fa80e7fea21f4d93c005ad758f81ba6",
+    "calibrationSHA256": "5e88f22ca549574953b66dcd15ea31e91a4bfc581732890d5c48aa658ba409e5",
+    "confirmationTraceSHA256": "1368839b398012051ac8207219f32836f861ef6204b4d540d69ef8434ec7379a",
+    "confirmationResultSHA256": "c16bddf6fc64426aa44d0f4e67921c31f6dfeea0335068b8d4e61f8b6d6c9f90",
+    "correct": 132,
+    "evaluated": 192,
+    "correctInterrupts": 29,
+    "interruptCases": 64,
+    "falseInterrupts": 25,
+    "nonInterruptCases": 128,
+    "phraseEndP95MS": 450.0,
+    "phraseEndCorrect": 20,
+    "phraseEndTotal": 32,
+    "detectedBy100MS": 0
+  }
+}

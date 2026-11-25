@@ -30,6 +30,13 @@ public final class ListeningCoordinator: ListeningModeControlling, Sendable {
         var writeMode: (@Sendable (ListeningMode) async throws -> Void)?
         var publishMode: (@Sendable (ListeningMode) async throws -> Void)?
         var release: (@Sendable (AgentInput) async throws -> Void)?
+
+        mutating func retireJudgment() -> Task<Void, Never>? {
+            let task = judgment
+            judgment = nil
+            judgmentID = nil
+            return task
+        }
     }
     private let state = Mutex(State())
     private let judge: QuietExitJudge?
@@ -82,9 +89,7 @@ public final class ListeningCoordinator: ListeningModeControlling, Sendable {
         let old = state.withLock { value -> Task<Void, Never>? in
             value.fellBack = false
             if mode == .quiet, previous == .quiet, wakeCondition == nil { return nil }
-            let pending = value.judgment
-            value.judgment = nil
-            value.judgmentID = nil
+            let pending = value.retireJudgment()
             value.wakeCondition = mode == .quiet ? wakeCondition : nil
             if mode == .quiet {
                 if previous != .quiet {
@@ -145,7 +150,9 @@ public final class ListeningCoordinator: ListeningModeControlling, Sendable {
             return
         }
         do {
-            let result = try await judge.judge(text, wakeCondition: wakeCondition)
+            let result = try await judge.judge(
+                text, wakeCondition: wakeCondition,
+                context: .init(requestID: input.id + ".awake", scopeID: input.sessionID))
             guard isCurrent(episode, id) else { return }
             state.withLock { $0.failures = 0 }
             await record(text, episode: episode, judgement: result)
@@ -193,15 +200,17 @@ public final class ListeningCoordinator: ListeningModeControlling, Sendable {
         }
     }
 
+    public func cancelJudgment() {
+        let pending = state.withLock { $0.retireJudgment() }
+        pending?.cancel()
+    }
+
     /// A stopped perception session cancels the pending judgment and returns the variable to its default, so the next
     /// session does not silently start in `quiet`.
     public func perceptionEnded() async {
         let (pending, mode, writeMode) = state.withLock { value in
-            let pending = value.judgment
-            value.judgment = nil
-            value.judgmentID = nil
             value.fullDuplexSupported = nil
-            return (pending, value.mode, value.writeMode)
+            return (value.retireJudgment(), value.mode, value.writeMode)
         }
         pending?.cancel()
         guard mode != .default else { return }
@@ -237,7 +246,7 @@ public final class ListeningCoordinator: ListeningModeControlling, Sendable {
         let record = ListeningDialogRecord(
             sessionID: sessionID, episodeID: episode,
             text: String(decoding: Array(text.utf8.prefix(ListeningDialogRecord.maximumTextBytes)), as: UTF8.self),
-            decision: judgement.map { $0.decision == .exit ? .exit : .stay } ?? .error, reason: judgement?.reason,
+            decision: judgement.map { $0.decision == .exit ? .exit : .stay } ?? .error,
             modelTier: judgement?.tier, modelID: judgement?.modelID, latencyMS: judgement?.latencyMS ?? 0,
             error: error)
         do { try await dialogs.appendListeningDialog(record) } catch {

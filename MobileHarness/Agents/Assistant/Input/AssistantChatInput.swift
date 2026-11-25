@@ -92,6 +92,7 @@ extension AssistantChatWorker {
         if case .transcript(let text, final: true)? = input.payload.perception, input.sessionID == speechSessionID,
             let listening, listening.mode == .quiet
         {
+            guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
             // `quiet` keeps the utterance out of the conversation; only the exit judgment reads it.
             if let turn = input.turn { speechEnded(turn.id) }
             listening.receiveQuiet(text, input)

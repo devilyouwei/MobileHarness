@@ -1,15 +1,17 @@
-"""Evaluate ending the Assistant's quiet (wake) mode from the latest sentence alone, directly in Python.
+"""Evaluate ending Assistant quiet mode from the latest sentence and optional wake agreement in Python.
 
 With a prompts file whose "answer" is "boolean" (the wake question), chat backends answer true/false instead and true
 counts as exit.
 
 Chat backends (Apple system model, cloud) get the Assistant's judge prompt: instructions as the system message, the
 sentence as the user message, one word answer exit/stay. Native Decision models (d3, vela, laya) cannot answer words,
-so they get the same instruction as a boolean question over a one-field state; probability > 0.5 means exit.
+so they get a boolean question over the same evidence; probability > 0.5 means exit.
+Version 1 prompt fixtures preserve the original request and parsing behavior.
 """
 import argparse
 import asyncio
 from collections import Counter
+from importlib.metadata import PackageNotFoundError, version
 import json
 from pathlib import Path
 import platform
@@ -23,7 +25,7 @@ LABELS = ('exit', 'stay')
 
 
 def parse_answer(text):
-    """First alphabetic word must be exit or stay; anything after it is the reason. Mirrors the App's parser."""
+    """Parse historical version 1 fixtures, which permitted an explanation."""
     text = text.strip()
     word = ''
     for character in text:
@@ -58,28 +60,58 @@ def load_cases(document, limit=None):
     for case in cases:
         if case['expected'] not in LABELS or case['language'] not in ('en', 'zh-Hans') or not case['sentence'].strip():
             raise ValueError('Invalid case: ' + case['id'])
+        if 'wakeCondition' in case:
+            condition = case['wakeCondition']
+            if not isinstance(condition, str) or not condition.strip() or condition.startswith('literal:'):
+                raise ValueError('Expected a semantic wake condition: ' + case['id'])
     return cases[:limit] if limit else cases
+
+
+def request_for(case, prompts, native):
+    language = case['language']
+    sentence = case['sentence'].strip()
+    if prompts.get('version') == 2:
+        sentence = sentence[:512]
+        template = 'instructions'
+        state = sentence
+        if 'wakeCondition' in case:
+            template = 'conditioned'
+            state = json.dumps(dict(latestUtterance=sentence, wakeCondition=case['wakeCondition']),
+                               ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+        if native:
+            return dict(state=state, question=dict(type='noul', instructions=prompts['decision'][language][template]))
+        return dict(messages=[dict(role='system', content=prompts['chat'][language][template]),
+                              dict(role='user', content=state)])
+    if 'wakeCondition' in case:
+        raise ValueError('Wake conditions require version 2 prompts')
+    if native:
+        state = json.dumps(dict(latest_user_sentence=case['sentence']), ensure_ascii=False)
+        return dict(state=state, question=dict(type='noul', instructions=prompts['decision'][language]))
+    if 'template' in prompts:
+        question = prompts['template'][language].replace('{sentence}', sentence)
+        return dict(messages=[dict(role='user', content=question)])
+    return dict(messages=[dict(role='system', content=prompts['chat'][language]),
+                          dict(role='user', content=sentence)])
 
 
 async def evaluate_case(case, prompts, native=None, chat=None):
     result = dict(language=case['language'], group=case['group'], expected=case['expected'],
                   scored=case.get('partition') != 'ambiguous')
+    request = request_for(case, prompts, native is not None)
     if native is not None:
-        state = json.dumps(dict(latest_user_sentence=case['sentence']), ensure_ascii=False)
-        question = dict(type='noul', instructions=prompts['decision'][case['language']])
-        answer = await native.predict(state, question)
+        answer = await native.predict(request['state'], request['question'])
+        if not 0 <= answer['noul'] <= 1:
+            raise ValueError('Invalid noul score')
         prediction = 'exit' if answer['noul'] > .5 else 'stay'
         return dict(result, prediction=prediction, score=answer['noul'], inputTokens=answer.get('inputTokens'),
                     passed=prediction == case['expected'])
-    if 'template' in prompts:
-        question = prompts['template'][case['language']].replace('{sentence}', case['sentence'].strip())
-        messages = [dict(role='user', content=question)]
+    answer = await chat.chat(request['messages'])
+    if prompts.get('version') == 2:
+        word = answer['text'].strip().lower()
+        prediction, reason = (word if word in LABELS else None), None
     else:
-        messages = [dict(role='system', content=prompts['chat'][case['language']]),
-                    dict(role='user', content=case['sentence'].strip())]
-    answer = await chat.chat(messages)
-    parse = parse_boolean if prompts.get('answer') == 'boolean' else parse_answer
-    prediction, reason = parse(answer['text'])
+        parse = parse_boolean if prompts.get('answer') == 'boolean' else parse_answer
+        prediction, reason = parse(answer['text'])
     result.update(prediction=prediction, reason=reason, response=answer['text'], passed=prediction == case['expected'])
     for key in ('usage', 'finishReason', 'inputTokens', 'outputTokens'):
         if key in answer:
@@ -112,11 +144,21 @@ def metrics(rows):
 def metrics_by_language(rows):
     return {language: metrics([r for r in rows if r.get('language') == language]) for language in ('zh-Hans', 'en')}
 
+def dependency_versions():
+    versions = {}
+    for package in ('coreai-core', 'transformers', 'numpy', 'hugging-mac-sdk', 'apple-fm-sdk'):
+        try:
+            versions[package] = version(package)
+        except PackageNotFoundError:
+            continue
+    return versions
+
 
 async def run(args):
     document = json.loads(args.input.read_text())
     prompts = json.loads(args.prompts.read_text())
     cases = load_cases(document, args.limit)
+    requests = {case['id']: request_for(case, prompts, args.model is not None) for case in cases}
     native = chat = None
     status = 1
     try:
@@ -132,8 +174,16 @@ async def run(args):
             timeout=args.timeout, provenance=dict(inputSHA256=digest(args.input), promptsSHA256=digest(args.prompts),
                 runnerSHA256=digest(__file__), model=args.model or 'chat',
                 configSHA256=digest(args.config) if args.config else None, excludedWarmups=len(warmups),
-                environment=dict(platform=platform.platform(), python=platform.python_version())))
+                timeoutSeconds=args.timeout, requestedCases=len(cases),
+                environment=dict(platform=platform.platform(), python=platform.python_version(),
+                                 packages=dependency_versions())))
         report = json.loads(args.output.read_text())
+        if prompts.get('version') == 2:
+            cases_by_id = {case['id']: case for case in cases}
+            for row in report['rows']:
+                case = cases_by_id[row['id']]
+                row.update(language=case['language'], group=case['group'], expected=case['expected'],
+                           scored=case.get('partition') != 'ambiguous', request=requests[row['id']])
         report['metrics'] = metrics(report['rows'])
         report['metricsByLanguage'] = metrics_by_language(report['rows'])
         write_report(args.output, report)

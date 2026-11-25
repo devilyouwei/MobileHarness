@@ -1,0 +1,4989 @@
+{
+  "fixtureSHA256": "017155c7299e72078df9b3601f68d9b64f62bda2cfb3d2db4c714f55e09511e7",
+  "referenceSHA256": "4765cfecc04bcbd14e481f650816f1b9aaa2ae27157f45621c62b20953e7c1a9",
+  "runnerSHA256": "c0fadbb2d2d94aab4797ae7fc98e04f5d9ea56c4aff93eee92639e9c6150e7f3",
+  "chunk": 8,
+  "trailingBlanks": 0,
+  "batch": 1,
+  "warmups": 2,
+  "strictFirstMatch": true,
+  "packages": {
+    "coremltools": "9.0",
+    "onnxruntime": "1.24.4",
+    "kaldi-native-fbank": "1.23.3",
+    "numpy": "2.4.6"
+  },
+  "results": {
+    "onnx": {
+      "correct": 59,
+      "total": 96,
+      "truePositive": 23,
+      "falseInterrupts": 28,
+      "detectedBy100MS": 0,
+      "detectionP95MS": 390.0,
+      "decodeP95MS": 2.448
+    },
+    "coreml-cpu": {
+      "correct": 59,
+      "total": 96,
+      "truePositive": 23,
+      "falseInterrupts": 28,
+      "detectedBy100MS": 0,
+      "detectionP95MS": 390.0,
+      "decodeP95MS": 2.528
+    },
+    "coreml-all": {
+      "correct": 59,
+      "total": 96,
+      "truePositive": 23,
+      "falseInterrupts": 28,
+      "detectedBy100MS": 0,
+      "detectionP95MS": 390.0,
+      "decodeP95MS": 6.524
+    }
+  },
+  "rows": [
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.48,
+          0.64,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 230.0,
+      "computeP95MS": 2.439
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.44,
+          0.52,
+          0.68,
+          0.72,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 350.0,
+      "computeP95MS": 2.351
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.24,
+          0.36,
+          0.48,
+          0.56,
+          0.72,
+          0.8,
+          0.92,
+          0.96
+        ]
+      },
+      "delayMS": 310.0,
+      "computeP95MS": 2.362
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.24,
+          0.36,
+          0.52,
+          0.64,
+          0.76,
+          0.84,
+          0.96,
+          1.0
+        ]
+      },
+      "delayMS": 270.0,
+      "computeP95MS": 2.326
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.2,
+          0.32,
+          0.4,
+          0.56,
+          0.64,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 2.286
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.48,
+          0.6,
+          0.68,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 2.336
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.52,
+          0.64,
+          0.72,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 2.314
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.36,
+          0.48,
+          0.56,
+          0.68,
+          0.8,
+          0.92,
+          1.0
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 2.313
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.079
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.133
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.146
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.131
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.36,
+          0.4,
+          0.56,
+          0.64,
+          0.76,
+          0.84,
+          1.0,
+          1.04
+        ]
+      },
+      "delayMS": -890.0,
+      "computeP95MS": 2.306
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.4,
+          0.44,
+          0.6,
+          0.68,
+          0.8,
+          0.88,
+          1.04,
+          1.08
+        ]
+      },
+      "delayMS": -770.0,
+      "computeP95MS": 2.327
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.44,
+          0.48,
+          0.64,
+          0.72,
+          0.84,
+          0.92,
+          1.08,
+          1.16
+        ]
+      },
+      "delayMS": -810.0,
+      "computeP95MS": 2.482
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.48,
+          0.52,
+          0.64,
+          0.72,
+          0.88,
+          0.96,
+          1.12,
+          1.16
+        ]
+      },
+      "delayMS": -850.0,
+      "computeP95MS": 2.331
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2080.0,
+        "tokenTimesSeconds": [
+          1.12,
+          1.16,
+          1.32,
+          1.44,
+          1.52,
+          1.6400000000000001,
+          1.76,
+          1.8
+        ]
+      },
+      "delayMS": -1380.0,
+      "computeP95MS": 2.322
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2080.0,
+        "tokenTimesSeconds": [
+          1.12,
+          1.2,
+          1.36,
+          1.44,
+          1.56,
+          1.6400000000000001,
+          1.72,
+          1.76
+        ]
+      },
+      "delayMS": -1420.0,
+      "computeP95MS": 2.33
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2240.0,
+        "tokenTimesSeconds": [
+          1.16,
+          1.28,
+          1.4000000000000001,
+          1.48,
+          1.6,
+          1.68,
+          1.84,
+          1.8800000000000001
+        ]
+      },
+      "delayMS": -1300.0,
+      "computeP95MS": 2.341
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2240.0,
+        "tokenTimesSeconds": [
+          1.2,
+          1.28,
+          1.44,
+          1.52,
+          1.6400000000000001,
+          1.76,
+          1.8800000000000001,
+          1.92
+        ]
+      },
+      "delayMS": -1340.0,
+      "computeP95MS": 2.285
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.283
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.235
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.307
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.271
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.08,
+          0.2,
+          0.32,
+          0.4,
+          0.52,
+          0.56,
+          0.72,
+          0.76
+        ]
+      },
+      "delayMS": 360.0,
+      "computeP95MS": 2.408
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.56,
+          0.64,
+          0.76,
+          0.8
+        ]
+      },
+      "delayMS": 320.0,
+      "computeP95MS": 2.293
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 280.0,
+      "computeP95MS": 2.262
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.48,
+          0.52,
+          0.6,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 240.0,
+      "computeP95MS": 2.289
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.108
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 40,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.157
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 80,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.366
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 120,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.163
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.182
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.315
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.148
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.119
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.285
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.324
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.09
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 3.003
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.88,
+          0.92,
+          1.12,
+          1.16,
+          1.24,
+          1.36,
+          1.48,
+          1.56
+        ]
+      },
+      "delayMS": -910.0,
+      "computeP95MS": 2.265
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.92,
+          1.0,
+          1.12,
+          1.2,
+          1.28,
+          1.36,
+          1.52,
+          1.6
+        ]
+      },
+      "delayMS": -950.0,
+      "computeP95MS": 2.231
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.96,
+          1.04,
+          1.16,
+          1.24,
+          1.32,
+          1.44,
+          1.56,
+          1.6400000000000001
+        ]
+      },
+      "delayMS": -990.0,
+      "computeP95MS": 2.456
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          1.0,
+          1.12,
+          1.2,
+          1.28,
+          1.36,
+          1.48,
+          1.6400000000000001,
+          1.68
+        ]
+      },
+      "delayMS": -1030.0,
+      "computeP95MS": 2.407
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.454
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.419
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.409
+    },
+    {
+      "backend": "onnx",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.16
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.08,
+          0.2,
+          0.32,
+          0.4,
+          0.48,
+          0.64,
+          0.72,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 2.202
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.52,
+          0.64,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 2.2
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 2.22
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.44,
+          0.52,
+          0.56,
+          0.72,
+          0.84,
+          0.92,
+          0.96
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 2.907
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.56
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 40,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.461
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 80,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.494
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 120,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.266
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.112
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.164
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.066
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.267
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.16,
+          1.24,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": 170.0,
+      "computeP95MS": 2.541
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.16,
+          1.28,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": 290.0,
+      "computeP95MS": 3.2
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.96,
+          1.0,
+          1.04,
+          1.2,
+          1.32,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": 250.0,
+      "computeP95MS": 2.679
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.8,
+          0.88,
+          1.0,
+          1.04,
+          1.12,
+          1.28,
+          1.36,
+          1.44,
+          1.48
+        ]
+      },
+      "delayMS": 210.0,
+      "computeP95MS": 2.67
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.6,
+          0.68,
+          0.8,
+          0.84,
+          0.92,
+          1.04,
+          1.16,
+          1.24,
+          1.28
+        ]
+      },
+      "delayMS": -1140.0,
+      "computeP95MS": 2.637
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.64,
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.12,
+          1.2,
+          1.28,
+          1.32
+        ]
+      },
+      "delayMS": -1180.0,
+      "computeP95MS": 2.38
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.12,
+          1.24,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": -1220.0,
+      "computeP95MS": 2.37
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.16,
+          1.24,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1100.0,
+      "computeP95MS": 2.378
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.242
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.962
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.471
+    },
+    {
+      "backend": "onnx",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.308
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.2,
+          0.32,
+          0.4,
+          0.48,
+          0.6,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 170.0,
+      "computeP95MS": 2.181
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.48,
+          0.64,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 290.0,
+      "computeP95MS": 2.277
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 250.0,
+      "computeP95MS": 2.183
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.44,
+          0.52,
+          0.56,
+          0.72,
+          0.84,
+          0.96,
+          1.0
+        ]
+      },
+      "delayMS": 210.0,
+      "computeP95MS": 2.179
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.187
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 960.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.28,
+          0.36,
+          0.44,
+          0.52,
+          0.64,
+          0.72
+        ]
+      },
+      "delayMS": 310.0,
+      "computeP95MS": 2.291
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.32,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76
+        ]
+      },
+      "delayMS": 430.0,
+      "computeP95MS": 2.22
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.36,
+          0.44,
+          0.52,
+          0.6,
+          0.72,
+          0.84
+        ]
+      },
+      "delayMS": 390.0,
+      "computeP95MS": 2.24
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.231
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.485
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.614
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.368
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.0,
+          1.16,
+          1.24,
+          1.36,
+          1.44
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 2.406
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.04,
+          1.2,
+          1.28,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 2.683
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.08,
+          1.2,
+          1.32,
+          1.44,
+          1.48
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 2.548
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.84,
+          0.88,
+          1.0,
+          1.08,
+          1.12,
+          1.28,
+          1.36,
+          1.52,
+          1.56
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 2.285
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.64,
+          0.72,
+          0.8,
+          0.88,
+          0.92,
+          1.04,
+          1.2,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": -1370.0,
+      "computeP95MS": 2.265
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          0.96,
+          1.12,
+          1.2,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1250.0,
+      "computeP95MS": 2.623
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.0,
+          1.16,
+          1.24,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1290.0,
+      "computeP95MS": 2.377
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.96,
+          1.0,
+          1.04,
+          1.2,
+          1.32,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": -1330.0,
+      "computeP95MS": 2.311
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 3.255
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.26
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.262
+    },
+    {
+      "backend": "onnx",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.482
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.48,
+          0.64,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 230.0,
+      "computeP95MS": 2.905
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.44,
+          0.52,
+          0.68,
+          0.72,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 350.0,
+      "computeP95MS": 2.767
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.24,
+          0.36,
+          0.48,
+          0.56,
+          0.72,
+          0.8,
+          0.92,
+          0.96
+        ]
+      },
+      "delayMS": 310.0,
+      "computeP95MS": 2.887
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.24,
+          0.36,
+          0.52,
+          0.64,
+          0.76,
+          0.84,
+          0.96,
+          1.0
+        ]
+      },
+      "delayMS": 270.0,
+      "computeP95MS": 2.971
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.2,
+          0.32,
+          0.4,
+          0.56,
+          0.64,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 2.936
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.48,
+          0.6,
+          0.68,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 2.902
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.52,
+          0.64,
+          0.72,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 3.388
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.36,
+          0.48,
+          0.56,
+          0.68,
+          0.8,
+          0.92,
+          1.0
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 5.005
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 3.041
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.054
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.959
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.9
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.36,
+          0.4,
+          0.56,
+          0.64,
+          0.76,
+          0.84,
+          1.0,
+          1.04
+        ]
+      },
+      "delayMS": -890.0,
+      "computeP95MS": 2.37
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.4,
+          0.44,
+          0.6,
+          0.68,
+          0.8,
+          0.88,
+          1.04,
+          1.08
+        ]
+      },
+      "delayMS": -770.0,
+      "computeP95MS": 2.338
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.44,
+          0.48,
+          0.64,
+          0.72,
+          0.84,
+          0.92,
+          1.08,
+          1.16
+        ]
+      },
+      "delayMS": -810.0,
+      "computeP95MS": 2.398
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.48,
+          0.52,
+          0.64,
+          0.72,
+          0.88,
+          0.96,
+          1.12,
+          1.16
+        ]
+      },
+      "delayMS": -850.0,
+      "computeP95MS": 2.235
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2080.0,
+        "tokenTimesSeconds": [
+          1.12,
+          1.16,
+          1.32,
+          1.44,
+          1.52,
+          1.6400000000000001,
+          1.76,
+          1.8
+        ]
+      },
+      "delayMS": -1380.0,
+      "computeP95MS": 2.255
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2080.0,
+        "tokenTimesSeconds": [
+          1.12,
+          1.2,
+          1.36,
+          1.44,
+          1.56,
+          1.6400000000000001,
+          1.72,
+          1.76
+        ]
+      },
+      "delayMS": -1420.0,
+      "computeP95MS": 2.245
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2240.0,
+        "tokenTimesSeconds": [
+          1.16,
+          1.28,
+          1.4000000000000001,
+          1.48,
+          1.6,
+          1.68,
+          1.84,
+          1.8800000000000001
+        ]
+      },
+      "delayMS": -1300.0,
+      "computeP95MS": 2.265
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2240.0,
+        "tokenTimesSeconds": [
+          1.2,
+          1.28,
+          1.44,
+          1.52,
+          1.6400000000000001,
+          1.76,
+          1.8800000000000001,
+          1.92
+        ]
+      },
+      "delayMS": -1340.0,
+      "computeP95MS": 2.359
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.074
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.137
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.298
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.273
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.08,
+          0.2,
+          0.32,
+          0.4,
+          0.52,
+          0.56,
+          0.72,
+          0.76
+        ]
+      },
+      "delayMS": 360.0,
+      "computeP95MS": 2.568
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.56,
+          0.64,
+          0.76,
+          0.8
+        ]
+      },
+      "delayMS": 320.0,
+      "computeP95MS": 2.243
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 280.0,
+      "computeP95MS": 2.272
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.48,
+          0.52,
+          0.6,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 240.0,
+      "computeP95MS": 2.294
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.0
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 40,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.933
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 80,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.504
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 120,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.042
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.884
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.902
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.871
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.926
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.008
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.12
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.903
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.943
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.88,
+          0.92,
+          1.12,
+          1.16,
+          1.24,
+          1.36,
+          1.48,
+          1.56
+        ]
+      },
+      "delayMS": -910.0,
+      "computeP95MS": 2.334
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.92,
+          1.0,
+          1.12,
+          1.2,
+          1.28,
+          1.36,
+          1.52,
+          1.6
+        ]
+      },
+      "delayMS": -950.0,
+      "computeP95MS": 2.337
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.96,
+          1.04,
+          1.16,
+          1.24,
+          1.32,
+          1.44,
+          1.56,
+          1.6400000000000001
+        ]
+      },
+      "delayMS": -990.0,
+      "computeP95MS": 2.337
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          1.0,
+          1.12,
+          1.2,
+          1.28,
+          1.36,
+          1.48,
+          1.6400000000000001,
+          1.68
+        ]
+      },
+      "delayMS": -1030.0,
+      "computeP95MS": 2.261
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.226
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.172
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.238
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.126
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.08,
+          0.2,
+          0.32,
+          0.4,
+          0.48,
+          0.64,
+          0.72,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 2.334
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.52,
+          0.64,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 2.922
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 2.486
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.44,
+          0.52,
+          0.56,
+          0.72,
+          0.84,
+          0.92,
+          0.96
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 2.305
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.296
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 40,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.517
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 80,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.38
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 120,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.568
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.196
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.142
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.896
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.821
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.16,
+          1.24,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": 170.0,
+      "computeP95MS": 2.271
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.16,
+          1.28,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": 290.0,
+      "computeP95MS": 2.276
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.96,
+          1.0,
+          1.04,
+          1.2,
+          1.32,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": 250.0,
+      "computeP95MS": 2.36
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.8,
+          0.88,
+          1.0,
+          1.04,
+          1.12,
+          1.28,
+          1.36,
+          1.44,
+          1.48
+        ]
+      },
+      "delayMS": 210.0,
+      "computeP95MS": 2.29
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.6,
+          0.68,
+          0.8,
+          0.84,
+          0.92,
+          1.04,
+          1.16,
+          1.24,
+          1.28
+        ]
+      },
+      "delayMS": -1140.0,
+      "computeP95MS": 2.38
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.64,
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.12,
+          1.2,
+          1.28,
+          1.32
+        ]
+      },
+      "delayMS": -1180.0,
+      "computeP95MS": 2.277
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.12,
+          1.24,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": -1220.0,
+      "computeP95MS": 2.374
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.16,
+          1.24,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1100.0,
+      "computeP95MS": 2.402
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.467
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.235
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.246
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.242
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.2,
+          0.32,
+          0.4,
+          0.48,
+          0.6,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 170.0,
+      "computeP95MS": 2.293
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.48,
+          0.64,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 290.0,
+      "computeP95MS": 2.195
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 250.0,
+      "computeP95MS": 2.387
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.44,
+          0.52,
+          0.56,
+          0.72,
+          0.84,
+          0.96,
+          1.0
+        ]
+      },
+      "delayMS": 210.0,
+      "computeP95MS": 2.18
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.269
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 960.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.28,
+          0.36,
+          0.44,
+          0.52,
+          0.64,
+          0.72
+        ]
+      },
+      "delayMS": 310.0,
+      "computeP95MS": 2.452
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.32,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76
+        ]
+      },
+      "delayMS": 430.0,
+      "computeP95MS": 2.292
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.36,
+          0.44,
+          0.52,
+          0.6,
+          0.72,
+          0.84
+        ]
+      },
+      "delayMS": 390.0,
+      "computeP95MS": 2.473
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.939
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.958
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 1.848
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.016
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.0,
+          1.16,
+          1.24,
+          1.36,
+          1.44
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 3.185
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.04,
+          1.2,
+          1.28,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 2.52
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.08,
+          1.2,
+          1.32,
+          1.44,
+          1.48
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 2.376
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.84,
+          0.88,
+          1.0,
+          1.08,
+          1.12,
+          1.28,
+          1.36,
+          1.52,
+          1.56
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 2.293
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.64,
+          0.72,
+          0.8,
+          0.88,
+          0.92,
+          1.04,
+          1.2,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": -1370.0,
+      "computeP95MS": 2.724
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          0.96,
+          1.12,
+          1.2,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1250.0,
+      "computeP95MS": 2.245
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.0,
+          1.16,
+          1.24,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1290.0,
+      "computeP95MS": 2.361
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.96,
+          1.0,
+          1.04,
+          1.2,
+          1.32,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": -1330.0,
+      "computeP95MS": 2.217
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.281
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.118
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.395
+    },
+    {
+      "backend": "coreml-cpu",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 2.568
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.48,
+          0.64,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 230.0,
+      "computeP95MS": 6.39
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.44,
+          0.52,
+          0.68,
+          0.72,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 350.0,
+      "computeP95MS": 6.457
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.24,
+          0.36,
+          0.48,
+          0.56,
+          0.72,
+          0.8,
+          0.92,
+          0.96
+        ]
+      },
+      "delayMS": 310.0,
+      "computeP95MS": 6.295
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.24,
+          0.36,
+          0.52,
+          0.64,
+          0.76,
+          0.84,
+          0.96,
+          1.0
+        ]
+      },
+      "delayMS": 270.0,
+      "computeP95MS": 6.263
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.2,
+          0.32,
+          0.4,
+          0.56,
+          0.64,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 6.601
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.48,
+          0.6,
+          0.68,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 6.275
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.52,
+          0.64,
+          0.72,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 6.594
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.36,
+          0.48,
+          0.56,
+          0.68,
+          0.8,
+          0.92,
+          1.0
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 6.518
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.187
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.036
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.051
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.158
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.36,
+          0.4,
+          0.56,
+          0.64,
+          0.76,
+          0.84,
+          1.0,
+          1.04
+        ]
+      },
+      "delayMS": -890.0,
+      "computeP95MS": 6.569
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.4,
+          0.44,
+          0.6,
+          0.68,
+          0.8,
+          0.88,
+          1.04,
+          1.08
+        ]
+      },
+      "delayMS": -770.0,
+      "computeP95MS": 6.472
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.44,
+          0.48,
+          0.64,
+          0.72,
+          0.84,
+          0.92,
+          1.08,
+          1.16
+        ]
+      },
+      "delayMS": -810.0,
+      "computeP95MS": 6.494
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-playback",
+        "inputFedMS": 1440.0,
+        "tokenTimesSeconds": [
+          0.48,
+          0.52,
+          0.64,
+          0.72,
+          0.88,
+          0.96,
+          1.12,
+          1.16
+        ]
+      },
+      "delayMS": -850.0,
+      "computeP95MS": 6.384
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2080.0,
+        "tokenTimesSeconds": [
+          1.12,
+          1.16,
+          1.32,
+          1.44,
+          1.52,
+          1.6400000000000001,
+          1.76,
+          1.8
+        ]
+      },
+      "delayMS": -1380.0,
+      "computeP95MS": 8.058
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2080.0,
+        "tokenTimesSeconds": [
+          1.12,
+          1.2,
+          1.36,
+          1.44,
+          1.56,
+          1.6400000000000001,
+          1.72,
+          1.76
+        ]
+      },
+      "delayMS": -1420.0,
+      "computeP95MS": 6.581
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2240.0,
+        "tokenTimesSeconds": [
+          1.16,
+          1.28,
+          1.4000000000000001,
+          1.48,
+          1.6,
+          1.68,
+          1.84,
+          1.8800000000000001
+        ]
+      },
+      "delayMS": -1300.0,
+      "computeP95MS": 6.832
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 2240.0,
+        "tokenTimesSeconds": [
+          1.2,
+          1.28,
+          1.44,
+          1.52,
+          1.6400000000000001,
+          1.76,
+          1.8800000000000001,
+          1.92
+        ]
+      },
+      "delayMS": -1340.0,
+      "computeP95MS": 6.651
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.158
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.252
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.332
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-1-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.394
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.08,
+          0.2,
+          0.32,
+          0.4,
+          0.52,
+          0.56,
+          0.72,
+          0.76
+        ]
+      },
+      "delayMS": 360.0,
+      "computeP95MS": 6.444
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.56,
+          0.64,
+          0.76,
+          0.8
+        ]
+      },
+      "delayMS": 320.0,
+      "computeP95MS": 6.382
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 280.0,
+      "computeP95MS": 6.48
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-talking",
+      "expected": "zh-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.48,
+          0.52,
+          0.6,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 240.0,
+      "computeP95MS": 6.572
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.166
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 40,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 7.122
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 80,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.526
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-stop-playback",
+      "expected": "zh-stop-playback",
+      "offsetMS": 120,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.322
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.232
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.121
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.076
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.024
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 5.995
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.289
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.074
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 5.949
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.88,
+          0.92,
+          1.12,
+          1.16,
+          1.24,
+          1.36,
+          1.48,
+          1.56
+        ]
+      },
+      "delayMS": -910.0,
+      "computeP95MS": 6.257
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.92,
+          1.0,
+          1.12,
+          1.2,
+          1.28,
+          1.36,
+          1.52,
+          1.6
+        ]
+      },
+      "delayMS": -950.0,
+      "computeP95MS": 6.402
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.96,
+          1.04,
+          1.16,
+          1.24,
+          1.32,
+          1.44,
+          1.56,
+          1.6400000000000001
+        ]
+      },
+      "delayMS": -990.0,
+      "computeP95MS": 6.425
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "zh-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          1.0,
+          1.12,
+          1.2,
+          1.28,
+          1.36,
+          1.48,
+          1.6400000000000001,
+          1.68
+        ]
+      },
+      "delayMS": -1030.0,
+      "computeP95MS": 6.38
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.209
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.461
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.207
+    },
+    {
+      "backend": "coreml-all",
+      "id": "zh-2-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 5.883
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.08,
+          0.2,
+          0.32,
+          0.4,
+          0.48,
+          0.64,
+          0.72,
+          0.8,
+          0.84
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 6.101
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.52,
+          0.64,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 6.263
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 6.516
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.44,
+          0.52,
+          0.56,
+          0.72,
+          0.84,
+          0.92,
+          0.96
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 7.649
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.599
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 40,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.377
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 80,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.556
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 120,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.58
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.088
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 5.996
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 5.906
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 7.926
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.16,
+          1.24,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": 170.0,
+      "computeP95MS": 6.398
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.16,
+          1.28,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": 290.0,
+      "computeP95MS": 11.877
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.96,
+          1.0,
+          1.04,
+          1.2,
+          1.32,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": 250.0,
+      "computeP95MS": 8.696
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.8,
+          0.88,
+          1.0,
+          1.04,
+          1.12,
+          1.28,
+          1.36,
+          1.44,
+          1.48
+        ]
+      },
+      "delayMS": 210.0,
+      "computeP95MS": 9.305
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.6,
+          0.68,
+          0.8,
+          0.84,
+          0.92,
+          1.04,
+          1.16,
+          1.24,
+          1.28
+        ]
+      },
+      "delayMS": -1140.0,
+      "computeP95MS": 6.744
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.64,
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.12,
+          1.2,
+          1.28,
+          1.32
+        ]
+      },
+      "delayMS": -1180.0,
+      "computeP95MS": 7.014
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.12,
+          1.24,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": -1220.0,
+      "computeP95MS": 6.74
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.16,
+          1.24,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1100.0,
+      "computeP95MS": 6.753
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 7.081
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 9.082
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.603
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-1-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 7.109
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 0,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.2,
+          0.32,
+          0.4,
+          0.48,
+          0.6,
+          0.72,
+          0.84,
+          0.88
+        ]
+      },
+      "delayMS": 170.0,
+      "computeP95MS": 6.782
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.36,
+          0.44,
+          0.48,
+          0.64,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 290.0,
+      "computeP95MS": 6.307
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76,
+          0.88,
+          0.92
+        ]
+      },
+      "delayMS": 250.0,
+      "computeP95MS": 6.3
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-stop-talking",
+      "expected": "en-stop-talking",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1280.0,
+        "tokenTimesSeconds": [
+          0.2,
+          0.32,
+          0.44,
+          0.52,
+          0.56,
+          0.72,
+          0.84,
+          0.96,
+          1.0
+        ]
+      },
+      "delayMS": 210.0,
+      "computeP95MS": 6.549
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 0,
+      "correct": false,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.845
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 40,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 960.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.24,
+          0.28,
+          0.36,
+          0.44,
+          0.52,
+          0.64,
+          0.72
+        ]
+      },
+      "delayMS": 310.0,
+      "computeP95MS": 6.553
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 80,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.28,
+          0.32,
+          0.4,
+          0.48,
+          0.56,
+          0.68,
+          0.76
+        ]
+      },
+      "delayMS": 430.0,
+      "computeP95MS": 6.695
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-please-stop",
+      "expected": "en-please-stop",
+      "offsetMS": 120,
+      "correct": true,
+      "hit": {
+        "keyword": "en-please-stop",
+        "inputFedMS": 1120.0,
+        "tokenTimesSeconds": [
+          0.16,
+          0.32,
+          0.36,
+          0.44,
+          0.52,
+          0.6,
+          0.72,
+          0.84
+        ]
+      },
+      "delayMS": 390.0,
+      "computeP95MS": 6.594
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.153
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.225
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.198
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-hold",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.266
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.0,
+          1.16,
+          1.24,
+          1.36,
+          1.44
+        ]
+      },
+      "delayMS": 260.0,
+      "computeP95MS": 6.667
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.92,
+          1.0,
+          1.04,
+          1.2,
+          1.28,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": 220.0,
+      "computeP95MS": 6.785
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.8,
+          0.88,
+          0.96,
+          1.04,
+          1.08,
+          1.2,
+          1.32,
+          1.44,
+          1.48
+        ]
+      },
+      "delayMS": 180.0,
+      "computeP95MS": 6.509
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-negation",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1920.0,
+        "tokenTimesSeconds": [
+          0.84,
+          0.88,
+          1.0,
+          1.08,
+          1.12,
+          1.28,
+          1.36,
+          1.52,
+          1.56
+        ]
+      },
+      "delayMS": 300.0,
+      "computeP95MS": 6.456
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1600.0,
+        "tokenTimesSeconds": [
+          0.64,
+          0.72,
+          0.8,
+          0.88,
+          0.92,
+          1.04,
+          1.2,
+          1.32,
+          1.36
+        ]
+      },
+      "delayMS": -1370.0,
+      "computeP95MS": 6.365
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.68,
+          0.76,
+          0.84,
+          0.92,
+          0.96,
+          1.12,
+          1.2,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1250.0,
+      "computeP95MS": 6.338
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.72,
+          0.8,
+          0.88,
+          0.96,
+          1.0,
+          1.16,
+          1.24,
+          1.36,
+          1.4000000000000001
+        ]
+      },
+      "delayMS": -1290.0,
+      "computeP95MS": 6.459
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-quote",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": false,
+      "hit": {
+        "keyword": "en-stop-talking",
+        "inputFedMS": 1760.0,
+        "tokenTimesSeconds": [
+          0.76,
+          0.84,
+          0.96,
+          1.0,
+          1.04,
+          1.2,
+          1.32,
+          1.4000000000000001,
+          1.44
+        ]
+      },
+      "delayMS": -1330.0,
+      "computeP95MS": 6.343
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 0,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 7.955
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 40,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.384
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 80,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 6.484
+    },
+    {
+      "backend": "coreml-all",
+      "id": "en-2-unlisted",
+      "expected": null,
+      "offsetMS": 120,
+      "correct": true,
+      "hit": null,
+      "delayMS": null,
+      "computeP95MS": 14.571
+    }
+  ],
+  "status": "complete"
+}

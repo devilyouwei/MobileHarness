@@ -79,7 +79,7 @@ SettingsFormController 只拥有草稿规范化、默认选项、请求忙态和
 
 ## 多 Provider 管理
 
-Settings 的 Agent Models（智能体模型）入口使用 SF Symbols `atom` 原子图标。Agent Models 总页的 Agent Models（智能体模型）分区按 Assistant（助手）、Writer（创作助手）、Decision（决策）顺序展示三个模型配置入口。Agent Models 总页依次展示 Cloud Providers & Models（云端服务与模型）、Agent Models（智能体模型）和 Local Models（本地模型）三个分区。角色入口整行可点，标题和状态使用系统主、次正文色。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Models。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B、D3 Edge 与 Vela 3 Fast，名称与模型目录及选择摘要一致。Local Models 模型标题前以蓝色 Chat（对话）、橙色 Decision（决策）胶囊标出用途，并与标题垂直居中；标签包含文字且支持字体缩放，不仅靠颜色区分。Apple 系统模型同列于 Local Models，显示系统可用性，模型由系统管理。
+Settings 的 Agent Models（智能体模型）入口使用 SF Symbols `atom` 原子图标。Agent Models 总页的 Agent Models（智能体模型）分区按 Assistant（助手）、Writer（创作助手）、Decision（决策）顺序展示三个模型配置入口。Agent Models 总页依次展示 Cloud Providers & Models（云端服务与模型）、Agent Models（智能体模型）和 Local Models（本地模型）三个分区。角色入口整行可点，标题和状态使用系统主、次正文色。Decision 条目显示 Interrupt 和 Awake 标签，表明两个场景使用同一项已提交配置。Provider 列表按名称和 URL 显示，支持添加及左滑编辑／删除；总页草稿随导航保留到离开 Agent Models。子页各自持有草稿，返回时放弃未保存的编辑。根 SettingsFormController 在共享已提交快照上合并当前页改动，成功后发布；失败保留草稿。Provider 凭据留在既有私有设置链路。下载区使用统一下载源，按模型身份管理 Gemma 4 E2B、D3 Edge 与 Vela 3 Fast，名称与模型目录及选择摘要一致。Local Models 模型标题前以蓝色 Chat（对话）、橙色 Decision（决策）胶囊标出用途，并与标题垂直居中；标签包含文字且支持字体缩放，不仅靠颜色区分。Apple 系统模型同列于 Local Models，显示系统可用性，模型由系统管理。
 
 Provider 名称与稳定 ID 是当前文档的必填字段，通过私有配置链路保存。新增/编辑采用独立 modal 草稿（name/url/key），默认生成未占用的 Provider N 名称；取消不修改选择和凭据，确认校验 URL 唯一性与名称。列表名称为主、URL 单行省略为辅，保留三字段粘贴和 Key 脱敏。
 

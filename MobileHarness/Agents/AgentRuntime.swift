@@ -115,7 +115,6 @@ import StorageFiles
             summarizeTitle: @escaping @Sendable (AssistantConversation) async throws -> String,
             modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
-            quietTiers: [QuietModelTier] = [],
             language: @escaping @Sendable () -> String
         ) throws -> AgentExecutionPreparation {
             try writerContainer.configureHistory(
@@ -257,7 +256,8 @@ import StorageFiles
                             input, reason: rejected[.assistant] ?? "Assistant did not receive the transcript")
                     }, sink: { await business.output($0.actionObservation) })
                 return AgentExecutionBinding(configuration: configuration) { facilities in
-                    try AgentRuntime(
+                    let decision = makeInputDecision(business)
+                    return try AgentRuntime(
                         facilities: facilities, business: business, contextScope: contextScope, home: home,
                         containerFailures: containerFailures, cache: cache, assistantContext: assistantContext,
                         assistantControl: assistantControl,
@@ -266,9 +266,9 @@ import StorageFiles
                         activity: activity, log: log, photographerAgent: photographerAgent,
                         applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
-                        inputDecision: makeInputDecision(business), inputQueueStatus: business.inputQueueStatus,
+                        inputDecision: decision, inputQueueStatus: business.inputQueueStatus,
                         listening: ListeningCoordinator(
-                            judge: quietTiers.isEmpty ? nil : QuietExitJudge(tiers: quietTiers, language: language),
+                            judge: QuietExitJudge(decision: decision),
                             dialogs: repositories.listeningDialogs, sessionID: applicationControlSessionID,
                             report: { [weak home] message in
                                 Logger(subsystem: "dev.mobileharness", category: "SpeechListening").error(

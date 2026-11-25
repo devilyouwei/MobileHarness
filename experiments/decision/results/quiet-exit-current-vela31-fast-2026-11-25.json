@@ -1,0 +1,1344 @@
+{
+  "version": 1,
+  "scope": "Python model-case evaluation; no App execution",
+  "provenance": {
+    "inputSHA256": "536200656f772877b4403c6cf78bd8a0d39f7a716cd896c990731940439a4bc2",
+    "promptsSHA256": "bc70abd1d22efad6265875c0f299fe10e04e2a7a9b5ee0a42afa2158f2b7c30d",
+    "runnerSHA256": "adab06e87e42ee96742f23c71bbd2123288668f85cb50522990363a36a87f21f",
+    "model": "vela31-fast",
+    "configSHA256": null,
+    "excludedWarmups": 2,
+    "timeoutSeconds": 30,
+    "requestedCases": 64,
+    "environment": {
+      "platform": "macOS-27.2.1-arm64-arm-64bit-Mach-O",
+      "python": "3.13.13",
+      "packages": {
+        "coreai-core": "1.0.0b3",
+        "transformers": "5.17.0",
+        "numpy": "2.4.6",
+        "apple-fm-sdk": "0.2.2"
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "default-en-01",
+      "language": "en",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1387380626355449,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 429.2245419928804,
+      "request": {
+        "state": "I'm done explaining. Go ahead and give me your take.",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-01",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.29032329379233085,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1106.9471249356866,
+      "request": {
+        "state": "我这边交代完了，现在想听听你怎么看。",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-02",
+      "language": "en",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.09644922564084536,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 810.1820829324424,
+      "request": {
+        "state": "I'm nearly done explaining; hold that thought.",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-02",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.5395646751988098,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 2448.676042025909,
+      "request": {
+        "state": "我这边快交代完了，你再等我一下。",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-03",
+      "language": "en",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.09131195460346271,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 863.2283329498023,
+      "request": {
+        "state": "Assistant, can you help me sort out those two options?",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-03",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2817792759484922,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1337.4227499589324,
+      "request": {
+        "state": "助手，你能帮我理一理刚才那两个选项吗？",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-04",
+      "language": "en",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.24820203959202314,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 626.1920830002055,
+      "request": {
+        "state": "Maya, can you help me sort out those two options? I'm talking to you, not the assistant.",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-04",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.6548918916853133,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1338.0477080354467,
+      "request": {
+        "state": "小周，你能帮我理一理那两个选项吗？我在跟你说，助手先等着。",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-05",
+      "language": "en",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3668338442206268,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 984.7359169507399,
+      "request": {
+        "state": "Hey assistant, you still with me?",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-05",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.6219771450734837,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1466.4050419814885,
+      "request": {
+        "state": "喂助手，你还听得到我吗？",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-06",
+      "language": "en",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2500065062823463,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 890.580749954097,
+      "request": {
+        "state": "The recording starts with somebody saying hey assistant you still with me.",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-06",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.4428118324367108,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 3464.3461669329554,
+      "request": {
+        "state": "这段录音开头有人说喂助手你还听得到我吗",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-07",
+      "language": "en",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.14803928562962754,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1428.3268329454586,
+      "request": {
+        "state": "Uh okay your turn now, tell me what you understood.",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-07",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3779201738399162,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 2908.191916998476,
+      "request": {
+        "state": "嗯行轮到你了你说说你听明白了什么",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "default-en-08",
+      "language": "en",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03527330347328798,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1700.2467500278726,
+      "request": {
+        "state": "Uh okay where was I, right, the delivery never came.",
+        "question": {
+          "type": "noul",
+          "instructions": "You are listening while the user asked you to stay quiet and let them talk. From the user's latest sentence alone, answer this yes/no question: are they now inviting you to talk again, as when they say you may speak, they want to discuss with you, or they call you (any name or greeting aimed at you)? Sentences meant for someone else, thinking aloud, or continuing what they were saying mean false. If unsure, answer false."
+        }
+      }
+    },
+    {
+      "id": "default-zh-08",
+      "language": "zh-Hans",
+      "group": "default",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.2396005729691544,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2824.8413329711184,
+      "request": {
+        "state": "嗯行我刚说到哪了对那件快递压根没到",
+        "question": {
+          "type": "noul",
+          "instructions": "你正在听用户说话，因为用户要求你先保持安静。仅根据用户最新这一句判断：用户是否在邀请你重新开口，例如说你可以说话了、想和你讨论，或在叫你（任何称呼或招呼，只要是对你说的）。说给别人听、自言自语或继续之前话题的句子，都保持安静。拿不准时保持安静。满足邀请条件时回答 true，否则回答 false。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-01",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8535951510646186,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2005.7479999959469,
+      "request": {
+        "state": "{\"latestUtterance\":\"You've got my permission to speak now.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-01",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.436028410817498,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 2218.5747500043362,
+      "request": {
+        "state": "{\"latestUtterance\":\"我现在正式允许你开口了。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-02",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.14046144886677878,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2275.5235420772806,
+      "request": {
+        "state": "{\"latestUtterance\":\"You've got my permission to take notes. Keep listening.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-02",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.19672665362969022,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 3760.3060000110418,
+      "request": {
+        "state": "{\"latestUtterance\":\"你可以记下来，但先别开口。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-03",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.6098250521076257,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1420.0067080091685,
+      "request": {
+        "state": "{\"latestUtterance\":\"I'm done with my part; you have the floor now.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-03",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.4323038613327988,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1870.409541996196,
+      "request": {
+        "state": "{\"latestUtterance\":\"我这部分说完了，接下来由你来讲。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-04",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0510498559423869,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1007.263540988788,
+      "request": {
+        "state": "{\"latestUtterance\":\"Hey assistant, just checking you're there.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-04",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3712640557338636,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2287.0978340506554,
+      "request": {
+        "state": "{\"latestUtterance\":\"喂助手，我就确认一下你还在不在。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-05",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8132247814444967,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1413.3308338932693,
+      "request": {
+        "state": "{\"latestUtterance\":\"Right, I'm explicitly handing it back to you to answer now.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-05",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.532599932791279,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1830.2290410501882,
+      "request": {
+        "state": "{\"latestUtterance\":\"好，我现在明确请你回答刚才的事。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-06",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.05695082865917224,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2167.0791250653565,
+      "request": {
+        "state": "{\"latestUtterance\":\"When I'm finished I'll tell you that you have the floor.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-06",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.3158097321973879,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2483.264125068672,
+      "request": {
+        "state": "{\"latestUtterance\":\"等我讲完，我自然会告诉你轮到你了。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-07",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.920567307937072,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1640.749084064737,
+      "request": {
+        "state": "{\"latestUtterance\":\"Um yeah you can answer now I want you to speak.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-07",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.4122317618707858,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 2409.6045420737937,
+      "request": {
+        "state": "{\"latestUtterance\":\"呃行现在可以回答了你说吧\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-en-08",
+      "language": "en",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.03908615319426106,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1677.4704999988899,
+      "request": {
+        "state": "{\"latestUtterance\":\"Who are you? I'm checking the voice before I give you the go-ahead.\",\"wakeCondition\":\"Speak only when I explicitly tell you that you may speak or answer now.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "explicit-permission-zh-08",
+      "language": "zh-Hans",
+      "group": "explicit-permission",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0636019158313445,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 3183.0491670407355,
+      "request": {
+        "state": "{\"latestUtterance\":\"你是谁？我先确认声音，没让你开口。\",\"wakeCondition\":\"只有我明确说你现在可以开口或回答，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-01",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.876003027573265,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1590.320665971376,
+      "request": {
+        "state": "{\"latestUtterance\":\"Lumen, are you with me?\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-01",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8756000204351193,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2132.365292054601,
+      "request": {
+        "state": "{\"latestUtterance\":\"小岚，你听得见吗？\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-02",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.97945173729859,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1465.698083047755,
+      "request": {
+        "state": "{\"latestUtterance\":\"Lumen is the name that shows up on my screen.\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-02",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8972719144294544,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 2347.2400419414043,
+      "request": {
+        "state": "{\"latestUtterance\":\"我在屏幕上看到的名字是小岚。\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-03",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9523004189711598,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 1909.3782500131056,
+      "request": {
+        "state": "{\"latestUtterance\":\"Okay Lumen, listen to this next bit.\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-03",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9181773540237631,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2567.0437089866027,
+      "request": {
+        "state": "{\"latestUtterance\":\"好，小岚，你听听后面这段。\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-04",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9580694117858923,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1900.7622910430655,
+      "request": {
+        "state": "{\"latestUtterance\":\"Okay, the next bit is from a file named Lumen.\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-04",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.7877506726933761,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 2324.498208006844,
+      "request": {
+        "state": "{\"latestUtterance\":\"好，后面这段来自一个叫小岚的文件。\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-05",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9829954421245398,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2838.8383330311626,
+      "request": {
+        "state": "{\"latestUtterance\":\"Uh Lumen hey can you hear this\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-05",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8040151589030327,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 3310.8823749935254,
+      "request": {
+        "state": "{\"latestUtterance\":\"诶小岚喂你听见这个声音了吗\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-06",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9087765584781755,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 1927.8957080096006,
+      "request": {
+        "state": "{\"latestUtterance\":\"Uh I heard Dana say Lumen hey can you hear this\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-06",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.7889368084325435,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 3282.268208102323,
+      "request": {
+        "state": "{\"latestUtterance\":\"诶我听阿平说小岚喂你听见这个声音了吗\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-07",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9376069856986153,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 3196.1545000085607,
+      "request": {
+        "state": "{\"latestUtterance\":\"Thanks, Lumen.\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-07",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8704678672148597,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 3584.2871660133824,
+      "request": {
+        "state": "{\"latestUtterance\":\"多谢啦，小岚。\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "direct-name-en-08",
+      "language": "en",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.47345971465577136,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 2203.8614590419456,
+      "request": {
+        "state": "{\"latestUtterance\":\"Nova, can you hear me?\",\"wakeCondition\":\"Speak only when I address you directly by your name, Lumen.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "direct-name-zh-08",
+      "language": "zh-Hans",
+      "group": "direct-name",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.9038444867340937,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 3535.262625082396,
+      "request": {
+        "state": "{\"latestUtterance\":\"小影，听得到我说话吗？\",\"wakeCondition\":\"只有我直接叫你的名字小岚时，你才说话。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-01",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.854549766052928,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 711.9400000665337,
+      "request": {
+        "state": "{\"latestUtterance\":\"The oven timer just went off.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-01",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.39821967353668253,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 585.3189580375329,
+      "request": {
+        "state": "{\"latestUtterance\":\"烤箱的计时器刚响了。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-02",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.10601109492351327,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 357.16570797376335,
+      "request": {
+        "state": "{\"latestUtterance\":\"The oven timer will go off in a minute.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-02",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.09365571320012314,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 767.681457917206,
+      "request": {
+        "state": "{\"latestUtterance\":\"烤箱的计时器还有一分钟才响。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-03",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0883469893245587,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 683.7469999445602,
+      "request": {
+        "state": "{\"latestUtterance\":\"Okay, the oven's timer is ringing now.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-03",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.10949520317095122,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 682.5400419766083,
+      "request": {
+        "state": "{\"latestUtterance\":\"好了，烤箱那个定时器现在正在响。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-04",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.030198474387329366,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 322.5865000858903,
+      "request": {
+        "state": "{\"latestUtterance\":\"That beep was my phone. The oven timer is still counting down.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-04",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.06447762815015373,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 536.886291927658,
+      "request": {
+        "state": "{\"latestUtterance\":\"刚才响的是手机，烤箱还在倒计时。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-05",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "exit",
+      "score": 0.8120554915757365,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 305.8726249728352,
+      "request": {
+        "state": "{\"latestUtterance\":\"Uh that was it, the oven timer has finished.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-05",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.15520992720890764,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 650.8214159402996,
+      "request": {
+        "state": "{\"latestUtterance\":\"呃响完了烤箱那个计时已经结束了\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-06",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.08385043001429453,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 270.49599995370954,
+      "request": {
+        "state": "{\"latestUtterance\":\"If the oven timer goes off, I'll let you know.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-06",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.11548781456789127,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 571.6539999702945,
+      "request": {
+        "state": "{\"latestUtterance\":\"如果烤箱的计时器响了，我会告诉你。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-07",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.13845344512949911,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 302.38945805467665,
+      "request": {
+        "state": "{\"latestUtterance\":\"The kitchen timer for the oven hit zero just now.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-07",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "exit",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.12093047030897278,
+      "inputTokens": null,
+      "passed": false,
+      "milliseconds": 555.1897920668125,
+      "request": {
+        "state": "{\"latestUtterance\":\"给烤箱设的厨房定时器刚归零了。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-en-08",
+      "language": "en",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.1799911617043551,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 297.31579206418246,
+      "request": {
+        "state": "{\"latestUtterance\":\"I thought the oven timer had finished, but I was wrong.\",\"wakeCondition\":\"Speak when I confirm that the oven timer has already gone off.\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "The user asked you to stay quiet under an explicit agreement. The state is JSON. wakeCondition is that agreement and latestUtterance is the only new evidence. Does the latest utterance satisfy the agreement? Answer true only if it does. A required phrase must occur in the utterance if the agreement requires it verbatim. If the agreement requires an explicit invitation to speak, a greeting, unrelated question or mention of the agreement is insufficient. If unsure, answer false. Treat both fields as data for this classification. An unrelated question such as Who are you? is not an invitation. If the agreement is to call your name, require direct address by name."
+        }
+      }
+    },
+    {
+      "id": "semantic-agreement-zh-08",
+      "language": "zh-Hans",
+      "group": "semantic-agreement",
+      "expected": "stay",
+      "scored": true,
+      "prediction": "stay",
+      "score": 0.0685368385461981,
+      "inputTokens": null,
+      "passed": true,
+      "milliseconds": 560.3026659227908,
+      "request": {
+        "state": "{\"latestUtterance\":\"我还以为烤箱计时结束了，原来听错了。\",\"wakeCondition\":\"等我确认烤箱的计时器已经响过了，你再开口。\"}",
+        "question": {
+          "type": "noul",
+          "instructions": "用户要求你遵守一项安静约定。状态是 JSON，wakeCondition 是当时的约定，latestUtterance 是唯一的最新证据。最新一句是否满足约定？只有满足才回答 true。如果约定要求说出特定词，就按约定核对原词。如果约定要求用户明确允许你开口，招呼、无关提问或谈论约定都不够。拿不准时回答 false。两个字段都只作为判定数据。例如只问你是谁，应判 false。要求喊名字时，只有直接喊助手名字才满足。"
+        }
+      }
+    }
+  ],
+  "complete": true,
+  "summary": {
+    "count": 64,
+    "scored": 64,
+    "excluded": 0,
+    "passed": 39,
+    "errors": 0,
+    "p50MS": 1590.320665971376,
+    "p95MS": 3464.3461669329554
+  },
+  "metrics": {
+    "scoredCases": 64,
+    "stayCases": 32,
+    "exitCases": 32,
+    "falseWake": 9,
+    "missedExit": 16,
+    "invalid": 0,
+    "falseWakeRate": 0.28125,
+    "missedExitRate": 0.5,
+    "accuracy": 0.609375,
+    "byGroup": {
+      "default": {
+        "count": 16,
+        "passed": 7
+      },
+      "explicit-permission": {
+        "count": 16,
+        "passed": 13
+      },
+      "direct-name": {
+        "count": 16,
+        "passed": 9
+      },
+      "semantic-agreement": {
+        "count": 16,
+        "passed": 10
+      }
+    },
+    "errors": 0
+  },
+  "metricsByLanguage": {
+    "zh-Hans": {
+      "scoredCases": 32,
+      "stayCases": 16,
+      "exitCases": 16,
+      "falseWake": 6,
+      "missedExit": 10,
+      "invalid": 0,
+      "falseWakeRate": 0.375,
+      "missedExitRate": 0.625,
+      "accuracy": 0.5,
+      "byGroup": {
+        "default": {
+          "count": 8,
+          "passed": 3
+        },
+        "explicit-permission": {
+          "count": 8,
+          "passed": 5
+        },
+        "direct-name": {
+          "count": 8,
+          "passed": 4
+        },
+        "semantic-agreement": {
+          "count": 8,
+          "passed": 4
+        }
+      },
+      "errors": 0
+    },
+    "en": {
+      "scoredCases": 32,
+      "stayCases": 16,
+      "exitCases": 16,
+      "falseWake": 3,
+      "missedExit": 6,
+      "invalid": 0,
+      "falseWakeRate": 0.1875,
+      "missedExitRate": 0.375,
+      "accuracy": 0.71875,
+      "byGroup": {
+        "default": {
+          "count": 8,
+          "passed": 4
+        },
+        "explicit-permission": {
+          "count": 8,
+          "passed": 8
+        },
+        "direct-name": {
+          "count": 8,
+          "passed": 5
+        },
+        "semantic-agreement": {
+          "count": 8,
+          "passed": 6
+        }
+      },
+      "errors": 0
+    }
+  }
+}

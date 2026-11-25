@@ -138,6 +138,7 @@ extension AssistantChatWorker {
     }
     public func stop() async {
         lifecycle = .stopped
+        listening?.cancelJudgment()
         cancelInterruptionWait()
         clearSpeechUtterances()
         for reference in Array(trackedTasks.keys) { await stopTrackingTask(reference) }

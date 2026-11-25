@@ -13,4 +13,6 @@
 
 ## 新增交互需求
 
+[闹钟与倒计时](Alarms-and-Timers.md)涵盖通过 Assistant 设置、查询和取消闹钟或倒计时，以及由 iOS 到期提醒。
+
 [多云端模型、HTML 呈现与持续语音感知](Model-Web-Speech-Plan.md)：三项独立需求分别跟踪；WebKit浏览/截图和独立模型绘图功能已实现，实施与验证见[交付归档](../../completed/WebKit-Actions-Plan.md)，模型配置与持续语音验收保留原范围。
