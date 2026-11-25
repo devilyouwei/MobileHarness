@@ -111,6 +111,22 @@ private func localRequest(_ id: String) throws -> ChatRequest {
     await #expect(throws: (any Error).self) { try await held.capability.chat(localRequest("closed")) }
 }
 
+@Test @MainActor func localCandidateDirectoryUsesPublicIDsAndCapabilityDeclarations() async throws {
+    let root = ModelContainer(resources: .temporaryDirectory)
+    try await root.start()
+    let models = try await root.language.localModels()
+    let apple = try #require(models.first { $0.identity.modelID == "apple-system" })
+    let gemma = try #require(models.first { $0.identity.modelID == "gemma4-e2b" })
+    #expect(apple.supportsChat && apple.supportsChatDecision && !apple.supportsToolCalls)
+    #expect(apple.artifactID == nil)
+    #expect(gemma.supportsChat && gemma.supportsToolCalls)
+    #expect(gemma.identity.displayName == "Gemma 4 E2B")
+    #expect(!models.contains { $0.identity.modelID == "chat" })
+    #expect(try await root.language.localDecisionModel("d3-edge") != nil)
+    #expect(try await root.language.localDecisionModel(apple.identity.modelID) == nil)
+    try await root.stop()
+}
+
 @Test func localConsumerFailureJoinsNativeCleanupBeforeReturningOrStartingNext() async throws {
     let probe = LocalChatProbe()
     let queue = try SerialChat(maximumPending: 8, model: { probe })

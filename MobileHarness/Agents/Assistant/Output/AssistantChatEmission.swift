@@ -58,12 +58,14 @@ extension AssistantChatWorker {
                 Self.replyWaiting.call(["enabled": "false", "requestID": requestID]), for: input)
         else { throw HarnessError.queueFull }
     }
-    func dispatchRequest(_ input: AgentInput) async throws {
-        try await conversations.markModelRequestDispatched(input.id)
+    func dispatchRequest(_ input: AgentInput, requestID: String, model: InferenceModelIdentity? = nil) async throws {
+        try await conversations.markModelRequestDispatched(
+            input.id, requestID: requestID, modelID: model?.modelID, displayName: model?.displayName)
         interruptedIntents[input.sessionID] = nil
     }
 
-    func collect(_ request: ChatRequest, input: AgentInput, using chat: any ChatCapability) async throws
+    func collect(_ request: ChatRequest, input: AgentInput, invocationID: String, using chat: any ChatCapability)
+        async throws
         -> String
     {
         try Task.checkCancellation()
@@ -79,9 +81,13 @@ extension AssistantChatWorker {
             replyWaitingRequest = requestID
             await replyPresentation(true)
         }
-        var request = request
+        var request = request.measuringInference()
+        let recordedRequest = request
         request.onDispatch = { [self] in
-            try await self.dispatchRequest(input)
+            if recordedRequest.metadata?.model == nil { try await self.dispatchRequest(input, requestID: invocationID) }
+        }
+        request.onModelDispatch = { [self] model in
+            try await self.dispatchRequest(input, requestID: invocationID, model: model)
         }
         let startCalls = generationCalls
         let result: Result<String, any Error>
@@ -93,7 +99,7 @@ extension AssistantChatWorker {
                         text: { try await self.consumeActionText($0, input: input) },
                         native: { _ = try await self.consumeNativeTools($0, input: input) },
                         evidence: { event in
-                            try await self.dispatchRequest(input)
+                            try await self.dispatchRequest(input, requestID: invocationID)
                             switch event {
                             case .text(let text) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
                                 try await self.finishReplyWaiting(requestID, input: input)
@@ -117,6 +123,22 @@ extension AssistantChatWorker {
                                 try await self.conversations.recordModelTiming(
                                     startedAt: timing.startedAt, firstTokenAt: timing.firstTokenAt,
                                     latency: timing.firstTokenLatency, for: input.id)
+                            }
+                        },
+                        metadata: { metadata in
+                            guard metadata.startedAt != nil else { return }
+                            try await self.recordGenerationEvidence {
+                                try await self.conversations.recordModelMetadata(
+                                    providerModelID: metadata.providerModelID, startedAt: metadata.startedAt,
+                                    firstOutputAt: metadata.firstOutputAt,
+                                    firstOutputLatency: metadata.firstOutputLatency,
+                                    completedAt: metadata.completedAt,
+                                    usage: metadata.tokenUsage.map {
+                                        .init(
+                                            input: $0.input, generated: $0.generated, total: $0.total,
+                                            cachedInput: $0.cachedInput, cacheWriteInput: $0.cacheWriteInput)
+                                    }, finishReason: metadata.finishReason.map(\.rawValue), for: input.id,
+                                    requestID: invocationID)
                             }
                         })))
         } catch {

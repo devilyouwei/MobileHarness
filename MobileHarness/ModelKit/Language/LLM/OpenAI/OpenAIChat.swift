@@ -1,5 +1,5 @@
 import Foundation
-import ModelKit
+@_spi(InferenceAdapter) import ModelKit
 import Synchronization
 
 /// OpenAI-compatible text chat; the consumer contract is identical to local chat.
@@ -31,12 +31,14 @@ public actor OpenAIChat: ChatCapability {
     public var availability: CapabilityAvailability { .available }
 
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        let request = request.measuringInference(
+            model: .init(modelID: configuration.model, displayName: configuration.model))
         let http = try configuration.request(request)
         let limits = try StreamLimits(capacity: 128, maximumEventBytes: nil)
         let lease = try await resource.acquire()
         let control = RequestControl()
-        let pair = InferenceSession<ChatEvent>.make(
-            context: request.context, limits: limits, estimatedBytes: { $0.estimatedBytes },
+        let pair = request.makeInferenceSession(
+            limits: limits,
             onTermination: { reason in
                 if case .finished = reason { return }
                 control.cancel()
@@ -50,8 +52,7 @@ public actor OpenAIChat: ChatCapability {
             var capture = HTTPByteCapture(sink: request.transportCapture)
             do {
                 try Task.checkCancellation()
-                try await request.onDispatch?()
-                request.timing?.start()
+                try await request.dispatchInference()
                 await request.transportCapture?(
                     .request(
                         method: http.httpMethod ?? "GET", url: HTTPLogSanitizer.url(http.url),
@@ -100,6 +101,7 @@ public actor OpenAIChat: ChatCapability {
                         if case .finished = event { finish = event } else { try await emitter.yieldSuspending(event) }
                     }
                 }
+                request.inferenceMetadata?.recordProviderModel(decoder.providerModelID)
                 await capture.finish(error: nil)
                 guard let finish else { throw OpenAIChatError.truncatedStream }
                 try Task.checkCancellation()

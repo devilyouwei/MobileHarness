@@ -28,6 +28,7 @@ struct ChatEventDecoder {
     private var previousCR = false
     private(set) var finished = false
     private(set) var done = false
+    private(set) var providerModelID: String?
     private var receivedUsage = false
     private var eventType: String?
 
@@ -184,19 +185,23 @@ struct ChatEventDecoder {
                 }
             }
             guard calls.count == completed.count else { throw OpenAIChatError.truncatedStream }
+            providerModelID = response["model"] as? String
             var events: [ChatEvent] = []
             if let raw = response["usage"], !(raw is NSNull) {
-                guard !receivedUsage, let usage = raw as? [String: Any],
-                    let input = usage["input_tokens"] as? Int,
-                    let generated = usage["output_tokens"] as? Int,
-                    let total = usage["total_tokens"] as? Int,
-                    input >= 0, generated >= 0, total >= 0,
-                    ["input_tokens", "output_tokens", "total_tokens"].allSatisfy({ key in
-                        guard let number = usage[key] as? NSNumber else { return false }
-                        return CFGetTypeID(number) != CFBooleanGetTypeID()
-                    })
-                else { throw failure(.invalidUsage, stage: .usage, field: "usage") }
+                guard !receivedUsage, let usage = raw as? [String: Any] else {
+                    throw failure(.invalidUsage, stage: .usage, field: "usage")
+                }
                 receivedUsage = true
+                func optionalCount(_ value: Any?, field: String) throws -> Int? {
+                    guard let value, !(value is NSNull) else { return nil }
+                    guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                        let count = value as? Int, count >= 0, number.doubleValue == Double(count)
+                    else { throw failure(.invalidUsage, stage: .usage, field: field) }
+                    return count
+                }
+                let input = try optionalCount(usage["input_tokens"], field: "usage.input_tokens")
+                let generated = try optionalCount(usage["output_tokens"], field: "usage.output_tokens")
+                let total = try optionalCount(usage["total_tokens"], field: "usage.total_tokens")
                 let details: [String: Any]
                 if let rawDetails = usage["input_tokens_details"], !(rawDetails is NSNull) {
                     guard let object = rawDetails as? [String: Any] else {
@@ -206,24 +211,20 @@ struct ChatEventDecoder {
                 } else {
                     details = [:]
                 }
-                func optionalCount(_ key: String) throws -> Int? {
-                    guard let value = details[key], !(value is NSNull) else { return nil }
-                    guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
-                        let count = value as? Int, count >= 0, count <= input,
-                        number.doubleValue == Double(count)
-                    else { throw failure(.invalidUsage, stage: .usage, field: "usage.input_tokens_details." + key) }
-                    return count
-                }
-                let cached = try optionalCount("cached_tokens")
-                let written = try optionalCount("cache_write_tokens")
-                guard (cached ?? 0) <= input - (written ?? 0) else {
+                let cached = try optionalCount(
+                    details["cached_tokens"], field: "usage.input_tokens_details.cached_tokens")
+                let written = try optionalCount(
+                    details["cache_write_tokens"], field: "usage.input_tokens_details.cache_write_tokens")
+                if let input, (written ?? 0) > input || (cached ?? 0) > input - (written ?? 0) {
                     throw failure(.invalidUsage, stage: .usage, field: "usage.input_tokens_details.cacheTotals")
                 }
-                events.append(
-                    .usage(
-                        try ChatTokenUsage(
-                            input: input, generated: generated, total: total,
-                            cachedInput: cached, cacheWriteInput: written)))
+                if [input, generated, total, cached, written].contains(where: { $0 != nil }) {
+                    events.append(
+                        .usage(
+                            try ChatTokenUsage(
+                                input: input, generated: generated, total: total,
+                                cachedInput: cached, cacheWriteInput: written)))
+                }
             }
             if type == "response.incomplete" {
                 guard completed.isEmpty,

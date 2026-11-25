@@ -31,13 +31,20 @@ public struct ModelMessage: Codable, Sendable, Equatable {
 }
 
 public struct ModelTokenUsage: Codable, Sendable, Equatable {
-    public let input: Int
-    public let generated: Int
-    public let total: Int
+    public let input: Int?
+    public let generated: Int?
+    public let total: Int?
     public let cachedInput: Int?
     public let cacheWriteInput: Int?
+    public var isValid: Bool {
+        guard [input, generated, total, cachedInput, cacheWriteInput].compactMap({ $0 }).allSatisfy({ $0 >= 0 })
+        else { return false }
+        guard let input else { return true }
+        let written = cacheWriteInput ?? 0
+        return written <= input && (cachedInput ?? 0) <= input - written
+    }
     public init(
-        input: Int, generated: Int, total: Int, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
+        input: Int?, generated: Int?, total: Int?, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
     ) {
         self.input = input
         self.generated = generated

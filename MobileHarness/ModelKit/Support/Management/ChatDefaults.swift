@@ -1,5 +1,5 @@
 import Foundation
-import ModelKit
+@_spi(InferenceAdapter) import ModelKit
 import ModelKitAppleLLM
 import ModelKitOpenAI
 @_spi(ModelAssembly) import ModelKitRuntime
@@ -12,7 +12,10 @@ extension DefaultModelAssembly {
     @available(iOS 27, macOS 27, *)
     static func registerAppleChat(manager: ModelManager) async throws {
         try await manager.register(
-            ModelRegistration(id: ModelID("apple-system"), capabilities: [.chat], memoryPolicy: .releaseWhenIdle) {
+            ModelRegistration(
+                id: ModelID(AppleChat.modelIdentity.modelID), capabilities: [.chat], memoryPolicy: .releaseWhenIdle,
+                selectableModel: AppleChat.modelIdentity, supportsChatDecision: true
+            ) {
                 context in
                 ProvidedCapabilities(chat: try AppleChat(context: context))
             })
@@ -24,7 +27,9 @@ extension DefaultModelAssembly {
     {
         try ModelRegistration(
             id: id, capabilities: [.chat], memoryPolicy: .releaseWhenIdle,
-            artifactID: configuration == nil ? "gemma4-e2b" : nil
+            artifactID: configuration == nil ? "gemma4-e2b" : nil,
+            selectableModel: configuration == nil ? .init(modelID: "gemma4-e2b") : nil,
+            supportsToolCalls: true, supportsChatDecision: true
         ) { context in
             if let configuration {
                 return ProvidedCapabilities(chat: try OpenAIChat(context: context, configuration: configuration))
@@ -75,9 +80,8 @@ actor SerialChat {
         guard active == nil || pending.count < maximumPending else { throw CapabilityError.inputBusy }
         let id = UUID()
         let control = InferenceTaskControl()
-        let pair = InferenceSession<ChatEvent>.make(
-            context: request.context, limits: try StreamLimits(capacity: 128, maximumEventBytes: nil),
-            estimatedBytes: { $0.estimatedBytes },
+        let pair = request.makeInferenceSession(
+            limits: try StreamLimits(capacity: 128, maximumEventBytes: nil),
             onTermination: { reason in
                 if case .finished = reason { return }
                 control.cancel()

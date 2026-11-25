@@ -108,7 +108,10 @@ public enum ConversationHistoryPresentation {
                     error: request.error ?? (index == (turn.modelRequests?.count ?? 0) - 1 ? turn.error : nil),
                     react: request.isObservation ?? (index > 0), modelRequestStartedAt: request.modelRequestStartedAt,
                     firstTokenLatency: request.firstTokenLatency, decisionMetadata: request.decisionMetadata,
-                    historyTaskID: request.historyTaskID, historyOrder: request.historyOrder)
+                    historyTaskID: request.historyTaskID, historyOrder: request.historyOrder,
+                    model: request.logsCleared == true ? "" : request.model)
+                projected.modelID = request.modelID
+                projected.providerModelID = request.providerModelID
                 projected.requestParametersJSON = request.requestParametersJSON
                 projected.responseEventsJSON = request.responseEventsJSON
                 projected.logsCleared = request.logsCleared
@@ -123,14 +126,16 @@ public enum ConversationHistoryPresentation {
         calls: [HistoryToolCall]?, usage: HistoryTokenUsage?, response: String, state: HistoryTurn.State,
         reason: String?, error: String?, react: Bool,
         modelRequestStartedAt: Date? = nil, firstTokenLatency: Double? = nil,
-        decisionMetadata: HistoryDecisionMetadata? = nil, historyTaskID: String? = nil, historyOrder: UInt64 = 0
+        decisionMetadata: HistoryDecisionMetadata? = nil, historyTaskID: String? = nil, historyOrder: UInt64 = 0,
+        model: String? = nil
     ) -> HistoryTurn {
         HistoryTurn(
             coordination: parent.coordination,
             messageID: messageID, historyOrder: historyOrder, id: id, date: date, user: input,
             request: requestJSON.flatMap { try? JSONDecoder().decode([HistoryMessage].self, from: Data($0.utf8)) }
                 ?? [],
-            model: parent.model, maximumOutputTokens: parent.maximumOutputTokens, temperature: parent.temperature,
+            model: model ?? parent.model, maximumOutputTokens: parent.maximumOutputTokens,
+            temperature: parent.temperature,
             modelRequests: nil, firstTokenAt: firstTokenAt, requestJSON: requestJSON, ownerInputID: parent.id,
             isReACT: react,
             toolDefinitions: parent.toolDefinitions, toolCalls: calls, tokenUsage: usage,
@@ -218,9 +223,15 @@ extension HistoryTurn {
     }
     public func tokenReport(_ copy: AppLanguage = .english) -> String {
         guard let usage = tokenUsage else { return copy.text("Token usage: ") }
-        var report = copy.format(
-            "Input: %ld tokens · Generated: %ld tokens · Total: %ld tokens", usage.input, usage.generated,
-            usage.total)
+        var report: String
+        if let input = usage.input, let generated = usage.generated, let total = usage.total {
+            report = copy.format(
+                "Input: %ld tokens · Generated: %ld tokens · Total: %ld tokens", input, generated, total)
+        } else {
+            report = copy.format(
+                "Input: %@ tokens · Generated: %@ tokens · Total: %@ tokens",
+                usage.input?.formatted() ?? "—", usage.generated?.formatted() ?? "—", usage.total?.formatted() ?? "—")
+        }
         if let cached = usage.cachedInput { report += copy.format(" · Cache read: %ld tokens", cached) }
         if let written = usage.cacheWriteInput { report += copy.format(" · Cache write: %ld tokens", written) }
         return report

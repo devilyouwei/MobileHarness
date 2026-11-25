@@ -80,7 +80,10 @@ public final class AgentModelRequestRecording: Sendable {
         case .text(let text): item = .init(kind: "text", text: text)
         case .toolCall(let call): item = .init(kind: "toolCall", call: call)
         case .usage(let usage):
-            var values = ["input": usage.input, "generated": usage.generated, "total": usage.total]
+            var values: [String: Int] = [:]
+            values["input"] = usage.input
+            values["generated"] = usage.generated
+            values["total"] = usage.total
             values["cachedInput"] = usage.cachedInput
             values["cacheWriteInput"] = usage.cacheWriteInput
             item = .init(kind: "usage", usage: values)

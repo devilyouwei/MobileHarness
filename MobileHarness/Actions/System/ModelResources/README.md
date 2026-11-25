@@ -39,7 +39,7 @@ ModelResourcesClient and ModelResourceInteractionWorkflow are Actions-owned UI f
 
 ## Decision 资源
 
-D3 Edge 和 Gemma 在 Agent Models 共用下载源，各自管理下载、取消、删除、校验、版本与许可。资源快照同时读取 Apple 系统模型的实时可用性，供角色页和本地模型清单使用。Apple 的模型文件由系统管理。删除 D3 仅围栏对应模型，并加入本地调用和卸载该制品。
+Chat 和 Decision 资源共享下载源。库存通过注册描述区分可下载制品与系统管理模型，制品行复用 ModelKit 容量、进度和错误，系统模型行复用可用性。角色选择从同一库存投影读取候选。删除由 ModelKit 围栏对应制品和引用它的模型，业务负责加入当前使用。
 
 下载设置保留旧 useLocalDecision 字段供 [Provider 设置](../Provider/README.md) 在升级时读取，保存下载设置时保持旧值。当前 Decision 独占模型选择由 Provider 设置拥有。删除或缺少已选 D3 时，Assistant 提示错误并入队，不切换云端。
 
@@ -55,4 +55,4 @@ Resource preferences also persist vadOnsetWindows (1…16) and vadThreshold (0.0
 
 Actions 只拥有用户意图、UI 投影和模型选择／下载源／语音参数偏好。偏好文档位于 Storage settings 命名空间；模型目录、制品存储、传输恢复与后台交接均由 [ModelKit Management](../../../ModelKit/Support/Management/README.md) 拥有。
 
-Decision原生模型ID包括d3-edge、vela3-fast、vela3.1-fast和laya-multilingual；保存选择和资源分组使用同一集合，安装资格仍由ModelKit制品快照判定。下载不自动切换选择。
+Chat 和 Decision 的下载分组由已注册模型与制品的关联确定。下载不自动切换选择。

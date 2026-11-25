@@ -38,9 +38,10 @@ public enum ConversationTitleGenerator {
             group.addTask {
                 let journal = TitleRequestJournal(
                     input: excerpts, requestJSON: try audit.snapshot().requestJSON, audit: audit, persist: journal)
-                try await journal.begin()
                 let invocationID = await journal.id
-                var captured = prepared
+                var captured = prepared.measuringInference()
+                let recordedRequest = captured
+                captured.onModelDispatch = { identity in try await journal.begin(identity: identity) }
                 captured.transportCapture = audit.transportRecorder { value in
                     if let update = value.transport { try await transport(invocationID, update) }
                 }
@@ -51,6 +52,7 @@ public enum ConversationTitleGenerator {
                         try await withTaskCancellationHandler {
                             var finished = false
                             for try await event in session.events {
+                                try await journal.begin()
                                 audit.record(event)
                                 try Task.checkCancellation()
                                 guard !finished else {
@@ -64,6 +66,7 @@ public enum ConversationTitleGenerator {
                                 case .toolCall:
                                     throw CapabilityError.invalidRequest("Unexpected title tool call")
                                 case .finished(let reason):
+                                    await journal.finished(reason)
                                     guard reason == .stop else {
                                         throw CapabilityError.invalidRequest("Incomplete conversation title")
                                     }
@@ -81,11 +84,12 @@ public enum ConversationTitleGenerator {
                             session.cancel()
                         }
                     }
-                    try await journal.finish(error: nil)
+                    try await journal.finish(metadata: recordedRequest.metadata, error: nil)
                     return result
                 } catch {
                     let primary = error
-                    try await Task { try await journal.finish(error: primary) }.value
+                    try await Task { try await journal.finish(metadata: recordedRequest.metadata, error: primary) }
+                        .value
                     throw primary
                 }
             }
@@ -101,6 +105,7 @@ public enum ConversationTitleGenerator {
 
 private actor TitleRequestJournal {
     private var record: AssistantModelRequest
+    private var dispatched = false
     private let audit: AgentModelRequestRecording
     private let persist: @Sendable (AssistantModelRequest) async throws -> Void
     var id: String { record.id }
@@ -113,9 +118,15 @@ private actor TitleRequestJournal {
         self.persist = persist
         record = .init(id: UUID().uuidString, input: input, requestJSON: requestJSON)
         record.producerMetadata = ["purpose": "title"]
-        record.modelRequestStartedAt = Date()
     }
-    func begin() async throws { try await persist(record) }
+    func begin(identity: InferenceModelIdentity? = nil) async throws {
+        guard !dispatched else { return }
+        record.modelID = identity?.modelID
+        record.model = identity?.displayName ?? identity?.modelID
+        try await persist(record)
+        dispatched = true
+    }
+    func finished(_ reason: ChatEvent.FinishReason) { record.finishReason = String(describing: reason) }
     func append(_ delta: String) throws {
         guard record.response.utf8.count + delta.utf8.count <= 1024 else { throw CapabilityError.eventTooLarge }
         record.response += delta
@@ -125,11 +136,17 @@ private actor TitleRequestJournal {
             input: value.input, generated: value.generated, total: value.total, cachedInput: value.cachedInput,
             cacheWriteInput: value.cacheWriteInput)
     }
-    func finish(error: (any Error)?) async throws {
+    func finish(metadata: InferenceMetadata?, error: (any Error)?) async throws {
+        guard dispatched else { return }
+        record.providerModelID = metadata?.providerModelID
+        record.modelRequestStartedAt = metadata?.startedAt
+        record.modelRequestCompletedAt = metadata?.completedAt
+        record.firstTokenAt = metadata?.firstOutputAt
+        record.firstTokenLatency = metadata?.firstOutputLatency
+        if let value = metadata?.tokenUsage { usage(value) }
+        if let reason = metadata?.finishReason { finished(reason) }
         record.state = error == nil ? .completed : error is CancellationError ? .cancelled : .failed
         record.error = error.map(String.init(describing:))
-        record.finishReason = error == nil ? "stop" : "error"
-        record.modelRequestCompletedAt = Date()
         record.requestParametersJSON = try audit.snapshot().requestJSON
         record.responseEventsJSON = try audit.snapshot().responseJSON
         try await persist(record)

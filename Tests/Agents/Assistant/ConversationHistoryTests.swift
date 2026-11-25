@@ -622,11 +622,15 @@ extension AssistantHistoryStore {
 }
 
 @Test(.actionCatalog) func modelRequestJournalKeepsFirstTokenUsageAndLateOutcomesWithTheirRequest() async throws {
-    let store = AssistantHistoryStore()
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let url = directory.appendingPathComponent("history.json")
+    let store = try journal(at: url)
     let id = UUID().uuidString
     _ = try await store.beginFixture(id: id, user: "question", system: "system", model: "fixture")
     let first = AssistantModelRequest(id: UUID().uuidString, input: "question", requestJSON: "[]")
-    try await store.beginModelRequest(first, for: id)
+    try await store.beginModelRequest(first, for: id, awaitingDispatch: true)
+    try await store.markModelRequestDispatched(id, modelID: "apple-system", displayName: "Apple System LLM")
     let arrival = first.date.addingTimeInterval(0.125)
     try await store.recordModelTiming(startedAt: first.date, firstTokenAt: arrival, latency: 0.125, for: id)
     try await store.recordModelTiming(
@@ -638,15 +642,18 @@ extension AssistantHistoryStore {
     try await store.recordTokenUsage(.init(input: 2, generated: 3, total: 5), for: id)
     try await store.finishModelRequest(id, reason: "toolCalls")
     try await store.beginModelRequest(
-        .init(id: UUID().uuidString, input: "result", requestJSON: "[]"), for: id)
+        .init(id: UUID().uuidString, input: "result", requestJSON: "[]"), for: id, awaitingDispatch: true)
+    try await store.markModelRequestDispatched(id, modelID: "gemma4-e2b", displayName: "Gemma 4 E2B")
     try await store.append("second", to: id)
     try await store.recordTokenUsage(.init(input: 6, generated: 7, total: 13), for: id)
     try await store.finishModelRequest(id, reason: "stop")
     try await store.finish(id, state: .completed)
-    _ = try await store.startNew()
+    let archived = try #require(try await store.startNew())
     try await store.recordToolOutcome(call.id, for: id, state: .completed, output: "late result")
-    let record = try #require(try await store.snapshot().past.first?.turns.first)
+    let record = try #require(try await journal(at: url).conversation(archived.id).turns.first)
     let requests = try #require(record.modelRequests)
+    #expect(requests.map(\.modelID) == ["apple-system", "gemma4-e2b"])
+    #expect(requests.map(\.model) == ["Apple System LLM", "Gemma 4 E2B"])
     #expect(record.raw == "firstsecond" && requests.map { $0.response } == ["first", "second"])
     #expect(requests[0].firstTokenAt == arrival && requests[1].firstTokenAt == nil)
     #expect(requests[0].toolCalls.first?.output == "late result" && requests[1].toolCalls.isEmpty)

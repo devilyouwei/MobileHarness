@@ -118,7 +118,6 @@
         }
         var modelResourcesWorkflow: any ModelResourcesOperating { facades.resourceOperations }
         var settingsWorkflow: any SettingsOperating { facades.settingsOperations }
-        var modelName: String { facades.modelName() }
         public var modelResources: ModelResourcesState { resourcesUI.state }
         public var modelResourceControls: any ModelResourcesControlling { facades.resources }
         public var settings: SettingsState { settingsUI.state }

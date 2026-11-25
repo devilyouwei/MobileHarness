@@ -517,12 +517,15 @@ public actor AssistantHistoryStore {
         if !awaitingDispatch { try await checkpointLocked() }
     }
 
-    public func markModelRequestDispatched(_ id: String) async throws {
+    public func markModelRequestDispatched(
+        _ id: String, requestID: String? = nil, modelID: String? = nil, displayName: String? = nil
+    ) async throws {
         try await acquireWrite()
         defer { releaseWrite() }
         try await load()
         guard let input = value.current.turns.firstIndex(where: { $0.id == id }),
-            let request = value.current.turns[input].modelRequests?.indices.last
+            let requests = value.current.turns[input].modelRequests,
+            let request = requestID.map({ key in requests.firstIndex { $0.id == key } }) ?? requests.indices.last
         else { throw AssistantHistoryError.missingTurn }
         guard value.current.turns[input].modelRequests?[request].awaitingDispatch == true else { return }
         try Task.checkCancellation()
@@ -535,6 +538,10 @@ public actor AssistantHistoryStore {
             throw RecordStorageError.conflict
         }
         var next = value
+        if let modelID {
+            next.current.turns[input].modelRequests?[request].modelID = modelID
+            next.current.turns[input].modelRequests?[request].model = displayName ?? modelID
+        }
         next.current.turns[input].modelRequests?[request].awaitingDispatch = false
         next.current.turns[input].modelRequests?[request].date = Date()
         dirtyInputs.insert(id)
@@ -580,6 +587,26 @@ public actor AssistantHistoryStore {
         }
     }
 
+    public func recordModelMetadata(
+        providerModelID: String?, startedAt: Date?, firstOutputAt: Date?, firstOutputLatency: Double?,
+        completedAt: Date?, usage: ModelTokenUsage?, finishReason: String?, for id: String, requestID: String
+    ) async throws {
+        guard usage?.isValid != false else { throw AssistantHistoryError.invalidRecord }
+        try await updateTurn(id) { turn in
+            guard let index = turn.modelRequests?.firstIndex(where: { $0.id == requestID }),
+                turn.modelRequests?[index].awaitingDispatch != true
+            else { return false }
+            if let providerModelID { turn.modelRequests?[index].providerModelID = providerModelID }
+            if let startedAt { turn.modelRequests?[index].modelRequestStartedAt = startedAt }
+            if let firstOutputAt { turn.modelRequests?[index].firstTokenAt = firstOutputAt }
+            if let firstOutputLatency { turn.modelRequests?[index].firstTokenLatency = firstOutputLatency }
+            if let completedAt { turn.modelRequests?[index].modelRequestCompletedAt = completedAt }
+            if let usage { turn.modelRequests?[index].tokenUsage = usage }
+            if let finishReason { turn.modelRequests?[index].finishReason = finishReason }
+            return true
+        }
+    }
+
     /// Exact provider evidence; the original record date remains an admission timestamp.
     public func recordModelTiming(startedAt: Date, firstTokenAt: Date?, latency: Double?, for id: String) async throws {
         guard startedAt.timeIntervalSinceReferenceDate.isFinite,
@@ -606,7 +633,9 @@ public actor AssistantHistoryStore {
             guard let index = turn.modelRequests?.indices.last,
                 turn.modelRequests?[index].state == .generating
             else { throw AssistantHistoryError.invalidRecord }
-            turn.modelRequests?[index].modelRequestCompletedAt = Date()
+            if turn.modelRequests?[index].modelRequestCompletedAt == nil {
+                turn.modelRequests?[index].modelRequestCompletedAt = Date()
+            }
             turn.modelRequests?[index].state = error == nil ? .completed : .failed
             turn.modelRequests?[index].finishReason = reason
             turn.modelRequests?[index].error = error.map { String($0.prefix(4096)) }
@@ -682,13 +711,7 @@ public actor AssistantHistoryStore {
     }
 
     public func recordTokenUsage(_ usage: ModelTokenUsage, for id: String) async throws {
-        guard usage.input >= 0, usage.generated >= 0, usage.total >= 0,
-            usage.cachedInput.map({ (0...usage.input).contains($0) }) ?? true,
-            usage.cacheWriteInput.map({ (0...usage.input).contains($0) }) ?? true,
-            (usage.cachedInput ?? 0) <= usage.input - (usage.cacheWriteInput ?? 0)
-        else {
-            throw AssistantHistoryError.invalidRecord
-        }
+        guard usage.isValid else { throw AssistantHistoryError.invalidRecord }
         try await updateTurn(id) {
             $0.tokenUsage = usage
             if let index = $0.modelRequests?.indices.last { $0.modelRequests?[index].tokenUsage = usage }
@@ -775,7 +798,9 @@ public actor AssistantHistoryStore {
             next.current.turns[index].modelRequests?[request].state == .generating
                 || (state == .interrupted && next.current.turns[index].modelRequests?[request].state == .completed)
         {
-            next.current.turns[index].modelRequests?[request].modelRequestCompletedAt = Date()
+            if next.current.turns[index].modelRequests?[request].modelRequestCompletedAt == nil {
+                next.current.turns[index].modelRequests?[request].modelRequestCompletedAt = Date()
+            }
             next.current.turns[index].modelRequests?[request].state = state
             next.current.turns[index].modelRequests?[request].finishReason = reason
             let failure = next.current.turns[index].error

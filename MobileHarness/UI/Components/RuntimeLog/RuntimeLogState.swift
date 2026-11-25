@@ -309,6 +309,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
     public let duration: Duration
     public let route: Route
     public let modelName: String?
+    public let modelID: String?
     public let modelResult: Disposition?
     public let adoptedResult: Disposition
     public let booleanResult: Bool?
@@ -323,7 +324,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         id: String, source: String, inputText: String, time: Date = .now, duration: Duration, route: Route,
         modelResult: Disposition?,
         adoptedResult: Disposition, booleanResult: Bool? = nil, signalStatus: String? = nil, reason: String? = nil,
-        requests: [String], modelName: String? = nil
+        requests: [String], modelName: String? = nil, modelID: String? = nil
     ) {
         self.id = id
         self.source = String(source.prefix(64))
@@ -332,6 +333,7 @@ public struct DecisionLogItem: Identifiable, Sendable, Equatable {
         self.duration = duration
         self.route = route
         self.modelName = modelName
+        self.modelID = modelID
         self.modelResult = modelResult
         self.booleanResult = booleanResult
         self.signalStatus = signalStatus

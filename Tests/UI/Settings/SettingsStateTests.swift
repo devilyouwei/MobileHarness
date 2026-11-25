@@ -126,26 +126,30 @@ import Testing
     #expect(notices.transientToast == nil)
 }
 
-@Test @MainActor func localModelSettingsExposeOnlySupportedRoles() {
-    #expect(LocalLanguageModel.allCases.filter { $0.supports(.assistant) } == [.gemma, .apple])
-    #expect(LocalLanguageModel.allCases.filter { $0.supports(.writer) } == [.gemma])
-    #expect(
-        LocalLanguageModel.allCases.filter { $0.supports(.decision) } == [.gemma, .apple, .edge, .vela, .vela31, .laya])
+@Test @MainActor func localModelSettingsExposeOnlyProjectedRoles() {
     let resources = ModelResourcesState()
-    #expect(!resources.appleSystemAvailable)
-    #expect(resources.applySnapshot(.init(items: [], appleSystemAvailable: true), generation: resources.beginRefresh()))
-    #expect(resources.appleSystemAvailable)
+    let models: [LocalModelOption] = [
+        .init(
+            id: "new-chat", name: "New Chat", artifactID: "artifact", roles: [.assistant, .writer],
+            nativeDecision: false, available: true),
+        .init(
+            id: "system", name: "System", artifactID: nil, roles: [.assistant, .decision],
+            nativeDecision: false, available: false),
+    ]
+    #expect(resources.applySnapshot(.init(items: [], languageModels: models), generation: resources.beginRefresh()))
+    #expect(resources.localModels(for: .assistant).map(\.id) == ["new-chat", "system"])
+    #expect(resources.localModels(for: .writer).map(\.id) == ["new-chat"])
+    #expect(resources.localModels(for: .decision).first?.available == false)
+    #expect(resources.modelIDs(for: .language) == ["artifact"])
 }
 
 @Test func localModelRecommendationsUseRoleSpecificMeasurements() {
-    #expect(LocalLanguageModel.vela.benchmark(for: .decision)?.halfStars == 6)
-    #expect(LocalLanguageModel.edge.benchmark(for: .decision)?.halfStars == 5)
-    #expect(LocalLanguageModel.vela31.benchmark(for: .decision)?.halfStars == 4)
-    #expect(LocalLanguageModel.laya.benchmark(for: .decision)?.halfStars == 3)
-    for model in LocalLanguageModel.allCases {
-        #expect(model.benchmark(for: .assistant) == nil)
-        #expect(model.benchmark(for: .writer) == nil)
+    let expected = ["vela3-fast": 6, "d3-edge": 5, "vela3.1-fast": 4, "laya-multilingual": 3]
+    for (id, stars) in expected {
+        #expect(LocalModelBenchmark.recommendation(for: id, role: .decision)?.halfStars == stars)
+        #expect(LocalModelBenchmark.recommendation(for: id, role: .assistant) == nil)
+        #expect(LocalModelBenchmark.recommendation(for: id, role: .writer) == nil)
     }
-    #expect(LocalLanguageModel.gemma.benchmark(for: .decision) == nil)
-    #expect(LocalLanguageModel.apple.benchmark(for: .decision) == nil)
+    #expect(LocalModelBenchmark.recommendation(for: "gemma4-e2b", role: .decision) == nil)
+    #expect(LocalModelBenchmark.recommendation(for: "apple-system", role: .decision) == nil)
 }

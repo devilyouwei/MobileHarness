@@ -104,7 +104,8 @@ extension SQLiteModelRequestLogRepository {
         }
     }
     static let generationKeys: Set<String> = [
-        "model", "maximumOutputTokens", "temperature", "modelRequestStartedAt", "modelRequestCompletedAt",
+        "model", "modelID", "providerModelID", "maximumOutputTokens", "temperature", "modelRequestStartedAt",
+        "modelRequestCompletedAt",
         "firstTokenLatency", "firstTokenAt", "tokenUsage", "finishReason", "requestParametersJSON",
         "responseEventsJSON", "requestJSON", "request", "logsCleared", "error", "failureDiagnostic",
     ]

@@ -84,7 +84,8 @@ public final class ProviderSettingsService {
     public func writerConfiguration() async throws -> ProviderSettings {
         let value = try await restore()
         if value.writerUsesLocal {
-            return ProviderSettings(enabled: false, url: "", key: "", model: "")
+            return ProviderSettings(
+                enabled: false, url: "", key: "", model: "", writerLocalModelID: value.resolvedWriterLocalModelID)
         }
         guard let selected = value.writerProviderID else { throw ProviderSettingsError.invalidSelection }
         guard let provider = value.providers.first(where: { $0.id == selected }),
@@ -97,9 +98,7 @@ public final class ProviderSettingsService {
     private let store: any ProviderSettingsPersistence
     private let runtime: ProviderSettingsRuntime
     private let legacyDecision: @Sendable () async throws -> Bool
-    private let isAppleAvailable: @Sendable () async -> Bool
-    private let isLanguageInstalled: @Sendable () async throws -> Bool
-    private let isDecisionInstalled: @Sendable (String) async throws -> Bool
+    private let localModels: @Sendable () async throws -> [LocalModelFact]
     private var inheritedDecision = false
     private var saved: ProviderSettings?
     private var restored = false
@@ -109,16 +108,12 @@ public final class ProviderSettingsService {
     public init(
         store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime,
         legacyDecision: @escaping @Sendable () async throws -> Bool = { false },
-        isDecisionInstalled: @escaping @Sendable (String) async throws -> Bool = { _ in false },
-        isLanguageInstalled: @escaping @Sendable () async throws -> Bool = { false },
-        isAppleAvailable: @escaping @Sendable () async -> Bool = { false }
+        localModels: @escaping @Sendable () async throws -> [LocalModelFact] = { [] }
     ) {
         self.store = store
         self.runtime = runtime
         self.legacyDecision = legacyDecision
-        self.isDecisionInstalled = isDecisionInstalled
-        self.isLanguageInstalled = isLanguageInstalled
-        self.isAppleAvailable = isAppleAvailable
+        self.localModels = localModels
     }
     public func summary() throws -> String {
         guard restored else { throw ProviderSettingsError.busy }
@@ -154,15 +149,15 @@ public final class ProviderSettingsService {
         if value.decisionUsesLocal == nil { value.decisionUsesLocal = inheritedDecision }
         return value
     }
-    private func requireLocalModel(_ id: String) async throws {
-        switch id {
-        case "apple-system":
-            guard await isAppleAvailable() else { throw ProviderSettingsError.appleUnavailable }
-        case "gemma4-e2b":
-            guard try await isLanguageInstalled() else { throw ProviderSettingsError.languageRequired }
-        default:
-            guard try await isDecisionInstalled(id) else { throw ProviderSettingsError.decisionRequired }
+    private func requireLocalModel(_ id: String, role: LocalModelFact.Role, models: [LocalModelFact]) throws {
+        guard let model = models.first(where: { $0.id == id }), model.roles.contains(role) else {
+            throw ProviderSettingsError.invalidSelection
         }
+        guard !model.available else { return }
+        guard model.needsDownload else {
+            throw model.artifactID == nil ? ProviderSettingsError.appleUnavailable : .invalidSelection
+        }
+        throw role == .decision ? ProviderSettingsError.decisionRequired : .languageRequired
     }
 
     public func save(_ value: ProviderSettings) async throws -> ProviderSettings {
@@ -180,22 +175,24 @@ public final class ProviderSettingsService {
                 value.decisionProviderID = nil
                 value.decisionModel = ""
             }
+            var changes: [(String, LocalModelFact.Role)] = []
             let localID = value.resolvedDecisionLocalModelID
-            guard
-                ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual", "gemma4-e2b", "apple-system"].contains(
-                    localID),
-                ["gemma4-e2b", "apple-system"].contains(value.assistantLocalModelID)
-            else { throw ProviderSettingsError.invalidSelection }
             if value.decisionUsesLocal == true,
                 current.decisionUsesLocal != true || localID != current.resolvedDecisionLocalModelID
             {
-                try await requireLocalModel(localID)
+                changes.append((localID, .decision))
             }
             if !value.enabled, current.enabled || value.assistantLocalModelID != current.assistantLocalModelID {
-                try await requireLocalModel(value.assistantLocalModelID)
+                changes.append((value.assistantLocalModelID, .assistant))
             }
-            if value.writerUsesLocal && !current.writerUsesLocal {
-                try await requireLocalModel("gemma4-e2b")
+            if value.writerUsesLocal,
+                !current.writerUsesLocal || value.resolvedWriterLocalModelID != current.resolvedWriterLocalModelID
+            {
+                changes.append((value.resolvedWriterLocalModelID, .writer))
+            }
+            if !changes.isEmpty {
+                let models = try await localModels()
+                for (id, role) in changes { try requireLocalModel(id, role: role, models: models) }
             }
             if value.writerUsesLocal && value.writerProviderID != nil { throw ProviderSettingsError.invalidSelection }
             if value.enabled, value.model.isEmpty { throw ProviderSettingsError.invalidSelection }

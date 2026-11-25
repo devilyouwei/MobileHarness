@@ -70,7 +70,7 @@ SettingsProviderAdapter 的结果呈现调用显式忽略 UI 返回的接纳布�
 
 ProviderSettingsClient is an Actions-owned facade with coalesced restoration (at most 32 waiters) and joined shutdown. Provider draft/configuration and staging ports live in FunctionContracts; ApplicationControl owns cognitive authorization. UI SettingsFormController owns bounded discovery presentation workers and exposes joined shutdown, invoked by Actions cleanup.
 
-设置文档包含 Assistant 的本地 Chat 模型 ID 和云端选择、共享 providers 列表以及 Writer、Decision 的独立选择。Assistant 本地 ID 缺失时解析为 Gemma。编辑 Provider 保留稳定 ID。Writer 获取其绑定的 Provider 和钥匙串凭据。Writer 的 writerUsesLocal 明确区分本地 Gemma 与未配置；旧文档缺字段默认为 false，未配置报错，不继承 Assistant 云端。选择本地时清空 Writer 云端引用，Gemma 原生工具由 ModelKit 适配，超出本地上下文容量时显式报错，不回退云端。
+设置文档保存共享 Provider 和 Assistant、Writer、Decision 的独立模型选择。本地选择保存稳定 ID。旧文档缺 Assistant ID 时解析为 Gemma，Writer 的旧本地开关为真且缺 ID 时也解析为 Gemma。缺 Writer 模式时解析为未配置。Editor 保留 Provider 稳定 ID，云端配置从独立 Provider 和钥匙串读取。
 
 模型发现由角色子页发起，进入时刷新已选云端 Provider，切换时查询新选择。表单控制器按 Provider ID 缓存结果，凭据快照和请求 ID 围栏迟到结果。模型选择由各角色保存，密钥留在钥匙串。UI 请求生命周期见 [Settings](../../../UI/Settings/README.md)。
 
@@ -78,8 +78,4 @@ Writer配置的writerThinking是独立选择，默认false；可选持久覆盖�
 
 首次 Welcome 使用同一 SettingsOperating 保存完整 Provider 配置，沿 ApplicationControl/Gateway 请求与现有 ProviderSettingsService/ProviderSettingsStore 事务写入。仅新增 Provider 且尚未选择角色模型时保持既有本地配置；密钥仍经 credentialID 引用保存到钥匙串。Welcome 不引入新的凭据仓库、发现端点或模型默认策略。
 
-Decision 在同一 Provider 设置文档提交 decisionUsesLocal、decisionLocalModelID、decisionProviderID 和 decisionModel。旧文档缺模式时读取下载设置历史模式，本地 ID 缺失解析为 Edge。启用或切换本地模型时校验目标制品是否已安装，Apple 系统模型改用系统可用性查询。Writer 启用本地时校验支持工具调用的 Gemma。资源未就绪时事务拒绝保存。云端 Provider 的模型发现接口仅返回模型 ID，Writer 执行仍要求 Chat 能力声明支持工具调用。已选资源后来缺失不会因无关设置保存而静默切换。每次分类读取一份已提交快照；本地模式只提供本地 ID，云端模式只提供已选 Provider/Model 工厂。旧本地配置残留云端引用不执行，保存时清空。执行失败由 Assistant 提示错误并入队，不调用备用模型。
-
-已移除的 D3 Lite ID 不出现在选择列表、库存资格或保存白名单中。旧偏好保留原值供用户修正；执行失败明确报告，不自动切换到 Edge 或云端。
-
-Decision原生模型ID包括d3-edge、vela3-fast、vela3.1-fast和laya-multilingual；保存选择和资源分组使用同一集合，安装资格仍由ModelKit制品快照判定。下载不自动切换选择。
+本地角色资格从 ModelKit 候选投影得出。Assistant 要求 Chat，Writer 要求支持工具的 Chat，Decision 接受原生 Decision 或可适配的 Chat。候选展示与更改选择时的保存校验使用同一投影。缺少下载或系统能力不可用会阻止变更保存。已选资源随后缺失时保留选择，使用时显式失败。保存本地模式清除对应云端引用。Decision 的旧模式和缺省 ID 继续从既有兼容路径恢复。

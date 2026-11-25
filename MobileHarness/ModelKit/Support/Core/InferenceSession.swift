@@ -35,6 +35,8 @@ public final class InferenceSession<Event: Sendable>: Sendable {
     public let events: InferenceEvents<Event>
     private let storage: SessionStorage<Event>
     private let cleanup: @Sendable () async -> Void
+    @_spi(InferenceAdapter) public let metadataRecorder: InferenceMetadataRecorder
+    public var metadata: InferenceMetadata { metadataRecorder.snapshot }
     public var phase: InferencePhase { storage.phase }
     public func waitForCompletion() async { await cleanup() }
     /// Join this request's native cleanup on every consumer exit, including early return.
@@ -53,10 +55,11 @@ public final class InferenceSession<Event: Sendable>: Sendable {
 
     private init(
         context: InferenceContext, storage: SessionStorage<Event>, stream: AsyncThrowingStream<Event, Error>,
-        cleanup: @escaping @Sendable () async -> Void
+        cleanup: @escaping @Sendable () async -> Void, metadata: InferenceMetadataRecorder
     ) {
         self.context = context
         self.cleanup = cleanup
+        metadataRecorder = metadata
         self.storage = storage
         events = InferenceEvents(storage: storage, stream: stream)
     }
@@ -70,6 +73,20 @@ public final class InferenceSession<Event: Sendable>: Sendable {
         phase: InferencePhase = .running,
         waitForCompletion: @escaping @Sendable () async -> Void = {}
     ) -> (session: InferenceSession<Event>, emitter: InferenceEmitter<Event>) {
+        make(
+            context: context, limits: limits, estimatedBytes: estimatedBytes, onTermination: onTermination,
+            phase: phase, waitForCompletion: waitForCompletion, metadata: .init())
+    }
+
+    @_spi(InferenceAdapter) public static func make(
+        context: InferenceContext, limits: StreamLimits,
+        estimatedBytes: @escaping @Sendable (Event) -> Int,
+        onTermination: @escaping @Sendable (SessionTermination) -> Void = { _ in },
+        phase: InferencePhase = .running,
+        waitForCompletion: @escaping @Sendable () async -> Void = {},
+        metadata: InferenceMetadataRecorder,
+        onEvent: @escaping @Sendable (Event) -> Void = { _ in }
+    ) -> (session: InferenceSession<Event>, emitter: InferenceEmitter<Event>) {
         let policy: AsyncThrowingStream<Event, Error>.Continuation.BufferingPolicy =
             limits.capacity.map { .bufferingOldest($0) } ?? .unbounded
         let pair = AsyncThrowingStream<Event, Error>.makeStream(bufferingPolicy: policy)
@@ -79,9 +96,11 @@ public final class InferenceSession<Event: Sendable>: Sendable {
             if case .cancelled = termination { storage.end(.cancelled) }
         }
         return (
-            InferenceSession(context: context, storage: storage, stream: pair.stream, cleanup: waitForCompletion),
+            InferenceSession(
+                context: context, storage: storage, stream: pair.stream, cleanup: waitForCompletion, metadata: metadata),
             InferenceEmitter(
-                storage: storage, maximumEventBytes: limits.maximumEventBytes, estimatedBytes: estimatedBytes)
+                storage: storage, maximumEventBytes: limits.maximumEventBytes, estimatedBytes: estimatedBytes,
+                metadata: metadata, onEvent: onEvent)
         )
     }
 
@@ -135,6 +154,8 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
     fileprivate let storage: SessionStorage<Event>
     fileprivate let maximumEventBytes: Int?
     fileprivate let estimatedBytes: @Sendable (Event) -> Int
+    fileprivate let metadata: InferenceMetadataRecorder
+    fileprivate let onEvent: @Sendable (Event) -> Void
 
     public func yield(_ event: Event) throws {
         let bytes = estimatedBytes(event)
@@ -143,6 +164,7 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
             throw CapabilityError.eventTooLarge
         }
         let continuation = try storage.reserveEmission()
+        onEvent(event)
         switch continuation.yield(event) {
         case .enqueued: break
         case .dropped:
@@ -168,8 +190,12 @@ public struct InferenceEmitter<Event: Sendable>: Sendable {
     }
 
     public func markRunning() { storage.markRunning() }
-    public func finish() { storage.end(.finished) }
+    public func finish() {
+        metadata.complete()
+        storage.end(.finished)
+    }
     public func fail(_ error: any Error) {
+        metadata.complete()
         if error is CancellationError { storage.end(.cancelled) } else { storage.end(.failed(error)) }
     }
 }

@@ -577,13 +577,18 @@ public struct WriterWorkflow: Sendable {
         var request = request
         let timing = ChatTiming()
         request.timing = timing
+        request = request.measuringInference()
+        let recordedRequest = request
         let evidence = try AgentModelRequestRecording(request)
         var id: String?
         var stage = "History write"
         do {
             id = try await history?.begin(request, phase: phase, attempt: attempt, path: path, domain: domain)
             if let id {
-                request.onDispatch = { [history] in try await history?.dispatched(id) }
+                request.onDispatch = { [history] in
+                    if recordedRequest.metadata?.model == nil { try await history?.dispatched(id) }
+                }
+                request.onModelDispatch = { [history] model in try await history?.dispatched(id, model: model) }
                 try await history?.recording(try evidence.snapshot(initial: true), id: id)
                 request.transportCapture = evidence.transportRecorder { [history] value in
                     try await history?.recording(value, id: id)
@@ -602,7 +607,7 @@ public struct WriterWorkflow: Sendable {
             let result = try await operation(id, request, evidence)
             stage = "History save"
             if let id {
-                if let snapshot = timing.snapshot { try await history?.timing(snapshot, id: id) }
+                if let metadata = recordedRequest.metadata { try await history?.metadata(metadata, id: id) }
                 try await history?.recording(try evidence.snapshot(), id: id)
                 try await history?.finish(id)
             }
@@ -626,7 +631,7 @@ public struct WriterWorkflow: Sendable {
             if let id {
                 do {
                     try await Task {
-                        if let snapshot = timing.snapshot { try await history?.timing(snapshot, id: id) }
+                        if let metadata = recordedRequest.metadata { try await history?.metadata(metadata, id: id) }
                         try await history?.recording(try evidence.snapshot(), id: id)
                         try await history?.finish(id, error: primary, diagnostic: failure)
                     }.value

@@ -8,6 +8,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public var decisionModel: String
     public var decisionUsesLocal: Bool
     public var decisionLocalModelID: String
+    public var writerLocalModelID: String?
     public var writerUsesLocal: Bool
     public var writerProviderID: String?
     public var writerModel: String
@@ -21,7 +22,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [CloudSettingsDraft] = [], name: String = "",
         id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
-        writerUsesLocal: Bool = false,
+        writerUsesLocal: Bool = false, writerLocalModelID: String? = nil,
         decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool = false,
         decisionLocalModelID: String = "d3-edge", assistantLocalModelID: String = "gemma4-e2b"
     ) {
@@ -35,6 +36,7 @@ public struct CloudSettingsDraft: Sendable, Equatable {
         self.writerModel = writerModel
         self.writerThinking = writerThinking
         self.writerUsesLocal = writerUsesLocal
+        self.writerLocalModelID = writerLocalModelID
         self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
         self.providers = providers
         self.enabled = enabled
@@ -50,48 +52,20 @@ public enum AgentBrain: String, CaseIterable, Identifiable, Sendable {
     public var title: String { rawValue.capitalized }
 }
 
-enum LocalLanguageModel: String, CaseIterable {
-    case gemma = "gemma4-e2b"
-    case apple = "apple-system"
-    case edge = "d3-edge"
-    case vela = "vela3-fast"
-    case vela31 = "vela3.1-fast"
-    case laya = "laya-multilingual"
-
-    var title: String {
-        switch self {
-        case .gemma: "Gemma 4 E2B"
-        case .apple: "Apple System LLM"
-        case .edge: "D3 Edge"
-        case .vela: "Vela 3 Fast"
-        case .vela31: "Vela 3.1 Fast"
-        case .laya: "Laya Multilingual"
-        }
-    }
-
-    func supports(_ brain: AgentBrain) -> Bool {
-        switch self {
-        case .gemma: true
-        case .apple: brain != .writer
-        case .edge, .vela, .vela31, .laya: brain == .decision
-        }
-    }
-
-    func benchmark(for brain: AgentBrain) -> LocalModelBenchmark? {
-        guard brain == .decision else { return nil }
-        // Editorial task recommendation from Mac interrupt experiments, not accuracy or confidence.
-        switch self {
-        case .vela: return LocalModelBenchmark(halfStars: 6)
-        case .edge: return LocalModelBenchmark(halfStars: 5)
-        case .vela31: return LocalModelBenchmark(halfStars: 4)
-        case .laya: return LocalModelBenchmark(halfStars: 3)
-        case .gemma, .apple: return nil
-        }
-    }
-}
-
 struct LocalModelBenchmark {
     let halfStars: Int
+
+    static func recommendation(for modelID: String, role: AgentBrain) -> Self? {
+        guard role == .decision else { return nil }
+        // Editorial recommendations from macOS interrupt experiments.
+        return switch modelID {
+        case "vela3-fast": .init(halfStars: 6)
+        case "d3-edge": .init(halfStars: 5)
+        case "vela3.1-fast": .init(halfStars: 4)
+        case "laya-multilingual": .init(halfStars: 3)
+        default: nil
+        }
+    }
 }
 
 public struct AgentBrainDraft: Equatable, Sendable {
@@ -100,12 +74,13 @@ public struct AgentBrainDraft: Equatable, Sendable {
     public var usesLocal: Bool
     public var writerThinking: Bool
     public var decisionLocalModelID = "d3-edge"
+    public var writerLocalModelID: String? = nil
     public var assistantLocalModelID = "gemma4-e2b"
 
     func localModelID(for brain: AgentBrain) -> String {
         switch brain {
         case .assistant: assistantLocalModelID
-        case .writer: LocalLanguageModel.gemma.rawValue
+        case .writer: writerLocalModelID ?? "gemma4-e2b"
         case .decision: decisionLocalModelID
         }
     }
@@ -216,6 +191,7 @@ public final class SettingsState {
     public var decisionUsesLocal = false { didSet { if oldValue != decisionUsesLocal { revision += 1 } } }
     public var writerProviderID: String? { didSet { if oldValue != writerProviderID { revision += 1 } } }
     public var writerModel = "" { didSet { if oldValue != writerModel { revision += 1 } } }
+    public var writerLocalModelID: String? { didSet { if oldValue != writerLocalModelID { revision += 1 } } }
     public var writerUsesLocal = false { didSet { if oldValue != writerUsesLocal { revision += 1 } } }
     public var writerThinking = false { didSet { if oldValue != writerThinking { revision += 1 } } }
     public init(initial: CloudSettingsDraft) {
@@ -228,6 +204,7 @@ public final class SettingsState {
         writerModel = initial.writerModel
         writerThinking = initial.writerThinking
         writerUsesLocal = initial.writerUsesLocal
+        writerLocalModelID = initial.writerLocalModelID
         providers = initial.providers
         isEnabled = initial.enabled
         url = initial.url
@@ -246,7 +223,7 @@ public final class SettingsState {
         case .writer:
             .init(
                 providerID: writerProviderID, model: writerModel, usesLocal: writerUsesLocal,
-                writerThinking: writerThinking)
+                writerThinking: writerThinking, writerLocalModelID: writerLocalModelID)
         case .decision:
             .init(
                 providerID: decisionProviderID, model: decisionModel, usesLocal: decisionUsesLocal,
@@ -327,6 +304,7 @@ public final class SettingsState {
         writerModel = value.writerModel
         writerThinking = value.writerThinking
         writerUsesLocal = value.writerUsesLocal
+        writerLocalModelID = value.writerLocalModelID
         providers = value.providers
         isEnabled = value.enabled
         url = value.url
@@ -397,6 +375,7 @@ public protocol SettingsPresenting: UIPresentationAccess {
     var writerModel: String { get set }
     var writerThinking: Bool { get set }
     var writerUsesLocal: Bool { get set }
+    var writerLocalModelID: String? { get set }
     var isEnabled: Bool { get }
     var url: String { get }
     var key: String { get }

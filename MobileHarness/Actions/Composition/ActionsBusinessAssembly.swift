@@ -118,10 +118,8 @@
                         try await manager.artifactSnapshots().filter { $0.phase == .installed }.map { $0.artifact.id })
                 })
             let language = model.language
-            let appleAvailable: @Sendable () async -> Bool = {
-                guard let model = try? await language.localChatModel("apple-system") else { return false }
-                if case .available = await model.capability.availability { return true }
-                return false
+            let languageModels: @Sendable () async throws -> [LocalModelFact] = {
+                try await SettingsModelResourcesAdapter.localLanguageModels(using: language)
             }
             let providerService = ProviderSettingsService(
                 store: ProviderSettingsStore(
@@ -133,18 +131,7 @@
                     language: model.language,
                     beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings),
                 legacyDecision: { try await preferences.legacyDecisionSelection() },
-                isDecisionInstalled: { id in
-                    let manager = try await request.maintenance.artifacts()
-                    return try await manager.artifactSnapshots().contains {
-                        $0.artifact.id == id && $0.phase == .installed
-                    }
-                },
-                isLanguageInstalled: {
-                    let manager = try await request.maintenance.artifacts()
-                    return try await manager.artifactSnapshots().contains {
-                        $0.artifact.id == "gemma4-e2b" && $0.phase == .installed
-                    }
-                }, isAppleAvailable: appleAvailable)
+                localModels: languageModels)
             let providerSettings = ProviderSettingsRequests(service: providerService)
             let discovery = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
             let providerPresentation = ProviderPresentationAdapter(
@@ -179,7 +166,7 @@
             let resourceAdapter = ModelResourceCapabilityAdapter(
                 artifacts: request.maintenance.artifacts,
                 quiesce: request.maintenance.quiesce, bindSpeech: request.maintenance.bindSpeech,
-                systemChatAvailable: appleAvailable)
+                languageModels: languageModels)
             let album = PhotoAlbumService(
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
                 exportVideo: { [platform] file in try await platform.vision.saveVideo(file) })
@@ -283,11 +270,12 @@
                 artifactStreaming: artifacts, writerArtifacts: exports,
                 writerModel: { [model] in
                     let selected = try await providerService.writerConfiguration()
-                    let configuration =
-                        try selected.enabled
-                        ? OpenAIChatConfiguration(
-                            baseURL: OpenAIChatConfiguration.endpoint(selected.url), apiKey: selected.key,
-                            model: selected.model, thinking: selected.writerThinking ? .enabled : .minimum) : nil
+                    if !selected.enabled {
+                        return try await model.language.localChatModel(selected.resolvedWriterLocalModelID)
+                    }
+                    let configuration = try OpenAIChatConfiguration(
+                        baseURL: OpenAIChatConfiguration.endpoint(selected.url), apiKey: selected.key,
+                        model: selected.model, thinking: selected.writerThinking ? .enabled : .minimum)
                     return try await model.language.chatModel(configuration: configuration)
                 },
                 decisionConfiguration: { [model] in

@@ -98,7 +98,6 @@
             language: any ModelLanguageProviding, speech: any ModelSpeechProviding,
             audio: AudioContainer, runtime: AgentRuntime,
             perceptionContainer: SpeechPerceptionContainer,
-            modelName: @escaping @Sendable () async throws -> String,
             progress: @MainActor (String) -> Void
         ) async throws {
             audioDetectionState = diagnostics.audioDetection

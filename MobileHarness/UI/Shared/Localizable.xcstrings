@@ -893,6 +893,17 @@
         }
       }
     },
+    "Awake": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "唤醒"
+          }
+        }
+      }
+    },
     "Back": {
       "extractionState": "extracted",
       "localizations": {
@@ -10251,6 +10262,17 @@
         }
       }
     },
+    "Interrupt": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打断"
+          }
+        }
+      }
+    },
     "Interrupt decision": {
       "extractionState": "extracted",
       "localizations": {
@@ -10291,6 +10313,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "日志已清空"
+          }
+        }
+      }
+    },
+    "Use another model or download this model again for local chat.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择其他模型，或重新下载此模型以进行本地对话。"
+          }
+        }
+      }
+    },
+    "Select an available model.": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择一个可用模型。"
+          }
+        }
+      }
+    },
+    "Provider model: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务端型号：%@"
+          }
+        }
+      }
+    },
+    "Model ID: %@": {
+      "extractionState": "extracted",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型 ID：%@"
           }
         }
       }

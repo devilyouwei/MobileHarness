@@ -9,6 +9,8 @@ public struct ProviderSettings: Equatable, Sendable {
     public var decisionUsesLocal: Bool?
     public var decisionLocalModelID: String?
     public var resolvedDecisionLocalModelID: String { decisionLocalModelID ?? "d3-edge" }
+    public let writerLocalModelID: String?
+    public var resolvedWriterLocalModelID: String { writerLocalModelID ?? "gemma4-e2b" }
     public let writerUsesLocal: Bool
     public let writerProviderID: String?
     public let writerModel: String
@@ -22,7 +24,7 @@ public struct ProviderSettings: Equatable, Sendable {
     public init(
         enabled: Bool, url: String, key: String, model: String, providers: [ProviderSettings] = [], name: String = "",
         id: String? = nil, writerProviderID: String? = nil, writerModel: String = "", writerThinking: Bool = false,
-        writerUsesLocal: Bool = false,
+        writerUsesLocal: Bool = false, writerLocalModelID: String? = nil,
         decisionProviderID: String? = nil, decisionModel: String = "", decisionUsesLocal: Bool? = nil,
         decisionLocalModelID: String? = nil, assistantLocalModelID: String = "gemma4-e2b"
     ) {
@@ -36,6 +38,7 @@ public struct ProviderSettings: Equatable, Sendable {
         self.writerModel = writerModel
         self.writerThinking = writerThinking
         self.writerUsesLocal = writerUsesLocal
+        self.writerLocalModelID = writerLocalModelID
         self.name = name.isEmpty ? (URL(string: url)?.host ?? "Provider") : name
         self.providers = providers
         self.enabled = enabled

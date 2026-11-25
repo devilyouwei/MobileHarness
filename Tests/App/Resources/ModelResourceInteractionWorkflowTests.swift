@@ -220,7 +220,6 @@ import Testing
     #expect(!String(decoding: data, as: UTF8.self).contains("preferDownloadedSpeech"))
     #expect(ModelResourceGroup.recognition.modelIDs == ["nemotron", "silero", "deepfilternet3"])
     #expect(ModelResourceGroup.synthesis.modelIDs == ["moss-tts-nano"])
-    #expect(ModelResourceGroup.language.modelIDs == ["gemma4-e2b"])
     #expect(ModelResourceGroup.vision.modelIDs == ["yolo26n-pose"])
 }
 

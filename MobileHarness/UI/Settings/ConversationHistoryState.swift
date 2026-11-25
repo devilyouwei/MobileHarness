@@ -265,6 +265,8 @@ public struct HistoryRuntimeEffect: Codable, Sendable, Identifiable {
 public struct HistoryModelRequest: Codable, Sendable, Identifiable {
     public var producerMetadata: [String: String]? = nil
     public var model: String? = nil
+    public var modelID: String? = nil
+    public var providerModelID: String? = nil
     public var maximumOutputTokens: Int? = nil
     public var temperature: Double? = nil
     public var inputMessages: [HistoryMessage]? = nil
@@ -294,9 +296,9 @@ public struct HistoryModelRequest: Codable, Sendable, Identifiable {
 }
 
 public struct HistoryTokenUsage: Codable, Sendable, Equatable {
-    public let input: Int
-    public let generated: Int
-    public let total: Int
+    public let input: Int?
+    public let generated: Int?
+    public let total: Int?
     public let cachedInput: Int?
     public let cacheWriteInput: Int?
     public init(
@@ -381,6 +383,8 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public let user: String
     public let request: [HistoryMessage]
     public let model: String
+    public var modelID: String? = nil
+    public var providerModelID: String? = nil
     public let maximumOutputTokens: Int?
     public let temperature: Double
     public let modelRequests: [HistoryModelRequest]?

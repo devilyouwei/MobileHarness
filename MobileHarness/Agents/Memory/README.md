@@ -129,3 +129,5 @@ History clear registration and invocation share one InternalTool declaration wit
 历史详情仅呈现持久化输入、响应与业务快照；Memory 不提供重新解析旧回复的执行预览接口。真实 Action 调度及执行结果仍由其既有 owner 持有。
 
 ConversationTitleGenerator owns the Memory title-template accessor alongside title inference. Shared AgentPrompts provides locale-aware loading/rendering without embedding the Memory resource path. Template content, language selection and failure propagation retain their existing contracts.
+
+标题日志在 ModelKit 请求实际发出时建立，随后保存同一次请求的模型身份和终态元数据。

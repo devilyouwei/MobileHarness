@@ -38,6 +38,9 @@ public struct AssistantModelRequest: Codable, Sendable, Identifiable {
     public var requestParametersJSON: String? = nil
     public var responseEventsJSON: String? = nil
     public var producerMetadata: [String: String]? = nil
+    public var modelID: String? = nil
+    public var providerModelID: String? = nil
+    public var model: String? = nil
     public var messageID: String? = nil
     public var inputMessageID: String? = nil
     public var isObservation: Bool? = nil

@@ -20,6 +20,7 @@ import Foundation
             key: state.key.trimmingCharacters(in: .whitespacesAndNewlines), model: state.selectedModel,
             providers: state.providers, writerProviderID: state.writerProviderID, writerModel: state.writerModel,
             writerThinking: state.writerThinking, writerUsesLocal: state.writerUsesLocal,
+            writerLocalModelID: state.writerLocalModelID,
             decisionProviderID: state.decisionProviderID, decisionModel: state.decisionModel,
             decisionUsesLocal: state.decisionUsesLocal, decisionLocalModelID: state.decisionLocalModelID,
             assistantLocalModelID: state.assistantLocalModelID)
@@ -40,6 +41,7 @@ import Foundation
             state.writerModel = value.writerModel
             state.writerThinking = value.writerThinking
             state.writerUsesLocal = value.writerUsesLocal
+            state.writerLocalModelID = value.writerLocalModelID
             state.providers =
                 value.providers.isEmpty && value.enabled && !value.url.isEmpty
                 ? [.init(enabled: false, url: value.url, key: value.key, model: value.model)] : value.providers
@@ -183,6 +185,7 @@ import Foundation
                     &candidate, provider: choice.usesLocal ? nil : selected, model: choice.usesLocal ? "" : model)
             case .writer:
                 candidate.writerUsesLocal = choice.usesLocal
+                if choice.usesLocal { candidate.writerLocalModelID = choice.writerLocalModelID }
                 candidate.writerProviderID = choice.usesLocal ? nil : selected?.id
                 candidate.writerModel = choice.usesLocal || selected == nil ? "" : model
                 candidate.writerThinking = choice.writerThinking

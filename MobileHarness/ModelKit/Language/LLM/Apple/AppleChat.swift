@@ -1,10 +1,11 @@
 import Foundation
 import FoundationModels
-import ModelKit
+@_spi(InferenceAdapter) import ModelKit
 
 /// System-managed on-device inference; consumers retain only the neutral ChatCapability.
 @available(iOS 27, macOS 27, *)
 public actor AppleChat: ChatCapability {
+    public static let modelIdentity = InferenceModelIdentity(modelID: "apple-system", displayName: "Apple System LLM")
     private let resource: ModelResource<Void>
 
     public init(context: ModelContext) throws {
@@ -19,15 +20,15 @@ public actor AppleChat: ChatCapability {
     }
 
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        let request = request.measuringInference(model: Self.modelIdentity)
         let prepared = try AppleChatInput(request)
         try Task.checkCancellation()
         if case .unavailable(let reason) = availability { throw CapabilityError.unavailable(reason) }
         let lease = try await resource.acquire()
         do {
             let control = InferenceTaskControl()
-            let pair = InferenceSession<ChatEvent>.make(
-                context: request.context, limits: try StreamLimits(capacity: 128, maximumEventBytes: 4128),
-                estimatedBytes: { $0.estimatedBytes },
+            let pair = request.makeInferenceSession(
+                limits: try StreamLimits(capacity: 128, maximumEventBytes: 4128),
                 onTermination: { reason in
                     if case .finished = reason { return }
                     control.cancel()
@@ -140,9 +141,7 @@ private enum AppleChatEngine {
         try Task.checkCancellation()
         let session = LanguageModelSession(model: SystemLanguageModel.default, transcript: input.transcript)
         do {
-            try await request.onDispatch?()
-            try Task.checkCancellation()
-            request.timing?.start()
+            try await request.dispatchInference()
             let options = GenerationOptions(
                 temperature: request.temperature, maximumResponseTokens: request.maximumOutputTokens)
             var text = AppleChatText()

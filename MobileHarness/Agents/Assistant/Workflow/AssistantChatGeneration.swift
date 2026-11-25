@@ -433,7 +433,7 @@ extension AssistantChatWorker {
             var generationError: (any Error)?
             let text: String
             do {
-                text = try await collect(providerRequest, input: input, using: chat)
+                text = try await collect(providerRequest, input: input, invocationID: requestID, using: chat)
             } catch {
                 try Task.checkCancellation()
                 guard !(error is CancellationError), lifecycle == .running else { throw error }

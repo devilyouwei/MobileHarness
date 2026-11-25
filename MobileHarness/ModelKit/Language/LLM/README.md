@@ -27,7 +27,7 @@ ChatRequest retains InferenceContext, caller messages, optional output token bud
 
 ChatToolDefinition is a neutral function-envelope declaration; Responses flattens it. ChatToolCall identity/name/arguments is data, never execution authority. Native transcripts require complete original call/result pairing; unsupported local requests reject rather than pretending to execute/see images.
 
-ChatTiming is one mutex-protected caller sampler per request. Providers sample monotonic request start and the first nonempty public text or validated native argument delta, whichever arrives first; consumers persist supplied evidence. Private reasoning, item creation and tool execution/completion are not first-token samples. Unsupported providers or streams without either delta retain absent timing. There is no automatic provider retry or application task loop in these values.
+ChatTiming aliases ModelKit’s mutex-protected per-request inference sampler. Providers sample monotonic request start and the first nonempty public text or validated native argument delta, whichever arrives first; consumers persist supplied evidence. Private reasoning, item creation and tool execution/completion are not first-token samples. Unsupported providers or streams without either delta retain absent timing. There is no automatic provider retry or application task loop in these values.
 
 ## Related design
 
@@ -86,3 +86,7 @@ ChatRequest.toolChoice 默认为 automatic；required(name:) 要求工具已声�
 ChatRequest.onDispatch 是中立的实际开始回调。OpenAI 在请求校验/资源准备成功后、HTTP 发送前调用，Gemma 在实际 generate 前调用；回调失败阻止推理。业务方拥有历史提交，ModelKit 不导入 Storage。
 
 The optional [Apple system provider](Apple/README.md) exposes the same ChatCapability through ModelKitAppleLLM. It preserves native text history and rejects tools/images explicitly; it does not participate in default provider selection.
+
+## Request metadata
+
+Managed Chat binds the actual adapter identity into the request before enqueuing or dispatch. The model-aware dispatch callback delivers identity before execution so history can commit the corresponding request. Streaming text, tools, usage and finish events keep the existing contract. `InferenceSession.metadata` exposes the same usage and finish reason with the sampled times and optional provider-reported model ID. Use the final snapshot after consuming the stream and joining cleanup.

@@ -6,6 +6,7 @@ import ModelKit
 public enum AgentChatDriver {
     public struct Consumers: Sendable {
         public let recording: @Sendable (AgentModelRequestRecording.Snapshot) async throws -> Void
+        public let metadata: @Sendable (InferenceMetadata) async throws -> Void
         public let timing: @Sendable (ChatTiming.Snapshot) async throws -> Void
         public let text: @Sendable (AsyncThrowingStream<String, any Error>) async throws -> String
         public let native: @Sendable (AsyncThrowingStream<ChatToolCall, any Error>) async throws -> Void
@@ -15,8 +16,10 @@ public enum AgentChatDriver {
             native: @escaping @Sendable (AsyncThrowingStream<ChatToolCall, any Error>) async throws -> Void,
             evidence: @escaping @Sendable (ChatEvent) async throws -> Void,
             recording: @escaping @Sendable (AgentModelRequestRecording.Snapshot) async throws -> Void = { _ in },
-            timing: @escaping @Sendable (ChatTiming.Snapshot) async throws -> Void = { _ in }
+            timing: @escaping @Sendable (ChatTiming.Snapshot) async throws -> Void = { _ in },
+            metadata: @escaping @Sendable (InferenceMetadata) async throws -> Void = { _ in }
         ) {
+            self.metadata = metadata
             self.recording = recording
             self.timing = timing
             self.text = text
@@ -30,12 +33,12 @@ public enum AgentChatDriver {
     )
         async throws -> String
     {
-        var measured = request
-        let timing = ChatTiming()
-        measured.timing = timing
+        var measured = request.measuringInference()
         let audit = try AgentModelRequestRecording(
             measured)
         measured.transportCapture = audit.transportRecorder(consumers.recording)
+        let recordedRequest = measured
+        let timing = measured.timing
         do {
             try await consumers.recording(try audit.snapshot(initial: true))
             let session = try await capability.chat(measured)
@@ -61,7 +64,7 @@ public enum AgentChatDriver {
                                 guard !finished else {
                                     throw CapabilityError.invalidRequest("Events after chat completion")
                                 }
-                                if !recordedTiming, let snapshot = timing.snapshot {
+                                if !recordedTiming, let snapshot = timing?.snapshot {
                                     let terminal: Bool
                                     if case .finished = event { terminal = true } else { terminal = false }
                                     if snapshot.firstTokenAt != nil || terminal {
@@ -111,11 +114,17 @@ public enum AgentChatDriver {
                     native.continuation.finish(throwing: CancellationError())
                 }
             }
+            try await consumers.metadata(session.metadata)
             try await consumers.recording(try audit.snapshot())
             return answer
         } catch {
             let primary = error
-            do { try await Task { try await consumers.recording(try audit.snapshot()) }.value } catch {
+            do {
+                try await Task {
+                    if let metadata = recordedRequest.metadata { try await consumers.metadata(metadata) }
+                    try await consumers.recording(try audit.snapshot())
+                }.value
+            } catch {
                 throw ChatEvidenceFailure(primary: primary, persistence: error)
             }
             throw primary

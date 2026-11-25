@@ -91,7 +91,8 @@ extension DecisionCapability {
                 if case .finished = reason { return }
                 source.cancel()
                 control.cancel()
-            }, waitForCompletion: { await control.waitForCompletion() })
+            }, waitForCompletion: { await control.waitForCompletion() },
+            metadata: source.metadataRecorder)
         let task = Task {
             do {
                 let result = try await source.withCleanup {

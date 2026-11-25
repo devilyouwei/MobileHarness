@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import ModelKit
 import ModelKitDefaults
 import ModelKitRuntime
 import StorageCore
@@ -21,6 +22,24 @@ public enum SettingsModelResourcesAdapter {
                 vadOnsetWindows: draft.vadOnsetWindows, vadThreshold: draft.vadThreshold,
                 useSpeechEnhancement: draft.useSpeechEnhancement)
         } catch { throw ModelResourcePreferenceError.invalidSource }
+    }
+    public static func localLanguageModels(using language: any ModelLanguageProviding) async throws -> [LocalModelFact]
+    {
+        try await language.localModels().map { model in
+            var roles: Set<LocalModelFact.Role> = []
+            if model.supportsChat { roles.insert(.assistant) }
+            if model.supportsChat && model.supportsToolCalls { roles.insert(.writer) }
+            if model.supportsNativeDecision || model.supportsChatDecision { roles.insert(.decision) }
+            let reason: String?
+            switch model.availability {
+            case .available: reason = nil
+            case .unavailable(let value): reason = String(value.prefix(512))
+            }
+            return .init(
+                id: model.identity.modelID, name: model.identity.displayName ?? model.identity.modelID,
+                artifactID: model.artifactID, roles: roles, nativeDecision: model.supportsNativeDecision,
+                available: reason == nil, unavailableReason: reason, needsDownload: model.artifactInstalled == false)
+        }
     }
     public static func items(_ raw: String) throws -> ModelResourceViewSnapshot {
         let inventory = try ModelResourceInventory.decode(raw)
@@ -77,14 +96,21 @@ public enum SettingsModelResourcesAdapter {
             return value
         }
         return ModelResourceViewSnapshot(
-            items: items, installedGroups: Set(groups), appleSystemAvailable: inventory.appleSystemAvailable == true)
+            items: items, installedGroups: Set(groups),
+            languageModels: (inventory.languageModels ?? []).map { model in
+                .init(
+                    id: model.id, name: model.name, artifactID: model.artifactID,
+                    roles: Set(model.roles.compactMap { AgentBrain(rawValue: $0.rawValue) }),
+                    nativeDecision: model.nativeDecision, available: model.available,
+                    unavailableReason: model.unavailableReason, needsDownload: model.needsDownload)
+            })
     }
 }
 
 /// Native SDK adaptation only; Agent/functions select commands and source inputs.
 @MainActor public final class ModelResourceCapabilityAdapter: ModelResourceCapability, ModelResourceInventoryCapability
 {
-    private let systemChatAvailable: @Sendable () async -> Bool
+    private let languageModels: @Sendable () async throws -> [LocalModelFact]
     private let artifacts: @MainActor () async throws -> any ModelArtifactsManaging
     private var speechPreference: [Bool]?
     private let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
@@ -93,14 +119,14 @@ public enum SettingsModelResourcesAdapter {
         artifacts: @escaping @MainActor () async throws -> any ModelArtifactsManaging,
         quiesce: @escaping @MainActor (String) async -> Void,
         bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void,
-        systemChatAvailable: @escaping @Sendable () async -> Bool = { false }
+        languageModels: @escaping @Sendable () async throws -> [LocalModelFact] = { [] }
     ) {
         self.artifacts = artifacts
-        self.systemChatAvailable = systemChatAvailable
+        self.languageModels = languageModels
         self.quiesce = quiesce
         self.bindSpeech = bindSpeech
     }
-    public func appleSystemAvailable() async -> Bool { await systemChatAvailable() }
+    public func localLanguageModels() async throws -> [LocalModelFact] { try await languageModels() }
 
     public func snapshotResources() async throws -> [ModelResourceFact] {
         let manager = try await artifacts()

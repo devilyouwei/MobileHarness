@@ -524,6 +524,7 @@
 		9383D74BF742AAF24A3F87C1 /* MobileHarness/Actions/Support/Contracts/ActionSchedulingError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionSchedulingError.swift; sourceTree = SOURCE_ROOT; };
 		940BF7C580D777288C7CE760 /* Tests/PlatformKit/Core/PlatformContainerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/PlatformKit/Core/PlatformContainerTests.swift; sourceTree = SOURCE_ROOT; };
 		94CE5D4A6B6A6F5FC968B26C /* MobileHarness/Actions/History/Presentation/HistoryPresentationActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/History/Presentation/HistoryPresentationActions.swift; sourceTree = SOURCE_ROOT; };
+		F1BDC42C4386A90E3F6562E3 /* MobileHarness/ModelKit/Support/Core/InferenceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Core/InferenceMetadata.swift; sourceTree = SOURCE_ROOT; };
 		95BC3FA1DEFCA570D7567E66 /* MobileHarness/ModelKit/Support/Core/InferenceSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Support/Core/InferenceSession.swift; sourceTree = SOURCE_ROOT; };
 		965B9DBF43CBC3D94ABF1CC3 /* MobileHarness/ModelKit/Vision/YOLO/PoseTensorReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Vision/YOLO/PoseTensorReader.swift; sourceTree = SOURCE_ROOT; };
 		97A7B760905D4C67BA434151 /* MobileHarness/Actions/Camera/Capture/CameraCaptureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/Capture/CameraCaptureWorkflow.swift; sourceTree = SOURCE_ROOT; };
@@ -2147,6 +2148,7 @@
 				92C8D80BA894084463E66228 /* MobileHarness/ModelKit/Support/Core/AudioFrame.swift */,
 				57849D30B408746A7B87D7F6 /* MobileHarness/ModelKit/Support/Core/Capability.swift */,
 				CAB130D82AF048857C1379EF /* MobileHarness/ModelKit/Support/Core/ImageFrame.swift */,
+				F1BDC42C4386A90E3F6562E3 /* MobileHarness/ModelKit/Support/Core/InferenceMetadata.swift */,
 				95BC3FA1DEFCA570D7567E66 /* MobileHarness/ModelKit/Support/Core/InferenceSession.swift */,
 				C04E611B8EE51626DF5160CF /* MobileHarness/ModelKit/Support/Core/InferenceTaskControl.swift */,
 				C35F4F95656FA9166AC664D9 /* MobileHarness/ModelKit/Support/Core/ModelResource.swift */,

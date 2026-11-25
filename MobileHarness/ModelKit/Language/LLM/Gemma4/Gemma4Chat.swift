@@ -1,5 +1,5 @@
 import Foundation
-import ModelKit
+@_spi(InferenceAdapter) import ModelKit
 
 /// An optional local chat provider. Consumers depend on ChatCapability, not this type.
 @available(iOS 27, macOS 27, *)
@@ -38,6 +38,7 @@ public actor Gemma4Chat: ChatCapability {
     }
 
     public func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
+        let request = request.measuringInference(model: .init(modelID: "gemma4-e2b"))
         try Self.validate(request)
         try Task.checkCancellation()
         let lease = try await resource.acquire()
@@ -54,9 +55,8 @@ public actor Gemma4Chat: ChatCapability {
             let maximumTokens = prepared.maximumOutputTokens
             try Task.checkCancellation()
             let control = InferenceTaskControl()
-            let pair = InferenceSession<ChatEvent>.make(
-                context: request.context, limits: try StreamLimits(capacity: 4096, maximumEventBytes: 2_097_152),
-                estimatedBytes: { $0.estimatedBytes },
+            let pair = request.makeInferenceSession(
+                limits: try StreamLimits(capacity: 4096, maximumEventBytes: 2_097_152),
                 onTermination: { reason in
                     if case .finished = reason { return }
                     control.cancel()
@@ -67,8 +67,7 @@ public actor Gemma4Chat: ChatCapability {
                 defer { control.finish() }
                 do {
                     try Task.checkCancellation()
-                    try await request.onDispatch?()
-                    request.timing?.start()
+                    try await request.dispatchInference()
                     let toolMode = GemmaToolProtocol.enabled(request)
                     let output = GemmaToolOutputBuffer()
                     let generation = try await lease.model.generate(

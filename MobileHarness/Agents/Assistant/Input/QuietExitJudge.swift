@@ -75,9 +75,9 @@ public actor QuietExitJudge {
             do {
                 let answer = try await ask(tier, request)
                 let elapsed = started.duration(to: .now)
-                let decision = try Self.parse(answer)
+                let decision = try Self.parse(answer.text)
                 return QuietJudgement(
-                    decision: decision, reason: nil, tier: tier.name, modelID: tier.modelID,
+                    decision: decision, reason: nil, tier: tier.name, modelID: answer.modelID ?? tier.modelID,
                     latencyMS: Int(
                         elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000))
             } catch is CancellationError {
@@ -96,14 +96,14 @@ public actor QuietExitJudge {
         return decision
     }
 
-    private func ask(_ tier: QuietModelTier, _ request: ChatRequest) async throws -> String {
+    private func ask(_ tier: QuietModelTier, _ request: ChatRequest) async throws -> (text: String, modelID: String?) {
         let timeout = timeout
-        return try await withThrowingTaskGroup(of: String.self) { group in
+        return try await withThrowingTaskGroup(of: (String, String?).self) { group in
             group.addTask {
                 let chat = try await tier.chat()
                 let session = try await chat.chat(request)
                 defer { session.cancel() }
-                return try await session.withCleanup {
+                let text = try await session.withCleanup {
                     try await withTaskCancellationHandler {
                         var text = ""
                         var finished = false
@@ -122,13 +122,14 @@ public actor QuietExitJudge {
                         session.cancel()
                     }
                 }
+                return (text, session.metadata.model?.modelID)
             }
             group.addTask {
                 try await Task.sleep(for: timeout)
                 throw CapabilityError.unavailable("Quiet exit judgment timed out")
             }
             defer { group.cancelAll() }
-            return try await group.next() ?? ""
+            return try await group.next() ?? ("", nil)
         }
     }
 }

@@ -323,7 +323,7 @@ private final class ProviderCredentialFixture: ProviderCredentialStorage, @unche
 @Test(.actionCatalog) func providerEligibilityBelongsToActionsAndPreservesOrder() throws {
     let values = ["gpt-4o-mini", "embedding-model", "my-deployment", "gpt-5-pro", "gpt-4o-mini", "whisper-1"]
     #expect(try ProviderModelList.eligible(values) == ["gpt-4o-mini", "my-deployment"])
-    #expect(!ProviderModelList.isLikelyChatModel("GPT-5-Pro-2026"))
+    #expect(try ProviderModelList.eligible(["GPT-5-Pro-2026"]).isEmpty)
     #expect(throws: ProviderDiscoveryError.self) { try ProviderModelList.eligible([""]) }
 }
 
@@ -637,13 +637,20 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
         initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
     let store = makeStore()
     let edgeOnly = ProviderSettingsService(
-        store: store, runtime: runtime, legacyDecision: { true }, isDecisionInstalled: { $0 == "d3-edge" })
+        store: store, runtime: runtime, legacyDecision: { true },
+        localModels: {
+            [
+                .init(
+                    id: "d3-edge", name: "Edge", artifactID: "d3-edge", roles: [.decision], nativeDecision: true,
+                    available: true)
+            ]
+        })
     var choice = try await edgeOnly.restore()
     #expect(choice.decisionUsesLocal == true && choice.resolvedDecisionLocalModelID == "d3-edge")
     choice.decisionLocalModelID = "d3-lite"
     await #expect(throws: ProviderSettingsError.self) { try await edgeOnly.save(choice) }
     let liteReady = ProviderSettingsService(
-        store: store, runtime: runtime, legacyDecision: { true }, isDecisionInstalled: { $0 == "d3-lite" })
+        store: store, runtime: runtime, legacyDecision: { true }, localModels: { [] })
     _ = try await liteReady.restore()
     await #expect(throws: ProviderSettingsError.self) { try await liteReady.save(choice) }
     let inventory = ModelResourceInventory(items: [.init(id: "d3-lite", name: "D3 Lite", bytes: 1, phase: .installed)])
@@ -665,7 +672,7 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
         _ = try await missing.save(.init(enabled: false, url: initial.url, key: initial.key, model: initial.model))
     }
     #expect(fixture.events.isEmpty && fixture.value == initial)
-    let installed = ProviderSettingsService(store: fixture, runtime: runtime, isLanguageInstalled: { true })
+    let installed = ProviderSettingsService(store: fixture, runtime: runtime, localModels: { [localGemmaFixture] })
     _ = try await installed.restore()
     _ = try await installed.save(writerLocal)
     let reopened = ProviderSettingsService(store: fixture, runtime: runtime)
@@ -686,7 +693,7 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     }
     let initial = ProviderSettings(enabled: false, url: "https://example.invalid", key: "", model: "")
     let runtime = ProviderSettingsRuntime(initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
-    let service = ProviderSettingsService(store: store(), runtime: runtime, isLanguageInstalled: { true })
+    let service = ProviderSettingsService(store: store(), runtime: runtime, localModels: { [localGemmaFixture] })
     #expect(try await service.restore().writerUsesLocal == false)
     let local = ProviderSettings(enabled: false, url: initial.url, key: "", model: "", writerUsesLocal: true)
     _ = try await service.save(local)
@@ -722,7 +729,8 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
     let initial = try #require(fixture.value)
     let runtime = ProviderSettingsRuntime(
         initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
-    let unavailable = ProviderSettingsService(store: fixture, runtime: runtime, isAppleAvailable: { false })
+    let unavailable = ProviderSettingsService(
+        store: fixture, runtime: runtime, localModels: { [appleModelFixture(available: false)] })
     _ = try await unavailable.restore()
     let choice = ProviderSettings(
         enabled: false, url: initial.url, key: initial.key, model: initial.model, decisionUsesLocal: true,
@@ -732,9 +740,49 @@ func settingsContainerRunsInItsAgentWithPrivateStagingAndActualPresentation() as
         Issue.record("Saved an unavailable Apple model")
     } catch ProviderSettingsError.appleUnavailable {}
     #expect(fixture.value == initial)
-    let available = ProviderSettingsService(store: fixture, runtime: runtime, isAppleAvailable: { true })
+    let available = ProviderSettingsService(
+        store: fixture, runtime: runtime, localModels: { [appleModelFixture(available: true)] })
     _ = try await available.restore()
     _ = try await available.save(choice)
     #expect(fixture.value?.assistantLocalModelID == "apple-system")
     #expect(fixture.value?.resolvedDecisionLocalModelID == "apple-system")
+}
+
+private let localGemmaFixture = LocalModelFact(
+    id: "gemma4-e2b", name: "Gemma 4 E2B", artifactID: "gemma4-e2b",
+    roles: [.assistant, .writer, .decision], nativeDecision: false, available: true)
+
+private func appleModelFixture(available: Bool) -> LocalModelFact {
+    .init(
+        id: "apple-system", name: "Apple System LLM", artifactID: nil,
+        roles: [.assistant, .decision], nativeDecision: false, available: available)
+}
+
+@Test @MainActor func writerSelectionAcceptsNewSDKModelAndPersistsItsIdentity() async throws {
+    let fixture = ProviderTransactionFixture()
+    let initial = try #require(fixture.value)
+    let runtime = ProviderSettingsRuntime(initial: initial, prepare: { _ in {} }, beginChange: {}, endChange: {})
+    let service = ProviderSettingsService(
+        store: fixture, runtime: runtime,
+        localModels: {
+            [
+                appleModelFixture(available: true),
+                .init(
+                    id: "future-chat", name: "Future Chat", artifactID: "future-chat",
+                    roles: [.assistant, .writer], nativeDecision: false, available: true),
+            ]
+        })
+    _ = try await service.restore()
+    func draft(_ id: String) -> ProviderSettings {
+        .init(
+            enabled: true, url: initial.url, key: initial.key, model: initial.model,
+            writerUsesLocal: true, writerLocalModelID: id)
+    }
+    do {
+        _ = try await service.save(draft("apple-system"))
+        Issue.record("Saved a model lacking Writer capability")
+    } catch ProviderSettingsError.invalidSelection {}
+    _ = try await service.save(draft("future-chat"))
+    #expect(try await service.writerConfiguration().resolvedWriterLocalModelID == "future-chat")
+    #expect(fixture.value?.writerLocalModelID == "future-chat")
 }

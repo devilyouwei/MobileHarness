@@ -83,3 +83,5 @@ ChatRequest.transportCapture 是 ModelKit 定义的可选中立回调。OpenAI a
 ChatToolChoice.required 按请求工具名称映射写入 Responses tool_choice，parallel_tool_calls=false。它不改变配置选择或执行工具；Assistant Decision 验证恰好一次合法分类返回。
 
 onDispatch 在配置校验、资源接纳和取消检查之后、HTTP 发送之前调用一次；传输证据随后进入 transportCapture。准备失败不报告开始，网络/HTTP 错误保留已经发起的事实。
+
+The request snapshot retains the configured model ID and, when the terminal Responses payload includes a usable model identifier, the separate provider-reported ID.

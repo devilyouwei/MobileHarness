@@ -282,7 +282,9 @@ func historyRefreshJoinsPagingAndRetainsVisibleRecordsOnFailure(failRefresh: Boo
     let request = AssistantModelRequest(
         id: UUID().uuidString, input: "result",
         requestJSON: "[{\"role\":\"tool\",\"content\":\"result\",\"toolCallID\":\"provider\"}]")
-    try await store.beginModelRequest(request, for: id)
+    try await store.beginModelRequest(request, for: id, awaitingDispatch: true)
+    try await store.markModelRequestDispatched(
+        id, requestID: request.id, modelID: "apple-system", displayName: "Apple System LLM")
     try await store.recordModelTiming(
         startedAt: request.date, firstTokenAt: request.date.addingTimeInterval(0.25), latency: 0.25, for: id)
     try await store.append("observed", to: id)
@@ -293,7 +295,9 @@ func historyRefreshJoinsPagingAndRetainsVisibleRecordsOnFailure(failRefresh: Boo
     #expect(value.id == request.id && value.requestJSON == request.requestJSON)
     #expect(value.response == "observed" && value.firstTokenAt == request.date.addingTimeInterval(0.25))
     #expect(value.modelRequestStartedAt == request.date && value.firstTokenLatency == 0.25)
-    #expect(ConversationHistoryPresentation.turns(snapshot.current).first?.request.last?.toolCallID == "provider")
+    let projected = try #require(ConversationHistoryPresentation.turns(snapshot.current).first)
+    #expect(projected.request.last?.toolCallID == "provider")
+    #expect(projected.modelID == "apple-system" && projected.model == "Apple System LLM")
 }
 
 private enum HistoryPhotoFixtureError: Error { case failed }

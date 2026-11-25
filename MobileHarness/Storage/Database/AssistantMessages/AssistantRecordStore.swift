@@ -144,7 +144,7 @@ public actor AssistantRecordStore {
                 detail.response = ""
                 guard var evidence = try JSONSerialization.jsonObject(with: encoder.encode(detail)) as? [String: Any]
                 else { throw RecordStorageError.invalidRecord }
-                evidence["model"] = turn.model
+                evidence["model"] = request.model ?? turn.model
                 evidence["temperature"] = turn.temperature
                 evidence["maximumOutputTokens"] = turn.maximumOutputTokens
                 let detailData = try JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys])

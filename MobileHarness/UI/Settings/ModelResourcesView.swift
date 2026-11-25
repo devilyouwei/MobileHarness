@@ -186,15 +186,16 @@
                     }
                 }
                 let modelIDs =
-                    includesDecision ? group.modelIDs.union(ModelResourceGroup.decision.modelIDs) : group.modelIDs
+                    includesDecision
+                    ? state.modelIDs(for: group).union(state.modelIDs(for: .decision)) : state.modelIDs(for: group)
                 ForEach(state.items.filter { modelIDs.contains($0.id) }) { item in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .center, spacing: 16) {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(alignment: .center, spacing: 8) {
-                                    if ModelResourceGroup.language.modelIDs.contains(item.id) {
+                                    if state.modelIDs(for: .language).contains(item.id) {
                                         modelKindBadge("Chat", color: .blue)
-                                    } else if ModelResourceGroup.decision.modelIDs.contains(item.id) {
+                                    } else if state.modelIDs(for: .decision).contains(item.id) {
                                         modelKindBadge("Decision", color: .orange)
                                     }
                                     Text(appCopy.text(item.name))
@@ -280,14 +281,20 @@
                     }
                 }
                 if includesDecision {
-                    HStack {
-                        HStack(alignment: .center, spacing: 8) {
-                            modelKindBadge("Chat", color: .blue)
-                            Text(appCopy.text("Apple System LLM"))
+                    ForEach(state.languageModels.filter { $0.artifactID == nil }) { model in
+                        HStack {
+                            HStack(alignment: .center, spacing: 8) {
+                                if model.nativeDecision {
+                                    modelKindBadge("Decision", color: .orange)
+                                } else {
+                                    modelKindBadge("Chat", color: .blue)
+                                }
+                                Text(appCopy.text(model.name))
+                            }
+                            Spacer()
+                            Text(appCopy.text(model.available ? "Available" : "Unavailable"))
+                                .foregroundStyle(.secondary)
                         }
-                        Spacer()
-                        Text(appCopy.text(state.appleSystemAvailable ? "Available" : "Unavailable"))
-                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -310,13 +317,13 @@
                             ? appCopy.text("Voice activity detection will switch to the basic detector.")
                             : group == .recognition || group == .synthesis
                                 ? appCopy.text("Speech will switch to Apple. Download the model again to re-enable it.")
-                                : removal.map { ModelResourceGroup.decision.modelIDs.contains($0.id) } == true
+                                : removal.map { state.modelIDs(for: .decision).contains($0.id) } == true
                                     ? appCopy.text(
                                         "If this model is selected, download it again or choose another model to restore decision-making."
                                     )
                                     : group == .language
                                         ? appCopy.text(
-                                            "Use a cloud model or download Gemma 4 E2B again for local chat.")
+                                            "Use another model or download this model again for local chat.")
                                         : appCopy.text("Download YOLO again to use local pose recognition."))
             }
             .task {

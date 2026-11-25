@@ -72,3 +72,7 @@ InferenceSession.withCleanup scopes event consumption and joins native cleanup o
 ## External state listeners
 
 SignalListener.swift defines ModelKit-owned SignalListener and StateSignalListener for passive SDK facts. Artifact revisions are latest-value, generation-bound, single-consumer subscriptions; source capacity is 16. cancel/join detach only the observer and do not unload a model or cancel downloads. ApplicationControl owns the observation task, cancels/joins it across foreground replacement, and then closes the handle. ModelKit imports no UI/Agents contract for this path.
+
+## Invocation metadata
+
+`InferenceMetadata.swift` defines the neutral identity, timing and usage values. Each `InferenceSession` exposes its read-only metadata snapshot. Provider and forwarding sessions can share one request-local recorder through the adapter SPI. A prepared or queued session can carry identity before execution. Timing starts beyond the preparation boundary. Terminal metadata is available after joining cleanup, and partial evidence stays readable on failure or cancellation. Optional fields express missing observations.

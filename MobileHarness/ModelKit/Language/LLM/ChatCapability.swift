@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 
 /// Safe protocol evidence, independent of Agent policy, UI strings and provider response bodies.
 public struct ChatFailureDiagnostic: Equatable, Sendable, CustomStringConvertible {
@@ -167,28 +166,9 @@ public struct ChatToolCall: Codable, Equatable, Sendable {
     }
 }
 
-/// Per-request provider timing. Sampling never waits for the consumer or persistence.
-public final class ChatTiming: Sendable {
-    public struct Snapshot: Sendable, Equatable {
-        public let startedAt: Date
-        public let firstTokenAt: Date?
-        public let firstTokenLatency: Double?
-    }
-    private struct State {
-        var startedAt: Date?
-        var started: ContinuousClock.Instant?
-        var firstTokenAt: Date?
-        var latency: Double?
-    }
-    private let state = Mutex(State())
-    public init() {}
-    public func start() {
-        state.withLock {
-            guard $0.started == nil else { return }
-            $0.startedAt = Date()
-            $0.started = .now
-        }
-    }
+public typealias ChatTiming = InferenceTiming
+
+extension InferenceTiming {
     public func recordText(_ text: String) {
         guard !text.isEmpty else { return }
         recordFirstOutput()
@@ -197,20 +177,6 @@ public final class ChatTiming: Sendable {
     public func recordToolArguments(_ delta: String) {
         guard !delta.isEmpty else { return }
         recordFirstOutput()
-    }
-    private func recordFirstOutput() {
-        state.withLock {
-            guard let start = $0.started, $0.firstTokenAt == nil else { return }
-            let elapsed = start.duration(to: .now).components
-            $0.firstTokenAt = Date()
-            $0.latency = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
-        }
-    }
-    public var snapshot: Snapshot? {
-        state.withLock {
-            guard let start = $0.startedAt else { return nil }
-            return Snapshot(startedAt: start, firstTokenAt: $0.firstTokenAt, firstTokenLatency: $0.latency)
-        }
     }
 }
 
@@ -231,6 +197,9 @@ public struct ChatRequest: Sendable {
     public static let maximumImageCount = 5
     /// Called after provider preparation, immediately before HTTP dispatch or native inference.
     public var onDispatch: (@Sendable () async throws -> Void)?
+    public var onModelDispatch: (@Sendable (InferenceModelIdentity) async throws -> Void)?
+    @_spi(InferenceAdapter) public var inferenceMetadata: InferenceMetadataRecorder?
+    public var metadata: InferenceMetadata? { inferenceMetadata?.snapshot }
     public var transportCapture: (@Sendable (ChatTransportEvent) async -> Void)?
     public var timing: ChatTiming?
     public let context: InferenceContext
@@ -307,32 +276,51 @@ public struct ChatRequest: Sendable {
     }
 }
 
-public struct ChatTokenUsage: Equatable, Sendable {
-    public let input: Int
-    public let generated: Int
-    public let total: Int
-    public let cachedInput: Int?
-    public let cacheWriteInput: Int?
-    public init(
-        input: Int, generated: Int, total: Int, cachedInput: Int? = nil, cacheWriteInput: Int? = nil
-    ) throws {
-        guard input >= 0, generated >= 0, total >= 0,
-            cachedInput.map({ (0...input).contains($0) }) ?? true,
-            cacheWriteInput.map({ (0...input).contains($0) }) ?? true,
-            (cachedInput ?? 0) <= input - (cacheWriteInput ?? 0)
-        else {
-            throw CapabilityError.invalidRequest("Invalid token usage")
-        }
-        self.input = input
-        self.generated = generated
-        self.total = total
-        self.cachedInput = cachedInput
-        self.cacheWriteInput = cacheWriteInput
+extension ChatRequest {
+    /// Prepare an observation value for one call, including failures before a session is returned.
+    public func measuringInference() -> Self { measuringInference(model: nil) }
+
+    @_spi(InferenceAdapter) public func measuringInference(model: InferenceModelIdentity?) -> Self {
+        var request = self
+        let recorder = inferenceMetadata ?? InferenceMetadataRecorder(model: model, timing: timing)
+        recorder.bind(model)
+        request.inferenceMetadata = recorder
+        request.timing = recorder.timing
+        return request
+    }
+
+    /// Called at the existing provider dispatch boundary, once preparation has succeeded.
+    @_spi(InferenceAdapter) public func dispatchInference() async throws {
+        try Task.checkCancellation()
+        try await onDispatch?()
+        if let model = inferenceMetadata?.snapshot.model { try await onModelDispatch?(model) }
+        try Task.checkCancellation()
+        timing?.start()
+    }
+
+    @_spi(InferenceAdapter) public func makeInferenceSession(
+        limits: StreamLimits, onTermination: @escaping @Sendable (SessionTermination) -> Void,
+        phase: InferencePhase = .running, waitForCompletion: @escaping @Sendable () async -> Void
+    ) -> (session: InferenceSession<ChatEvent>, emitter: InferenceEmitter<ChatEvent>) {
+        let recorder = inferenceMetadata ?? InferenceMetadataRecorder(timing: timing)
+        return InferenceSession<ChatEvent>.make(
+            context: context, limits: limits, estimatedBytes: { $0.estimatedBytes },
+            onTermination: onTermination, phase: phase, waitForCompletion: waitForCompletion,
+            metadata: recorder,
+            onEvent: { event in
+                switch event {
+                case .usage(let usage): recorder.recordUsage(usage)
+                case .finished(let reason): recorder.recordFinishReason(reason)
+                case .text, .toolCall: break
+                }
+            })
     }
 }
 
+public typealias ChatTokenUsage = InferenceTokenUsage
+
 public enum ChatEvent: Equatable, Sendable {
-    public enum FinishReason: Sendable { case stop, lengthLimit, toolCalls }
+    public typealias FinishReason = InferenceFinishReason
     case text(String)
     case toolCall(ChatToolCall)
     case usage(ChatTokenUsage)

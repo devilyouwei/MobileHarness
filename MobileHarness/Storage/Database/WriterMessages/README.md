@@ -35,3 +35,5 @@ WriterHistory.begin 准备内存请求，awaitingDispatch 在 HTTP 发送或本�
 Task admission authenticates the original requester rather than an Assistant/Writer sender pair. Follow-up and cancellation must match the original sender and task association; the live role additionally verifies session ownership. Progress, terminal and rejection reports are published once to that requester. Assistant is the current user-facing caller, not protocol-level authority.
 
 This directory stores no publication or delivery state; a report that is not delivered is recorded only in Writer's runtime deliveryFailure snapshot.
+
+模型身份在请求 dispatch 时写入，对应 invocation 的 generation meta 另保存后端型号、用量和执行时间。历史列表和详情读取实际调用记录，旧标签兼容读取。

@@ -83,7 +83,7 @@ public enum SettingsProviderAdapter {
             case "provider.decisionRequired": return "The selected local Decision model must be downloaded first."
             case "provider.appleUnavailable": return "Apple System LLM is unavailable."
             case "provider.languageRequired":
-                return "Download Gemma 4 E2B in Agent Models before selecting the local model."
+                return "Download this model in Agent Models first."
             case "provider.capacity": return "Too many model requests. Try again."
             case "provider.request", "provider.expired": return "The model lookup expired. Try again."
             default: break
@@ -156,6 +156,7 @@ public enum SettingsProviderAdapter {
                         .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                     }, writerProviderID: value.writerProviderID, writerModel: value.writerModel,
                     writerThinking: value.writerThinking, writerUsesLocal: value.writerUsesLocal,
+                    writerLocalModelID: value.writerLocalModelID,
                     decisionProviderID: value.decisionProviderID, decisionModel: value.decisionModel,
                     decisionUsesLocal: value.decisionUsesLocal == true,
                     decisionLocalModelID: value.resolvedDecisionLocalModelID,

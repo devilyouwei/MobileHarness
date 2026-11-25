@@ -1,5 +1,5 @@
 import Foundation
-import ModelKit
+@_spi(InferenceAdapter) import ModelKit
 import ModelKitD3
 import ModelKitHub
 import ModelKitOpenAI
@@ -12,8 +12,22 @@ public protocol ModelResourceControlling: Sendable {
     func unload() async throws
     func status() async throws -> ModelState
 }
+public struct LocalModelDescriptor: Sendable {
+    public let identity: InferenceModelIdentity
+    public let artifactID: String?
+    public let supportsChat: Bool
+    public let supportsToolCalls: Bool
+    public let supportsNativeDecision: Bool
+    public let supportsChatDecision: Bool
+    public let availability: CapabilityAvailability
+    public let artifactInstalled: Bool?
+}
+
 public protocol ModelLanguageProviding: ChatCapability, ModelResourceControlling {
     var decision: any ModelDecisionProviding { get }
+    func localModels() async throws -> [LocalModelDescriptor]
+    func localChatDecisionModel(_ id: String) async throws -> ChatModel
+    func localDecisionModel(_ id: String) async throws -> (any ModelDecisionProviding)?
     func decisionModel(_ id: String) -> (any ModelDecisionProviding)?
     func configure(_ configuration: OpenAIChatConfiguration?) async throws
     func configure(_ configuration: OpenAIChatConfiguration?, localModelID: String) async throws
@@ -21,6 +35,14 @@ public protocol ModelLanguageProviding: ChatCapability, ModelResourceControlling
     func chatModel(configuration: OpenAIChatConfiguration?) async throws -> ChatModel
 }
 extension ModelLanguageProviding {
+    public func localModels() async throws -> [LocalModelDescriptor] { [] }
+
+    public func localChatDecisionModel(_ id: String) async throws -> ChatModel { try await localChatModel(id) }
+
+    public func localDecisionModel(_ id: String) async throws -> (any ModelDecisionProviding)? {
+        decisionModel(id)
+    }
+
     public func configure(_ configuration: OpenAIChatConfiguration?, localModelID: String) async throws {
         guard localModelID == "gemma4-e2b" else {
             throw CapabilityError.unavailable("Local Chat model is not supported")
@@ -228,6 +250,7 @@ private actor ModelScope {
         let capability: Task<any ChatCapability, Error>
     }
     private var cloudBindings: [CloudBinding] = []
+    private var modelNames: [String: String] = [:]
     private var localChats: [String: SerialChat] = [:]
     private let maximumPendingLocalChats: Int
     init(
@@ -360,12 +383,68 @@ private actor ModelScope {
             throw error
         }
     }
-    func chatModel(configuration: OpenAIChatConfiguration?, localModelID: String = "gemma4-e2b") throws -> ChatModel {
+    func localModels() async throws -> [LocalModelDescriptor] {
+        let manager = try await prepare()
+        let registrations = await manager.selectableModels()
+        let artifacts: [ModelArtifactSnapshot]
+        do { artifacts = try await manager.artifactSnapshots() } catch ModelArtifactError.missingArtifact {
+            artifacts = []
+        }
+        let snapshots = Dictionary(uniqueKeysWithValues: artifacts.map { ($0.artifact.id, $0) })
+        var models: [LocalModelDescriptor] = []
+        for registration in registrations {
+            try Task.checkCancellation()
+            guard let identity = try modelIdentity(registration) else { continue }
+            let native = registration.capabilities.contains(.decision)
+            let snapshot = registration.artifactID.flatMap { snapshots[$0] }
+            let availability: CapabilityAvailability
+            if let snapshot, snapshot.phase != .installed {
+                availability = .unavailable(reason: "Model artifacts are not installed")
+            } else {
+                availability = try await manager.availability(registration.id, for: native ? .decision : .chat)
+            }
+            models.append(
+                .init(
+                    identity: identity, artifactID: registration.artifactID,
+                    supportsChat: registration.capabilities.contains(.chat),
+                    supportsToolCalls: registration.supportsToolCalls, supportsNativeDecision: native,
+                    supportsChatDecision: registration.supportsChatDecision, availability: availability,
+                    artifactInstalled: snapshot.map { $0.phase == .installed }))
+        }
+        return models
+    }
+
+    func registration(for modelID: String) async throws -> ModelRegistration? {
+        let manager = try await prepare()
+        return await manager.selectableModel(modelID)
+    }
+
+    func modelIdentity(_ registration: ModelRegistration) throws -> InferenceModelIdentity? {
+        guard let model = registration.selectableModel else { return nil }
+        if let name = model.displayName { return .init(modelID: model.modelID, displayName: name) }
+        if modelNames.isEmpty {
+            modelNames = Dictionary(
+                uniqueKeysWithValues: try ModelArtifactCatalog.bundled().packages.map { ($0.id, $0.name) })
+        }
+        return .init(modelID: model.modelID, displayName: registration.artifactID.flatMap { modelNames[$0] })
+    }
+
+    func chatModel(configuration: OpenAIChatConfiguration?, localModelID: String = "gemma4-e2b") async throws
+        -> ChatModel
+    {
         try admission.checkAlive()
         guard !closed else { throw InferenceAdmissionError.stopped }
+        let identity: InferenceModelIdentity
+        if let configuration {
+            identity = .init(modelID: configuration.model, displayName: configuration.model)
+        } else {
+            identity =
+                try modelIdentity(localChatRegistration(try await registration(for: localModelID)))
+                ?? .init(modelID: localModelID)
+        }
         return ChatModel(
             capability: ConfiguredChat(scope: self, configuration: configuration, localModelID: localModelID),
-            modelName: configuration?.model ?? (localModelID == "apple-system" ? "Apple System LLM" : nil))
+            modelName: identity.displayName ?? identity.modelID)
     }
     private func cloud(_ configuration: OpenAIChatConfiguration) async throws -> any ChatCapability {
         if let binding = cloudBindings.first(where: { $0.configuration == configuration }) {
@@ -389,19 +468,20 @@ private actor ModelScope {
         }
     }
     func selectedChatID() async throws -> ModelID {
-        guard let configuration = cloudChat else { return try localChatID(assistantLocalModelID) }
+        guard let configuration = cloudChat else {
+            return try localChatRegistration(try await registration(for: assistantLocalModelID)).id
+        }
         _ = try await cloud(configuration)
         guard let id = cloudBindings.first(where: { $0.configuration == configuration })?.id else {
             throw CapabilityError.sessionClosed
         }
         return id
     }
-    private func localChatID(_ id: String) throws -> ModelID {
-        switch id {
-        case "gemma4-e2b": ModelID("chat")
-        case "apple-system": ModelID(id)
-        default: throw CapabilityError.invalidRequest("Unknown local Chat model")
+    private func localChatRegistration(_ registration: ModelRegistration?) throws -> ModelRegistration {
+        guard let registration, registration.capabilities.contains(.chat) else {
+            throw CapabilityError.invalidRequest("Unknown local Chat model")
         }
+        return registration
     }
     func selectedChat() async throws -> any ChatCapability {
         try await chatCapability(configuration: cloudChat, localModelID: assistantLocalModelID)
@@ -410,7 +490,7 @@ private actor ModelScope {
         -> any ChatCapability
     {
         if let configuration { return try await cloud(configuration) }
-        let id = try localChatID(localModelID)
+        let id = try localChatRegistration(try await registration(for: localModelID)).id
         return try await perform("language", "localChat", inference: false) {
             try await $0.get(id, as: .chat, load: false)
         }
@@ -422,9 +502,14 @@ private actor ModelScope {
         if let configuration {
             let capability = try await cloud(configuration)
             try admission.validate(generation)
-            return try await capability.chat(request)
+            let measured = request.measuringInference(
+                model: .init(modelID: configuration.model, displayName: configuration.model))
+            return try await capability.chat(measured)
         }
-        let id = try localChatID(localModelID)
+        let registration = try localChatRegistration(try await registration(for: localModelID))
+        let id = registration.id
+        let request = request.measuringInference(model: try modelIdentity(registration))
+        try admission.validate(generation)
         if localChats[localModelID] == nil {
             localChats[localModelID] = try SerialChat(maximumPending: maximumPendingLocalChats) { [weak self] in
                 guard let self else { throw CapabilityError.sessionClosed }
@@ -457,6 +542,8 @@ private actor ModelScope {
             messages: messages, context: request.context, maximumOutputTokens: request.maximumOutputTokens,
             temperature: request.temperature)
         prepared.onDispatch = request.onDispatch
+        prepared.onModelDispatch = request.onModelDispatch
+        prepared.inferenceMetadata = request.inferenceMetadata
         prepared.transportCapture = request.transportCapture
         prepared.timing = request.timing
         return prepared
@@ -470,7 +557,11 @@ private actor ModelScope {
         defer { updating = false }
         try admission.checkAlive()
         guard !closed else { throw InferenceAdmissionError.stopped }
-        if let configuration { _ = try await cloud(configuration) } else { _ = try localChatID(localModelID) }
+        if let configuration {
+            _ = try await cloud(configuration)
+        } else {
+            _ = try localChatRegistration(try await registration(for: localModelID))
+        }
         assistantLocalModelID = localModelID
         cloudChat = configuration
     }
@@ -577,6 +668,21 @@ public final class ModelLanguageContainer: ModelLanguageProviding, Sendable {
         self.decision = ModelDecisionContainer(scope: scope)
     }
     public let decision: any ModelDecisionProviding
+    public func localModels() async throws -> [LocalModelDescriptor] {
+        try await scope.localModels()
+    }
+    public func localChatDecisionModel(_ id: String) async throws -> ChatModel {
+        guard let registration = try await scope.registration(for: id), registration.supportsChatDecision else {
+            throw CapabilityError.unavailable("Model does not support Chat Decision")
+        }
+        return try await localChatModel(id)
+    }
+    public func localDecisionModel(_ id: String) async throws -> (any ModelDecisionProviding)? {
+        guard let registration = try await scope.registration(for: id), registration.capabilities.contains(.decision)
+        else { return nil }
+        return ModelDecisionContainer(
+            scope: scope, id: registration.id, identity: try await scope.modelIdentity(registration))
+    }
     public func decisionModel(_ id: String) -> (any ModelDecisionProviding)? {
         switch id {
         case "d3-edge": decision
@@ -1002,12 +1108,9 @@ extension ModelContainer {
     ) -> ModelPreparationStep {
         func resource() async throws -> ModelID? {
             guard let selected = try await selection() else { return nil }
-            switch selected {
-            case "gemma4-e2b": return ModelID("chat")
-            case "d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual", "apple-system", "deepfilternet3":
-                return ModelID(selected)
-            default: throw CapabilityError.invalidRequest("Unknown local preparation model: \(selected)")
-            }
+            if let registration = try await scope.registration(for: selected) { return registration.id }
+            if selected == "deepfilternet3" { return ModelID(selected) }
+            throw CapabilityError.invalidRequest("Unknown local preparation model: \(selected)")
         }
         return ModelPreparationStep(
             id: id,
@@ -1062,9 +1165,11 @@ public final class ModelDecisionContainer: ModelDecisionProviding, Sendable {
     }
     private let scope: ModelScope
     private let id: ModelID
-    fileprivate init(scope: ModelScope, id: ModelID = ModelID("d3-edge")) {
+    private let identity: InferenceModelIdentity?
+    fileprivate init(scope: ModelScope, id: ModelID = ModelID("d3-edge"), identity: InferenceModelIdentity? = nil) {
         self.scope = scope
         self.id = id
+        self.identity = identity
     }
     public var availability: CapabilityAvailability {
         get async {
@@ -1076,13 +1181,25 @@ public final class ModelDecisionContainer: ModelDecisionProviding, Sendable {
         }
     }
     public func decide(_ request: MultiDecisionRequest) async throws -> InferenceSession<MultiDecisionResult> {
-        try await scope.perform("decision", "decide") { try await $0.get(self.id, as: .decision).decide(request) }
+        let session = try await scope.perform("decision", "decide") {
+            try await $0.get(self.id, as: .decision).decide(request)
+        }
+        session.metadataRecorder.bind(identity ?? .init(modelID: id.rawValue))
+        return session
     }
     public func noul(_ request: NoulRequest) async throws -> InferenceSession<NoulResult> {
-        try await scope.perform("decision", "noul") { try await $0.get(self.id, as: .decision).noul(request) }
+        let session = try await scope.perform("decision", "noul") {
+            try await $0.get(self.id, as: .decision).noul(request)
+        }
+        session.metadataRecorder.bind(identity ?? .init(modelID: id.rawValue))
+        return session
     }
     public func choice(_ request: DecisionRequest) async throws -> InferenceSession<DecisionResult> {
-        try await scope.perform("decision", "decide") { try await $0.get(self.id, as: .decision).choice(request) }
+        let session = try await scope.perform("decision", "decide") {
+            try await $0.get(self.id, as: .decision).choice(request)
+        }
+        session.metadataRecorder.bind(identity ?? .init(modelID: id.rawValue))
+        return session
     }
     public func warmup() async throws { try await warmup(reportLoading: { _ in }) }
     public func warmup(reportLoading: @escaping @Sendable (Bool) async -> Void) async throws {

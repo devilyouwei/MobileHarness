@@ -185,7 +185,20 @@ public actor WriterHistory {
         }
     }
     public func progress(_ id: String) -> WriterRequestProgress? { progressValues.removeValue(forKey: id) }
-    public func dispatched(_ id: String) async throws { try await store.markModelRequestDispatched(id) }
+    public func dispatched(_ id: String, model: InferenceModelIdentity? = nil) async throws {
+        try await store.markModelRequestDispatched(id, modelID: model?.modelID, displayName: model?.displayName)
+    }
+    public func metadata(_ value: InferenceMetadata, id: String) async throws {
+        guard value.startedAt != nil else { return }
+        try await store.recordModelMetadata(
+            providerModelID: value.providerModelID, startedAt: value.startedAt, firstOutputAt: value.firstOutputAt,
+            firstOutputLatency: value.firstOutputLatency, completedAt: value.completedAt,
+            usage: value.tokenUsage.map {
+                .init(
+                    input: $0.input, generated: $0.generated, total: $0.total,
+                    cachedInput: $0.cachedInput, cacheWriteInput: $0.cacheWriteInput)
+            }, finishReason: value.finishReason.map(String.init(describing:)), for: id)
+    }
     public func event(_ event: ChatEvent, id: String) async throws {
         try await dispatched(id)
         switch event {

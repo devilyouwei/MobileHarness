@@ -19,10 +19,6 @@ public final class ProviderSettingsClient: SettingsOperating {
         self.provider = provider
         self.presentsResults = presentsResults
     }
-    public var modelName: String {
-        guard let saved, saved.enabled else { return "Local Gemma 4 E2B" }
-        return saved.model.isEmpty ? "Cloud default model" : saved.model
-    }
     public func shutdown() async {
         stopped = true
         restoration?.cancel()

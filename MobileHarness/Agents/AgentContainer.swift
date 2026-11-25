@@ -224,10 +224,8 @@ import StorageFiles
             return languageModels
         }
         private func quiesceForModelRemoval(_ id: String) async {
-            if ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual", "gemma4-e2b"].contains(id) {
-                await inputDecisionService?.quiesceLocal(id)
-            }
-            if ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"].contains(id) { return }
+            await inputDecisionService?.quiesceLocal(id)
+            if (try? await languageModels.localDecisionModel(id)) != nil { return }
             if id == "yolo26n-pose" {
                 await camera.pauseVisionForModelMaintenance()
             } else {
@@ -277,8 +275,8 @@ import StorageFiles
                 let reportDecision = business.decisionStatus
                 let models = self.languageModels
                 let service = AssistantInputDecision(
-                    localModel: { models.decisionModel($0) },
-                    localChatModel: { try await models.localChatModel($0).capability },
+                    localModel: { try await models.localDecisionModel($0) },
+                    localChatModel: { try await models.localChatDecisionModel($0) },
                     selectedConfiguration: {
                         guard let configuration else { return (nil, nil) }
                         let (localID, cloud) = try await configuration()
@@ -316,10 +314,6 @@ import StorageFiles
                             try await logs.writeRequestPayload(
                                 id, agent: "assistant", json: "", response: "", initial: false, update: update)
                         })
-                },
-                modelName: { [weak self] in
-                    guard let self else { throw CancellationError() }
-                    return await self.applicationControl.modelName
                 },
                 chatProvider: { [languageModels] in languageModels },
                 quietTiers: [
@@ -497,7 +491,6 @@ import StorageFiles
                 home: homeUI, diagnostics: diagnosticsUI, language: languageModels, speech: speechModels,
                 audio: audio, runtime: runtime(),
                 perceptionContainer: speechPerception,
-                modelName: { [applicationControl] in await applicationControl.modelName },
                 progress: progress)
             try Task.checkCancellation()
             try speechPerception.installInteraction(prepared)

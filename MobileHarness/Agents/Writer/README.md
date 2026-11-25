@@ -87,7 +87,7 @@ WriterPreview拥有默认安全预览：源码追加或确定性修改只唤醒�
 
 ## SQLite 历史与设置页
 
-WriterHistory 为每个真实控制/内容请求建立独立输入和模型请求记录，由本侧 WriterHistoryStore 与 WriterRecordStore 保存。生产装配显式注入 WriterMessageRepository、WriterExecutionRepository、AgentMessageRepository 和 ModelRequestLogRepository；无记录器仅用于显式测试实例，不是生产存储回退。完整文本/native pairs、工具定义、工具输出、用量、完成原因与失败/取消收尾保存到 SQLite。temperature 来自实际请求，控制与内容请求均不指定输出 token 上限，由 Provider 使用模型默认值；model 来自独立 ChatModel 的模型名称；不可用时明确标记名称未知。流增量先按既有 Chat 契约累积，结束边界提交；中断按现有 SQLite 恢复语义标记 interrupted，不重放操作。
+WriterHistory 为每个真实控制/内容请求建立独立输入和模型请求记录，由本侧 WriterHistoryStore 与 WriterRecordStore 保存。生产装配显式注入 WriterMessageRepository、WriterExecutionRepository、AgentMessageRepository 和 ModelRequestLogRepository；无记录器仅用于显式测试实例，不是生产存储回退。完整文本/native pairs、工具定义、工具输出、用量、完成原因与失败/取消收尾保存到 SQLite。temperature 来自实际请求，控制与内容请求均不指定输出 token 上限，由 Provider 使用模型默认值；模型身份由 ModelKit 在实际发出时提供，执行元数据在加入会话清理后保存。未知字段留空。流增量先按既有 Chat 契约累积，结束边界提交；中断按现有 SQLite 恢复语义标记 interrupted，不重放操作。
 
 委托 ID、工作区 ID 与目标保留在 decisionMetadata/请求上下文，不加入 Assistant 的 Task message-source 集合。Writer 任务保持独立输入/请求身份，复用有界历史仓库写门。工具结果在独立内容请求结束后更新原控制记录，并显式 checkpoint。SQLite 保存失败会终止本次请求并保留原始/清理错误，不能报告虚构持久化成功。
 
@@ -243,6 +243,6 @@ Actions 的 edit 接纳回执返回 ArtifactEditPreparation，包含流身份、
 
 WriterLocalTools owns the native ask/finish/enter/create declarations and WriterControlDomain selects the corresponding role-owned Skills. Root AgentContracts passes these declarations with owner=writer to AgentConfigurations during immutable catalog installation. Shared loading and registry projection require the matching owner and tool protocol; external/local declaration conflicts are rejected. CapabilityCoverage receives exact local-tool paths explicitly from composition and does not reference Writer implementation types. Writer remains the executor of these tools; catalog presence does not grant Gateway execution authority.
 
-Writer 模型由显式本地/云端选择决定：本地使用 Gemma，云端使用所选 Provider/Model；未配置报错。Gemma 提供原生工具适配；完整工具声明与历史超出本地窗口时明确失败，不自动选择云端。其他缺少原生工具的模型仍沿 unsupportedModel 路径结束。
+Writer 模型由显式本地/云端选择决定：本地使用所选的工具型 Chat，云端使用所选 Provider/Model；未配置报错。Gemma 提供原生工具适配；完整工具声明与历史超出本地窗口时明确失败，不自动选择云端。其他缺少原生工具的模型仍沿 unsupportedModel 路径结束。
 
 Task admission authenticates the original requester rather than an Assistant/Writer sender pair. Follow-up and cancellation must match the original sender and task association; the live role additionally verifies session ownership. Progress, terminal and rejection reports are published once to that requester. Assistant is the current user-facing caller, not protocol-level authority.

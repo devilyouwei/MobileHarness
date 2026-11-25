@@ -61,3 +61,5 @@ AgentPrompts loads immutable resources through an injected reader. JSON holds na
 Shared convenience methods own shared output, catalog and request-context resources. AssistantInputBatch owns Assistant input guidance and canonical source markers; ConversationTitleGenerator owns Memory title templates. The role supplies its own prompt assembly and locale. No shared helper embeds private role instructions or interprets a role's history schema.
 
 Peer messaging is not a model-visible Action. The owning Agent exposes it as a `peer` control (Assistant `task.send`); see [Agent controls](../Core/Capability/README.md#agent-controls) and [communication contracts](../Communication/README.md).
+
+AgentChatDriver consumes the existing event stream and forwards the final ModelKit metadata on completion or available evidence after failure. The owning Agent maps those values to its history store.

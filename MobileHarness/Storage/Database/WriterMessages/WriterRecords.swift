@@ -54,6 +54,8 @@ public struct WriterModelRequest: Codable, Sendable, Identifiable {
     public var requestParametersJSON: String? = nil
     public var responseEventsJSON: String? = nil
     public var producerMetadata: [String: String]? = nil
+    public var modelID: String? = nil
+    public var providerModelID: String? = nil
     public var model: String? = nil
     public var maximumOutputTokens: Int? = nil
     public var temperature: Double? = nil

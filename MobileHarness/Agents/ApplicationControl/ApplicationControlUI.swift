@@ -195,6 +195,7 @@ extension ApplicationControlAgent {
                             .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                         }, writerProviderID: draft.writerProviderID, writerModel: draft.writerModel,
                         writerThinking: draft.writerThinking, writerUsesLocal: draft.writerUsesLocal,
+                        writerLocalModelID: draft.writerLocalModelID,
                         decisionProviderID: draft.decisionProviderID, decisionModel: draft.decisionModel,
                         decisionUsesLocal: draft.decisionUsesLocal, decisionLocalModelID: draft.decisionLocalModelID,
                         assistantLocalModelID: draft.assistantLocalModelID),
@@ -220,6 +221,7 @@ extension ApplicationControlAgent {
                             .init(enabled: false, url: $0.url, key: $0.key, model: $0.model, name: $0.name, id: $0.id)
                         }, writerProviderID: stored.writerProviderID, writerModel: stored.writerModel,
                         writerThinking: stored.writerThinking, writerUsesLocal: stored.writerUsesLocal,
+                        writerLocalModelID: stored.writerLocalModelID,
                         decisionProviderID: stored.decisionProviderID, decisionModel: stored.decisionModel,
                         decisionUsesLocal: stored.decisionUsesLocal == true,
                         decisionLocalModelID: stored.resolvedDecisionLocalModelID,

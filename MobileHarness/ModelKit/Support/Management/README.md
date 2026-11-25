@@ -89,7 +89,7 @@ Automatic Apple recognition reads the host locale at provider selection. Apple E
 
 Each ModelContainer owns one assembly task and its resource root/configuration. At most 32 callers join that instance; distinct roots never share a manager. Caller cancellation does not cancel shared assembly. Failure is retained without an alternate manager; shutdown stays terminal.
 
-configureChat constructs/replaces only the chat binding through existing manager SPI; nil restores Gemma. Other resources/defaults remain. Consumers resolve current binding each request; configured does not mean network reachable/authenticated. configureArtifacts validates matching identities/revisions/directories and injects protocols without importing Storage. JSON defines files, never executable factories.
+configureChat updates the language scope’s selected Chat binding. Cloud requests reuse registered clients keyed by fixed configuration. A nil cloud configuration selects the supplied local ID, which defaults to Gemma. Other resources/defaults remain. Consumers resolve current binding each request; configured does not mean network reachable/authenticated. configureArtifacts validates matching identities/revisions/directories and injects protocols without importing Storage. JSON defines files, never executable factories.
 
 ## Preparation and residency
 
@@ -174,3 +174,7 @@ Sources support Hugging Face repositories, HTTPS `urlArchive` ZIPs, and HTTPS `u
 Catalog retirement cancels and joins orphaned native sessions before discarding their staging, reports the retired ID through the module failure callback, and persists the remaining transfer index. Existing installed weights are not automatically deleted. This prevents removed declarations from blocking unrelated restoration.
 
 ArtifactStore.observeChanges returns ModelKit.StateSignalListener<UInt64>. Its producer is model.artifacts.revision with a new generation per source binding. It uses the existing latest-one stream and 16-observer limit; cancellation removes the exact observer token, and consumers join their own processing tasks.
+
+## Selectable language registrations
+
+Chat and native Decision registrations declare a stable selectable ID, supported modes and associated artifact ID. Manager indexes the existing registrations. The language port projects public descriptors and resolves the same IDs to execution bindings and preparation. Gemma’s resource ID is `chat`, its selectable ID and artifact ID are `gemma4-e2b`. Artifact-backed display names come from the bundled catalog. Apple declares its system identity and supplies OS availability through its lightweight provider.

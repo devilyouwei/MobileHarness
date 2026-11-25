@@ -101,18 +101,28 @@ public struct ModelRegistration: Sendable {
     public let capabilities: Set<ProvidedCapability>
     public let artifactID: String?
     public let memoryPolicy: ModelMemoryPolicy
+    public let selectableModel: InferenceModelIdentity?
+    public let supportsToolCalls: Bool
+    public let supportsChatDecision: Bool
     let factory: @Sendable (ModelContext) async throws -> ProvidedCapabilities
 
     public init(
         id: ModelID, capabilities: Set<ProvidedCapability>, memoryPolicy: ModelMemoryPolicy = .retain,
-        artifactID: String? = nil,
+        artifactID: String? = nil, selectableModel: InferenceModelIdentity? = nil,
+        supportsToolCalls: Bool = false, supportsChatDecision: Bool = false,
         factory: @escaping @Sendable (ModelContext) async throws -> ProvidedCapabilities
     ) throws {
-        guard !id.rawValue.isEmpty, !capabilities.isEmpty else { throw ModelRegistrationError.invalidRegistration }
+        guard !id.rawValue.isEmpty, !capabilities.isEmpty,
+            selectableModel.map({ !$0.modelID.isEmpty && $0.modelID.utf8.count <= 512 }) ?? true,
+            !(supportsToolCalls || supportsChatDecision) || capabilities.contains(.chat)
+        else { throw ModelRegistrationError.invalidRegistration }
         self.id = id
         self.capabilities = capabilities
         self.memoryPolicy = memoryPolicy
         self.artifactID = artifactID
+        self.selectableModel = selectableModel
+        self.supportsToolCalls = supportsToolCalls
+        self.supportsChatDecision = supportsChatDecision
         self.factory = factory
     }
 }

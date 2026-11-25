@@ -50,16 +50,16 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
         switch self {
         case .recognition: ["nemotron", "silero", "deepfilternet3"]
         case .synthesis: ["moss-tts-nano"]
-        case .language: ["gemma4-e2b"]
+        case .language: []
         case .vision: ["yolo26n-pose"]
-        case .decision: ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"]
+        case .decision: []
         }
     }
     public var installationMessage: String {
         switch self {
         case .recognition: "Download Nemotron first."
         case .synthesis: "Download MOSS first."
-        case .language: "Download Gemma 4 E2B first."
+        case .language: "Download this model in Agent Models first."
         case .vision: "Download and install the YOLO pose model first."
         case .decision: "Download the selected Decision model before using it."
         }
@@ -105,17 +105,43 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     }
 
 }
+public struct LocalModelOption: Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let artifactID: String?
+    public let roles: Set<AgentBrain>
+    public let nativeDecision: Bool
+    public let available: Bool
+    public let unavailableReason: String?
+    public let needsDownload: Bool
+
+    public init(
+        id: String, name: String, artifactID: String?, roles: Set<AgentBrain>, nativeDecision: Bool,
+        available: Bool, unavailableReason: String? = nil, needsDownload: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.artifactID = artifactID
+        self.roles = roles
+        self.nativeDecision = nativeDecision
+        self.available = available
+        self.unavailableReason = unavailableReason
+        self.needsDownload = needsDownload
+    }
+}
+
 /// Passive presentation snapshot; eligibility is supplied by the business layer.
 public struct ModelResourceViewSnapshot: Sendable {
     public let items: [ModelResourceItem]
     public let installedGroups: Set<ModelResourceGroup>
-    public let appleSystemAvailable: Bool
+    public let languageModels: [LocalModelOption]
     public init(
-        items: [ModelResourceItem], installedGroups: Set<ModelResourceGroup> = [], appleSystemAvailable: Bool = false
+        items: [ModelResourceItem], installedGroups: Set<ModelResourceGroup> = [],
+        languageModels: [LocalModelOption] = []
     ) {
         self.items = items
         self.installedGroups = installedGroups
-        self.appleSystemAvailable = appleSystemAvailable
+        self.languageModels = languageModels
     }
 }
 public enum ModelResourceOperation: Sendable { case download, remove, cancel }
@@ -143,7 +169,17 @@ public final class ModelResourcesState {
     public internal(set) var source = ModelResourceSourceDraft()
     public internal(set) var items: [ModelResourceItem] = []
     public internal(set) var installedGroups: Set<ModelResourceGroup> = []
-    public private(set) var appleSystemAvailable = false
+    public private(set) var languageModels: [LocalModelOption] = []
+    public func localModels(for role: AgentBrain) -> [LocalModelOption] {
+        languageModels.filter { $0.roles.contains(role) }
+    }
+    func modelIDs(for group: ModelResourceGroup) -> Set<String> {
+        switch group {
+        case .language: Set(languageModels.filter { !$0.nativeDecision }.compactMap(\.artifactID))
+        case .decision: Set(languageModels.filter(\.nativeDecision).compactMap(\.artifactID))
+        default: group.modelIDs
+        }
+    }
     public internal(set) var error: String? { didSet { refreshErrorGeneration = nil } }
     private var refreshErrorGeneration: UInt64?
     public internal(set) var saving = false
@@ -165,7 +201,7 @@ public final class ModelResourcesState {
         guard generation == refreshGeneration, generation > 0 else { return false }
         items = snapshot.items
         installedGroups = snapshot.installedGroups
-        appleSystemAvailable = snapshot.appleSystemAvailable
+        languageModels = snapshot.languageModels
         if refreshErrorGeneration != nil { error = nil }
         return true
     }

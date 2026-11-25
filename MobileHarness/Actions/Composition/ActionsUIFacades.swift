@@ -117,7 +117,6 @@
             return ActionsUIFacades(
                 camera: camera, history: history, resources: resources, bluetooth: bluetoothControls,
                 settings: settings, resourceOperations: resourceOperations, settingsOperations: settingsOperations,
-                modelName: { settingsOperations.modelName },
                 resourcesPresented: { resources.acceptPresentedSnapshot() })
         }
     }

@@ -28,3 +28,5 @@ Native cumulative snapshots convert to scalar-safe text deltas. Prefix revisions
 ModelResource rejects overlapping inference. Each returned InferenceSession owns a cancellable worker via InferenceTaskControl; termination cancels generation and completion joins cleanup. The request-local native session is confined to MainActor, while framework inference is asynchronous. On completion or failure, cleanup waits for the native session to become idle before releasing the lease. No UI page owns work, no application FIFO is added and no fallback provider is selected.
 
 [Chat contract](../README.md) · [ModelKit](../../../README.md)
+
+The adapter exposes its `apple-system` identity for registration and direct inference. Its request snapshot carries the system-reported usage and sampled execution timing alongside the existing usage event.

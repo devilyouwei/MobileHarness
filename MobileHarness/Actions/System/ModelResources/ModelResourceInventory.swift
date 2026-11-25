@@ -7,13 +7,13 @@ public enum ResourceModelGroup: String, Codable, Sendable, CaseIterable {
         switch self {
         case .recognition: ["nemotron"]
         case .synthesis: ["moss-tts-nano"]
-        case .language: ["gemma4-e2b"]
+        case .language: []
         case .vision: ["yolo26n-pose"]
-        case .decision: ["d3-edge", "vela3-fast", "vela3.1-fast", "laya-multilingual"]
+        case .decision: []
         }
     }
     public func isInstalled(in ids: Set<String>) -> Bool {
-        self == .decision ? !requiredIDs.isDisjoint(with: ids) : requiredIDs.isSubset(of: ids)
+        !requiredIDs.isEmpty && requiredIDs.isSubset(of: ids)
     }
 }
 public struct ModelResourceFact: Codable, Sendable, Equatable {
@@ -46,22 +46,57 @@ public struct ModelResourceFact: Codable, Sendable, Equatable {
         self.failure = failure
     }
 }
+public struct LocalModelFact: Codable, Sendable, Equatable {
+    public enum Role: String, Codable, Sendable { case assistant, writer, decision }
+    public let id: String
+    public let name: String
+    public let artifactID: String?
+    public let roles: Set<Role>
+    public let nativeDecision: Bool
+    public let available: Bool
+    public let unavailableReason: String?
+    public let needsDownload: Bool
+
+    public init(
+        id: String, name: String, artifactID: String?, roles: Set<Role>, nativeDecision: Bool,
+        available: Bool, unavailableReason: String? = nil, needsDownload: Bool = false
+    ) {
+        self.id = id
+        self.name = name
+        self.artifactID = artifactID
+        self.roles = roles
+        self.nativeDecision = nativeDecision
+        self.available = available
+        self.unavailableReason = unavailableReason
+        self.needsDownload = needsDownload
+    }
+}
+
 public enum ResourceInventoryError: Error, Sendable { case invalidSnapshot, capacityExceeded }
 public struct ModelResourceInventory: Codable, Sendable, Equatable {
     public static let maximumBytes = 65_536
     public let version: Int
     public let items: [ModelResourceFact]
-    public let appleSystemAvailable: Bool?
+    public let languageModels: [LocalModelFact]?
     public let installedGroups: Set<ResourceModelGroup>
-    public init(items: [ModelResourceFact], appleSystemAvailable: Bool? = nil) {
+    public init(items: [ModelResourceFact], languageModels: [LocalModelFact]? = nil) {
         version = 1
         self.items = items
-        self.appleSystemAvailable = appleSystemAvailable
+        self.languageModels = languageModels
         let ids = Set(items.filter { $0.phase == .installed }.map(\.id))
-        installedGroups = Set(ResourceModelGroup.allCases.filter { $0.isInstalled(in: ids) })
+        var groups = Set(
+            ResourceModelGroup.allCases.filter { $0 != .language && $0 != .decision && $0.isInstalled(in: ids) })
+        if let languageModels {
+            for model in languageModels where model.artifactID.map(ids.contains) == true {
+                groups.insert(model.nativeDecision ? .decision : .language)
+            }
+        }
+        installedGroups = groups
     }
     public func validate() throws {
-        guard items.count <= 64 else { throw ResourceInventoryError.capacityExceeded }
+        guard items.count <= 64, (languageModels?.count ?? 0) <= 32 else {
+            throw ResourceInventoryError.capacityExceeded
+        }
         guard version == 1, Set(items.map(\.id)).count == items.count else {
             throw ResourceInventoryError.invalidSnapshot
         }
@@ -89,16 +124,16 @@ public struct ModelResourceInventory: Codable, Sendable, Equatable {
         try Task.checkCancellation()
         let items = try await capability.snapshotResources()
         try Task.checkCancellation()
-        let value = await Self(items: items, appleSystemAvailable: capability.appleSystemAvailable())
+        let value = try await Self(items: items, languageModels: capability.localLanguageModels())
         try value.validate()
         return value
     }
 }
 public protocol ModelResourceInventoryCapability: Sendable {
     func snapshotResources() async throws -> [ModelResourceFact]
-    func appleSystemAvailable() async -> Bool
+    func localLanguageModels() async throws -> [LocalModelFact]
 }
 
 extension ModelResourceInventoryCapability {
-    public func appleSystemAvailable() async -> Bool { false }
+    public func localLanguageModels() async throws -> [LocalModelFact] { [] }
 }

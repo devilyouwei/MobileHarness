@@ -1,5 +1,8 @@
 # 技术需求
 
+
+- [ModelKit 模型目录与请求元数据](ModelKit-Model-Identity.md)：统一 Chat、Decision 选模事实与请求记录。
+
 - [Writer 文件读取参数兼容](Writer-Read-Integer-Arguments.md)：处理模型将文件读取范围输出为 JSON 整数后反复重试的问题。
 
 - [Action 多语言说明内聚](Action-Localization.md)：默认文案留在 `@Action`，翻译放入 `Actions/Resources` 镜像目录并由 Actions 暴露本地化接口，替换 Agents 的 FunctionCopy。

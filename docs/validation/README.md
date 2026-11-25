@@ -1,5 +1,8 @@
 # 验证与验收资料
 
+
+[ModelKit 模型目录与请求元数据](ModelKit-Model-Identity.md) 记录 Swift 回归、工程检查、构建及 Apple Intelligence 真机验收。
+
 [Action 多轨道调度与 wait](Action-Multi-Channel-Wait.md)：自闭 `time` 延时、Skill 注册、教学迁移的自动化证据及未执行的真实模型/真机验收。
 [wait 提示词真实模型评估](Wait-Prompt-Evaluation.md)：qwen3.8-max/flash 与 gpt-4.1 对 wait 作用域与延时 function token 的单轮语义评估、失败分析与局限。
 

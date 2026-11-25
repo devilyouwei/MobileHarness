@@ -241,3 +241,5 @@ flowchart LR
 ```
 
 Decision模型切换支持D3 Edge、Vela 3 Fast/3.1 Fast及Laya Multilingual；上下文和noul请求不随模型变化。根模块删除上述任一制品前，停止并加入该ID的Decision调用；模型名称仅用于日志呈现。
+
+Assistant 写入 ModelKit 在 dispatch 边界报告的模型身份，并在生成清理后为同一次请求补写执行元数据。Decision 解析本地注册的原生与 Chat 能力，运行日志读取模型会话身份，分类总耗时仍由 Agent 测量。

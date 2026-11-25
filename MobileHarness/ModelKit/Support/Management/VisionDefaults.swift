@@ -9,7 +9,8 @@ extension DefaultModelAssembly {
     static func registerDecision(manager: ModelManager, resources: URL) async throws {
         try await manager.register(
             ModelRegistration(
-                id: ModelID("d3-edge"), capabilities: [.decision], memoryPolicy: .retain, artifactID: "d3-edge"
+                id: ModelID("d3-edge"), capabilities: [.decision], memoryPolicy: .retain, artifactID: "d3-edge",
+                selectableModel: .init(modelID: "d3-edge")
             ) { context in
                 ProvidedCapabilities(
                     decision: try D3Decision(context: context, artifacts: resources.appendingPathComponent("D3Edge")))
@@ -17,7 +18,7 @@ extension DefaultModelAssembly {
         try await manager.register(
             ModelRegistration(
                 id: ModelID("vela3-fast"), capabilities: [.decision], memoryPolicy: .retain,
-                artifactID: "vela3-fast"
+                artifactID: "vela3-fast", selectableModel: .init(modelID: "vela3-fast")
             ) { context in
                 ProvidedCapabilities(
                     decision: try VelaDecision(
@@ -27,7 +28,7 @@ extension DefaultModelAssembly {
         try await manager.register(
             ModelRegistration(
                 id: ModelID("vela3.1-fast"), capabilities: [.decision], memoryPolicy: .retain,
-                artifactID: "vela3.1-fast"
+                artifactID: "vela3.1-fast", selectableModel: .init(modelID: "vela3.1-fast")
             ) { context in
                 ProvidedCapabilities(
                     decision: try Vela31Decision(
@@ -36,7 +37,7 @@ extension DefaultModelAssembly {
         try await manager.register(
             ModelRegistration(
                 id: ModelID("laya-multilingual"), capabilities: [.decision], memoryPolicy: .retain,
-                artifactID: "laya-multilingual"
+                artifactID: "laya-multilingual", selectableModel: .init(modelID: "laya-multilingual")
             ) { context in
                 ProvidedCapabilities(
                     decision: try LayaDecision(

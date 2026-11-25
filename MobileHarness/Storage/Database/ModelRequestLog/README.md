@@ -7,3 +7,5 @@ ModelKit 提供中立采集回调，Agents 桥接至本仓库；64 KiB 分块背
 ## Interfaces
 
 ModelRequestLogRepository/SQLiteModelRequestLogRepository 独立拥有协议数据和 generation meta。共享 ModelEvidence 只描述协议值，不引用 Assistant/Writer 私有记录。辅助标题请求的业务入口属于 AssistantConversations；日志更新/清理使用独立日志端口。
+
+每条 invocation 的 generation meta 可保存稳定模型 ID、展示名称和可选后端报告的型号。旧记录继续解码原名称。辅助标题沿用同一字段及清理规则。

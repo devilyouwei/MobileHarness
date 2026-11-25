@@ -54,3 +54,5 @@ LayaDecision接收平台对应bundle根目录；App下载iOS portable JIT wfp16-
 Laya的choice与noul具有不同qtype_onehot和原生选项；noul用false/true解释文本，并从true概率读取布尔值。main输出token_logits及pooled_cls，host在marker处取值并构造act四维特征；act输出验证后不作为上层路由覆盖。候选温度先按type/候选数量分桶，再用制品声明的type温度；按发布协议四位小数、noul严格>0.5。choice保持argmax。输入失败、加载失败、取消或非法输出均传播错误，不制造false或代替分类。
 
 LayaTokenizer在内存中将发布Metaspace的prepend_scheme=always映射为当前swift-transformers所需的add_prefix_space=true；不修改下载文件。该兼容层仅适用于声明了该契约的Laya tokenizer，防止词首token差异改变模型语义。
+
+The language registry resolves dedicated Decision bindings by public ID. Native Decision sessions provide their bound model identity and execution timing. Chat-backed Decision forwards the source session metadata, including internally consumed Chat usage, through result decoding and cleanup.

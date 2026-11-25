@@ -134,6 +134,9 @@ public actor ModelManager {
             throw ModelArtifactError.invalidCatalog
         }
         guard entries[registration.id] == nil else { throw ModelRegistrationError.duplicateModel(registration.id) }
+        if let model = registration.selectableModel, selectableModel(model.modelID) != nil {
+            throw ModelRegistrationError.duplicateModel(registration.id)
+        }
         guard entries.count < 32 else { throw CapabilityError.inputBusy }
         guard selected.isSubset(of: registration.capabilities) else { throw ModelRegistrationError.invalidRegistration }
         for capability in selected where defaults[capability] != nil {
@@ -152,7 +155,9 @@ public actor ModelManager {
         }
         let old = try entry(registration.id)
         guard !old.unloading else { throw CapabilityError.inputBusy }
-        guard old.registration.capabilities == registration.capabilities else {
+        guard old.registration.capabilities == registration.capabilities,
+            old.registration.selectableModel?.modelID == registration.selectableModel?.modelID
+        else {
             throw ModelRegistrationError.invalidRegistration
         }
         old.unloading = true
@@ -189,6 +194,16 @@ public actor ModelManager {
         public let phase: String
         public let inferenceActive: Bool
     }
+    @_spi(ModelAssembly) public func selectableModels() -> [ModelRegistration] {
+        entries.values.map(\.registration).filter { $0.selectableModel != nil }.sorted {
+            ($0.selectableModel?.modelID ?? "") < ($1.selectableModel?.modelID ?? "")
+        }
+    }
+
+    @_spi(ModelAssembly) public func selectableModel(_ id: String) -> ModelRegistration? {
+        entries.values.first { $0.registration.selectableModel?.modelID == id }?.registration
+    }
+
     /// Registry identities only; never samples resource state or constructs a provider.
     public func resourceIDs(capabilities: Set<ProvidedCapability>) -> [String] {
         entries.values.filter { !$0.registration.capabilities.isDisjoint(with: capabilities) }

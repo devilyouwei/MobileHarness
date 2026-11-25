@@ -251,7 +251,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         let text =
             "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Hello\"}\n\n"
-            + "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n"
+            + "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"model\":\"provider-revision\",\"output\":[]}}\n\n"
         client?.urlProtocol(self, didLoad: Data(text.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
@@ -296,6 +296,12 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
     var events: [ChatEvent] = []
     for try await event in session.events { events.append(event) }
     #expect(events == [.text("Hello"), .finished(.stop)])
+    await session.waitForCompletion()
+    #expect(session.metadata.model?.modelID == configuration.model)
+    #expect(session.metadata.providerModelID == "provider-revision")
+    #expect(session.metadata.startedAt != nil && session.metadata.firstOutputAt != nil)
+    #expect(session.metadata.completedAt != nil && session.metadata.finishReason == .stop)
+    #expect(session.metadata.tokenUsage == nil)
     #expect(dispatched.withLock { $0 } == 1)
     let wire = captured.withLock { $0 }
     guard case .request(let method, let url, let headers, let body, _) = wire.first else {
@@ -648,6 +654,13 @@ private final class AnonymousModelListProtocol: URLProtocol, @unchecked Sendable
     #expect(
         try decode(usage + "data: [DONE]\n\n") == [
             .usage(try ChatTokenUsage(input: 1, generated: 2, total: 3)), .finished(.stop),
+        ])
+    let partial =
+        #"data: {"type":"response.completed","response":{"status":"completed","output":[],"usage":{"output_tokens":0}}}"#
+        + "\n\n"
+    #expect(
+        try decode(partial) == [
+            .usage(try ChatTokenUsage(input: nil, generated: 0, total: nil)), .finished(.stop),
         ])
     expectResponseFailure(.invalidCompletion) { try decode(usage + usage) }
     for invalid in ["true", "-2"] {

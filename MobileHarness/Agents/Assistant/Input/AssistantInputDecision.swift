@@ -6,16 +6,18 @@ import Synchronization
 import UI
 
 public struct InputDecisionOutcome: Sendable, Equatable {
-    public enum Route: String, Sendable {
-        case local = "local:d3-edge"
-        case vela = "local:vela3-fast"
-        case vela31 = "local:vela3.1-fast"
-        case laya = "local:laya-multilingual"
-        case gemma = "local:gemma4-e2b"
-        case apple = "local:apple-system"
-        case cloud = "cloud:decision"
-        case failed = "decision:failed"
-        case superseded = "decision:superseded"
+    public enum Route: Sendable, Equatable {
+        case local(modelID: String)
+        case cloud, failed, superseded
+
+        public var rawValue: String {
+            switch self {
+            case .local(let id): "local:" + id
+            case .cloud: "cloud:decision"
+            case .failed: "decision:failed"
+            case .superseded: "decision:superseded"
+            }
+        }
     }
     public let route: Route
     public let modelResult: Bool?
@@ -33,6 +35,7 @@ public struct InputDecisionOutcome: Sendable, Equatable {
     }
     public var failure: Failure? = nil
     public var modelName: String? = nil
+    public var inference: InferenceMetadata? = nil
 }
 
 /// Frozen at admission: current assistant reply and latest user input.
@@ -68,8 +71,8 @@ public struct InputDecisionSnapshot: Sendable {
 
 /// Root-owned bounded classification and cleanup. A timeout retires its result, not its native resource.
 public actor AssistantInputDecision {
-    private let localModel: @Sendable (String) -> (any ModelDecisionProviding)?
-    private let localChatModel: @Sendable (String) async throws -> any ChatCapability
+    private let localModel: @Sendable (String) async throws -> (any ModelDecisionProviding)?
+    private let localChatModel: @Sendable (String) async throws -> ChatModel
     private var activeLocalID: String?
     private var localMaintenance: Set<String> = []
     private var switchingLocal = false
@@ -139,8 +142,8 @@ public actor AssistantInputDecision {
     }
 
     init(
-        localModel: @escaping @Sendable (String) -> (any ModelDecisionProviding)?,
-        localChatModel: @escaping @Sendable (String) async throws -> any ChatCapability = { _ in
+        localModel: @escaping @Sendable (String) async throws -> (any ModelDecisionProviding)?,
+        localChatModel: @escaping @Sendable (String) async throws -> ChatModel = { _ in
             throw CapabilityError.unavailable("Local Chat Decision is unavailable")
         },
         selectedConfiguration: @escaping @Sendable () async throws -> SelectedConfiguration,
@@ -181,10 +184,12 @@ public actor AssistantInputDecision {
         defer { switchingLocal = false }
         if let previous = activeLocalID, !localMaintenance.contains(previous) {
             await joinLocal()
-            if let model = localModel(previous), !localMaintenance.contains(previous) {
-                do { try await model.unload() } catch {
-                    return "Could not release previous Decision model: \(error.localizedDescription)"
+            do {
+                if let model = try await localModel(previous), !localMaintenance.contains(previous) {
+                    try await model.unload()
                 }
+            } catch {
+                return "Could not release previous Decision model: \(error.localizedDescription)"
             }
         }
         activeLocalID = id
@@ -204,11 +209,20 @@ public actor AssistantInputDecision {
     }
     public func classify(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
         await AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
-            await classifyInput(snapshot)
+            let evidence = Mutex<InferenceMetadata?>(nil)
+            var result = await classifyInput(snapshot) { metadata in
+                if metadata.model != nil || metadata.startedAt != nil { evidence.withLock { $0 = metadata } }
+            }
+            result.inference = evidence.withLock { $0 }
+            if let model = result.inference?.model { result.modelName = model.displayName ?? model.modelID }
+            return result
         }
     }
 
-    private func classifyInput(_ snapshot: InputDecisionSnapshot) async -> InputDecisionOutcome {
+    private func classifyInput(
+        _ snapshot: InputDecisionSnapshot,
+        capture: @escaping @Sendable (InferenceMetadata) -> Void
+    ) async -> InputDecisionOutcome {
         let requests = Mutex<[String]>([])
         let selectedModelName = Mutex<String?>(nil)
         var localFailureReason: String?
@@ -232,19 +246,7 @@ public actor AssistantInputDecision {
             await reportFailure(.settings)
             return failedOutcome("Could not read Decision settings: \(error.localizedDescription)", failure: .settings)
         }
-        selectedModelName.withLock {
-            $0 = route.localID.map { id in
-                switch id {
-                case "d3-edge": "D3 Edge"
-                case "vela3-fast": "Vela 3 Fast"
-                case "vela3.1-fast": "Vela 3.1 Fast"
-                case "laya-multilingual": "Laya Multilingual"
-                case "gemma4-e2b": "Gemma 4 E2B"
-                case "apple-system": "Apple System LLM"
-                default: id
-                }
-            }
-        }
+        selectedModelName.withLock { $0 = route.localID }
         let prompt: NoulRequest
         do {
             prompt = try snapshot.request()
@@ -257,9 +259,15 @@ public actor AssistantInputDecision {
             await reportFailure(.model)
             return failedOutcome(reason, failure: .model)
         }
-        if let id = route.localID, id == "gemma4-e2b" || id == "apple-system" {
-            let modelName = id == "apple-system" ? "Apple System LLM" : "Gemma 4 E2B"
-            let modelRoute: InputDecisionOutcome.Route = id == "apple-system" ? .apple : .gemma
+        let nativeModel: (any ModelDecisionProviding)?
+        do {
+            if let id = route.localID { nativeModel = try await localModel(id) } else { nativeModel = nil }
+        } catch {
+            await reportFailure(.model)
+            return failedOutcome(error.localizedDescription, failure: .model)
+        }
+        let localRoute = InputDecisionOutcome.Route.local(modelID: route.localID ?? "")
+        if let id = route.localID, nativeModel == nil {
             guard !localMaintenance.contains(id), activeLocalID == id else {
                 await reportFailure(.unavailable)
                 return failedOutcome("Local Chat model temporarily unavailable", failure: .unavailable)
@@ -267,23 +275,27 @@ public actor AssistantInputDecision {
             let resolve = localChatModel
             let result = await race(
                 "local", until: min(deadline, .now.advanced(by: localChatTimeout)),
-                name: modelName
+                name: id
             ) {
                 let model = try await resolve(id)
-                if case .unavailable(let reason) = await model.availability {
+                let modelName = model.modelName ?? id
+                selectedModelName.withLock { $0 = modelName }
+                if case .unavailable(let reason) = await model.capability.availability {
                     throw CapabilityError.unavailable(reason)
                 }
-                return try await Self.read(ChatDecision(model), request: prompt) { request in
+                return try await Self.read(ChatDecision(model.capability), request: prompt, capture: capture) {
+                    request in
                     requests.withLock { $0.append("Local \(modelName)\n\n" + request) }
                 }
             }
             switch result {
             case .superseded:
-                return Self.supersededOutcome(requests: requests.withLock { $0 }, modelName: modelName)
+                return Self.supersededOutcome(
+                    requests: requests.withLock { $0 }, modelName: selectedModelName.withLock { $0 })
             case .selected(let action):
-                await report("Local \(modelName)")
+                await report("Local \(selectedModelName.withLock { $0 } ?? id)")
                 return outcome(
-                    action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 },
+                    action, route: localRoute, snapshot: snapshot, requests: requests.withLock { $0 },
                     modelName: selectedModelName.withLock { $0 })
             case .failed(let reason, let failure):
                 if !stopped, !Task.isCancelled { await reportFailure(failure) }
@@ -291,24 +303,17 @@ public actor AssistantInputDecision {
             }
         }
         let modelName = selectedModelName.withLock { $0 } ?? "Decision"
-        let modelRoute: InputDecisionOutcome.Route =
-            switch route.localID {
-            case "vela3-fast": .vela
-            case "vela3.1-fast": .vela31
-            case "laya-multilingual": .laya
-            default: .local
-            }
         if let id = route.localID {
             localFailureReason = localFailure
             if switchingLocal || activeLocalID != id || localMaintenance.contains(id) {
                 localFailureReason = "Decision resources are being released"
                 localFailureKind = .notReady
-            } else if localModel(id) == nil {
+            } else if nativeModel == nil {
                 localFailureReason = "Selected local Decision model is unavailable"
                 localFailureKind = .unavailable
             }
         }
-        if let id = route.localID, let local = localModel(id), localFailureReason == nil, !stopped, !Task.isCancelled {
+        if let id = route.localID, let local = nativeModel, localFailureReason == nil, !stopped, !Task.isCancelled {
             do {
                 let status = try await local.status()
                 if localMaintenance.contains(id) || activeLocalID != id || switchingLocal || stopped || Task.isCancelled
@@ -319,7 +324,7 @@ public actor AssistantInputDecision {
                     await report(AppLanguage(preferredLanguage: language()).format("Local · %@", modelName))
                     let result = await race("local", until: min(deadline, .now.advanced(by: localTimeout))) {
                         try Task.checkCancellation()
-                        return try await Self.read(local, request: prompt) { request in
+                        return try await Self.read(local, request: prompt, capture: capture) { request in
                             requests.withLock { $0.append("Local \(modelName)\n\n" + request) }
                         }
                     }
@@ -328,7 +333,7 @@ public actor AssistantInputDecision {
                         return Self.supersededOutcome(requests: requests.withLock { $0 }, modelName: modelName)
                     case .selected(let action):
                         return outcome(
-                            action, route: modelRoute, snapshot: snapshot, requests: requests.withLock { $0 },
+                            action, route: localRoute, snapshot: snapshot, requests: requests.withLock { $0 },
                             modelName: selectedModelName.withLock { $0 })
                     case .failed(let reason, let failure):
                         localFailureReason = reason
@@ -371,7 +376,7 @@ public actor AssistantInputDecision {
         let result = await race("cloud", until: deadline) {
             let model = try await cloud()
             selectedModelName.withLock { $0 = model.modelName }
-            return try await Self.read(ChatDecision(model.capability), request: prompt) { request in
+            return try await Self.read(ChatDecision(model.capability), request: prompt, capture: capture) { request in
                 requests.withLock { $0.append("Cloud Decision\n\n" + request) }
             }
         }
@@ -398,10 +403,12 @@ public actor AssistantInputDecision {
 
     private static func read(
         _ model: any DecisionCapability, request: NoulRequest,
-        record: @Sendable (String) -> Void
+        capture: @Sendable (InferenceMetadata) -> Void, record: @Sendable (String) -> Void
     ) async throws -> Bool {
         record("noul\n\nState:\n" + request.text + "\n\nQuestion:\n" + request.instructions)
         let session = try await model.noul(request)
+        capture(session.metadata)
+        defer { capture(session.metadata) }
         return try await session.withCleanup {
             var result: Bool?
             for try await value in session.events {
@@ -504,7 +511,7 @@ extension InputDecisionOutcome {
     func logItem(for snapshot: InputDecisionSnapshot, duration: Duration) -> DecisionLogItem {
         let route: DecisionLogItem.Route =
             switch self.route {
-            case .local, .vela, .vela31, .laya, .gemma, .apple: .local
+            case .local: .local
             case .cloud: .cloud
             case .failed: .failed
             case .superseded: .superseded
@@ -514,7 +521,7 @@ extension InputDecisionOutcome {
             route: route,
             modelResult: nil, adoptedResult: .enqueue,
             booleanResult: modelResult, signalStatus: signalStatus,
-            reason: reason, requests: requests, modelName: modelName)
+            reason: reason, requests: requests, modelName: modelName, modelID: inference?.model?.modelID)
     }
 }
 
@@ -559,8 +566,10 @@ actor AssistantDecisionQueue {
                 guard !Task.isCancelled else { return }
                 guard pending.first?.snapshot.input.id == job.snapshot.input.id else { continue }
                 if pending.count > 1 {
+                    let evidence = result.inference
                     result = AssistantInputDecision.supersededOutcome(
                         requests: result.requests, modelName: result.modelName)
+                    result.inference = evidence
                 }
                 if result.modelResult == true {
                     if let target = job.target {

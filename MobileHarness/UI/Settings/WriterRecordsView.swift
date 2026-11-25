@@ -1018,6 +1018,12 @@ public enum WriterRecordPresentation {
                         LabeledContent(
                             appCopy.text("Model name"),
                             value: request.model.flatMap { $0.isEmpty ? nil : $0 } ?? appCopy.text("Unrecorded"))
+                        if let modelID = request.modelID, modelID != request.model {
+                            Text(appCopy.format("Model ID: %@", modelID)).textSelection(.enabled)
+                        }
+                        if let providerModelID = request.providerModelID, providerModelID != request.modelID {
+                            Text(appCopy.format("Provider model: %@", providerModelID)).textSelection(.enabled)
+                        }
                         LabeledContent(
                             appCopy.text("Output token limit"),
                             value: request.maximumOutputTokens?.formatted() ?? appCopy.text("Unrecorded"))
@@ -1032,7 +1038,8 @@ public enum WriterRecordPresentation {
                         if let usage = request.tokenUsage {
                             LabeledContent(
                                 appCopy.text("Input / Output / Total tokens"),
-                                value: "\(usage.input) / \(usage.generated) / \(usage.total)")
+                                value: [usage.input, usage.generated, usage.total].map { $0?.formatted() ?? "—" }
+                                    .joined(separator: " / "))
                             if let cached = usage.cachedInput {
                                 LabeledContent(appCopy.text("Cache read tokens"), value: cached.formatted())
                             }

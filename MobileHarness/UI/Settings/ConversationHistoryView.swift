@@ -740,6 +740,13 @@ import Foundation
                         Text(appCopy.format("Input ID: %@", turn.ownerInputID ?? "")).font(.caption).textSelection(
                             .enabled)
                         Text(appCopy.format("Model: %@", turn.model))
+                        if let modelID = turn.modelID, modelID != turn.model {
+                            Text(appCopy.format("Model ID: %@", modelID)).font(.caption).textSelection(.enabled)
+                        }
+                        if let providerModelID = turn.providerModelID, providerModelID != turn.modelID {
+                            Text(appCopy.format("Provider model: %@", providerModelID)).font(.caption).textSelection(
+                                .enabled)
+                        }
                         Text(turn.firstTokenReport(appCopy))
                         Text(
                             appCopy.format(

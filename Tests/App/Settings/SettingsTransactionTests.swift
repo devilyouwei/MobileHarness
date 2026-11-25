@@ -41,7 +41,6 @@ func settingsFacadeCommitsOnlyAcknowledgedSaveAndReconcilesFailure(fails: Bool) 
         try await workflow.save(updated)
     }
     let confirmed = fails ? "old" : "new"
-    #expect(workflow.modelName == confirmed)
     #expect(try await workflow.restore().model == confirmed)
     #expect(fixture.restores == (fails ? 2 : 1))
 }

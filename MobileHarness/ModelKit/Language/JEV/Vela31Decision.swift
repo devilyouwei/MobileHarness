@@ -1,5 +1,5 @@
 import Foundation
-import ModelKit
+@_spi(InferenceAdapter) import ModelKit
 import ModelKitCoreAI
 import Tokenizers
 
@@ -39,8 +39,11 @@ public actor Vela31Decision: DecisionCapability {
                     control.cancel()
                 }, waitForCompletion: { await control.waitForCompletion() })
             let resource = resource
+            let metadata = pair.session.metadataRecorder
             let task = Task {
                 do {
+                    try Task.checkCancellation()
+                    metadata.start()
                     let result = try await lease.model.choice(request)
                     try Task.checkCancellation()
                     try pair.emitter.yield(result)
