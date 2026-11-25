@@ -49,6 +49,8 @@ Cloud serialization preserves every original message boundary. For no-tool text,
 
 非法请求在构造时抛出 invalidRequest，不补造配对或截断输入。保留调用者的消息边界和顺序；当前函数定义与历史调用名称集合独立。
 
+ChatToolDefinition 可为声明为 string 的参数指定 `integerStringParameters`。支持该选项的适配器可接受 JSON 整数并输出十进制字符串，ChatToolCall 的参数仍是字符串对象。未声明的兼容字段在构造时拒绝。实际适配见 [Responses](OpenAI/README.md)。
+
 ChatTokenUsage 可选 cachedInput/cacheWriteInput，校验非负及不超过输入；缺失保持 nil。
 
 ## 分类异常诊断

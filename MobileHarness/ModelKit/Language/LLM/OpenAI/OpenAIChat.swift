@@ -85,8 +85,12 @@ public actor OpenAIChat: ChatCapability {
                     throw OpenAIChatError.responseFailure(.init(.unexpectedContentType, stage: .http))
                 }
                 transportStage = .stream
+                let integerStringParameters = Dictionary(
+                    uniqueKeysWithValues: request.tools.filter { !$0.integerStringParameters.isEmpty }
+                        .map { ($0.name, $0.integerStringParameters) })
                 var decoder = ChatEventDecoder(
-                    toolNames: OpenAIChatConfiguration.toolNames(request.tools), timing: request.timing)
+                    toolNames: OpenAIChatConfiguration.toolNames(request.tools),
+                    integerStringParameters: integerStringParameters, timing: request.timing)
                 var finish: ChatEvent?
                 for try await byte in bytes {
                     try Task.checkCancellation()

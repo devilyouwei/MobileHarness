@@ -46,6 +46,17 @@ private func writerDefinitions() throws -> [ChatToolDefinition] {
             ]))
     }
 }
+
+@Test(.actionCatalog) func writerOptsInOnlyWorkspaceReadRangeParameters() throws {
+    let editing = WriterControlDomain.editing
+    let definitions = try editing.definitions(editing.registry())
+    let compatible = definitions.filter { !$0.integerStringParameters.isEmpty }
+    let read = try #require(compatible.first)
+    #expect(compatible.count == 1)
+    #expect(read.name == "read")
+    #expect(read.integerStringParameters == ["line", "offset", "limit"])
+}
+
 @Test(.actionCatalog, arguments: [false, true]) func writerSeparatesNativeControlAndUnescapedContentStream(large: Bool)
     async throws
 {

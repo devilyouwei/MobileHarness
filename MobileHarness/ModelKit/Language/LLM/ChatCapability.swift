@@ -136,16 +136,23 @@ public struct ChatMessage: Codable, Equatable, Sendable {
 public struct ChatToolDefinition: Sendable {
     public let name: String
     public let declaration: Data
-    public init(declaration: Data) throws {
+    /// String parameters for which a provider may accept a JSON integer and emit its decimal string.
+    public let integerStringParameters: Set<String>
+    public init(declaration: Data, integerStringParameters: Set<String> = []) throws {
         guard declaration.count <= 65536,
             let object = try JSONSerialization.jsonObject(with: declaration) as? [String: Any],
             object["type"] as? String == "function",
             let function = object["function"] as? [String: Any],
             let name = function["name"] as? String, !name.isEmpty, name.utf8.count <= 64,
-            function["parameters"] is [String: Any]
+            let parameters = function["parameters"] as? [String: Any]
         else { throw CapabilityError.invalidRequest("Invalid tool declaration") }
+        let properties = parameters["properties"] as? [String: [String: Any]]
+        guard integerStringParameters.allSatisfy({ properties?[$0]?["type"] as? String == "string" }) else {
+            throw CapabilityError.invalidRequest("Integer compatibility requires declared string parameters")
+        }
         self.name = name
         self.declaration = declaration
+        self.integerStringParameters = integerStringParameters
     }
 }
 

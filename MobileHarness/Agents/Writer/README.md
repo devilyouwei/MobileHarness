@@ -75,6 +75,8 @@ flowchart TD
 
 ## 编辑工作流与格式 Instruction
 
+工作区读取通过 [WriterTools](Workflow/README.md) 声明范围参数兼容。Responses 将指定的整数参数转换为宿主工具所需的字符串，再由 Actions 校验实际范围。
+
 Writer 的 workspace 工具声明参数约束，文件编辑 Skill 教学操作顺序和失败修复。控制模型按需列出/查询文件、按行读取相关片段，用 contextReferences 将实际关联内容送入独立内容请求；新建/大段源码不进入工具参数，replace仅携带短精确旧/新文本。后续用户修订同时进入控制历史和内容请求目标。HTML/CSS/JS、Markdown、JSON、SVG 和纯文本的生成规则由 Writer 按目标扩展名选择。
 
 工作区内的文件操作使用独立控制提示和工具目录。进入后携带原始目标、已接受补充、绑定的工作区身份与入口呈现状态。已有文件先读再改。新目录先创建声明的入口文件。最后一次修改后使用 render 检查再 finish 发布。内容请求使用 ContentPrompts.json 的输出规则、格式字段和编辑上下文模板。

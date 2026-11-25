@@ -1,5 +1,7 @@
 # 技术需求
 
+- [Writer 文件读取参数兼容](Writer-Read-Integer-Arguments.md)：处理模型将文件读取范围输出为 JSON 整数后反复重试的问题。
+
 - [Action 多语言说明内聚](Action-Localization.md)：默认文案留在 `@Action`，翻译放入 `Actions/Resources` 镜像目录并由 Actions 暴露本地化接口，替换 Agents 的 FunctionCopy。
 - [Actions 目录整理](Actions-Directory-Cleanup.md)：模块根只保留入口与契约，装配文件归入 Composition，平铺域按能力分子目录，合并微型文件，补齐内部 Action 英文说明与 Skill 绑定翻译覆盖测试。
 - [资源跟随所属模块](Module-Owned-Resources.md)：Actions 翻译与 Agent/Skill 资源搬入各自模块的 `Resources/` 子目录，由各自 target 的 `Bundle.module` 读取，根 `Resources/` 只留 App 资源。

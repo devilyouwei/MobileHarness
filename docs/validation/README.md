@@ -48,6 +48,7 @@
 | [原生音视频故障诊断](Native-Media-Failure-Diagnosis.md) | 保存照片后媒体服务重置的现场证据、错误保真回归及真机调查限制。 |
 | [Writer 执行与续写生命周期](Writer-Execution-Lifetime.md) | 工具接纳后的续写权限、取消/清理并发回归、Simulator 构建与历史失败记录。 |
 | [Writer 消息倒序与自动分页](Writer-Records-Descending-Scroll.md) | 两张列表的排序、末页、滚动加载与导航返回。 |
+| [Writer 文件读取参数兼容](Writer-Read-Integer-Arguments.md) | 六条真机失败记录、Responses 参数回归和构建结果。 |
 | [Writer 按 ID 直接打开和进入](Writer-Direct-Workspace-Access.md) | 真机调用调查、直接选择与无效 ID 回归。 |
 | [Writer 精选事件播报](Writer-Selective-Assistant-Feedback.md) | 替身合成、授权播放、去重、后续模型上下文和设备验收边界。 |
 | [Writer 工具与工作区身份](Writer-Workspace-Tools-and-Identity.md) | 工作区别名、参数恢复、SQLite 重置和模型首个工具验证。 |

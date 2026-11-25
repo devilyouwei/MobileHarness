@@ -75,7 +75,9 @@ enum WriterControlDomain: String {
     func definitions(_ registry: CapabilityRegistry) throws -> [ChatToolDefinition] {
         try registry.tools.map { tool in
             guard let definition = tool.definition else { throw WriterFailure.invalidOutput }
-            return try ChatToolDefinition(declaration: JSONEncoder().encode(definition))
+            return try ChatToolDefinition(
+                declaration: JSONEncoder().encode(definition),
+                integerStringParameters: tool.path == "Artifacts.Workspace.read" ? ["line", "offset", "limit"] : [])
         }
     }
 

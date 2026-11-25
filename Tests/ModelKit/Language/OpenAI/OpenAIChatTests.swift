@@ -1350,6 +1350,60 @@ func nativeArgumentShapeAndIncrementMismatchHaveDifferentDiagnostics(arguments: 
     expectResponseFailure(.toolArgumentsMismatch) { try parse(prefix + end) }
 }
 
+@Test func workspaceReadAllowsOptedInIntegerArguments() throws {
+    let line = #"{"path":"fox.html","line":"145","limit":65}"#
+    let offset = #"{"path":"fox.html","offset":7600,"limit":4500}"#
+    let strings = #"{"path":"fox.html","line":"145","limit":"65"}"#
+    func parse(_ arguments: String, terminalArguments: String? = nil) throws -> [ChatEvent] {
+        let added: [String: Any] = ["type": "function_call", "id": "item-1", "call_id": "call-1", "name": "read_8"]
+        var item = added
+        item["arguments"] = arguments
+        var terminal = item
+        terminal["arguments"] = terminalArguments ?? arguments
+        let wire =
+            try eventWire(["type": "response.output_item.added", "output_index": 0, "item": added])
+            + eventWire([
+                "type": "response.function_call_arguments.delta", "output_index": 0,
+                "item_id": "item-1", "delta": arguments,
+            ])
+            + eventWire(["type": "response.output_item.done", "output_index": 0, "item": item])
+            + eventWire(["type": "response.completed", "response": ["status": "completed", "output": [terminal]]])
+        var decoder = ChatEventDecoder(
+            toolNames: ["read_8": "read"], integerStringParameters: ["read": ["line", "offset", "limit"]])
+        var events: [ChatEvent] = []
+        for byte in wire.utf8 { events += try decoder.consume(byte) }
+        return events
+    }
+
+    for (arguments, expected) in [
+        (line, ["path": "fox.html", "line": "145", "limit": "65"]),
+        (offset, ["path": "fox.html", "offset": "7600", "limit": "4500"]),
+        (#"{"path":"fox.html","line":150}"#, ["path": "fox.html", "line": "150"]),
+    ] {
+        let events = try parse(arguments)
+        guard case .toolCall(let call) = events.first else {
+            Issue.record("Expected a completed read call")
+            continue
+        }
+        #expect(call.id == "call-1" && call.name == "read")
+        #expect(try JSONDecoder().decode([String: String].self, from: Data(call.argumentsJSON.utf8)) == expected)
+        #expect(events.dropFirst().elementsEqual([.finished(.toolCalls)]))
+    }
+    #expect(
+        try parse(strings) == [
+            .toolCall(.init(id: "call-1", name: "read", argumentsJSON: strings)), .finished(.toolCalls),
+        ])
+    expectResponseFailure(.toolSequence) {
+        try parse(line, terminalArguments: #"{"limit":"65","line":"145","path":"fox.html"}"#)
+    }
+    for arguments in [
+        #"{"path":12}"#, #"{"limit":true}"#, #"{"limit":65.5}"#, #"{"limit":65.000000000000001}"#,
+        #"{"limit":9223372036854775808}"#, #"{"limit":null}"#, #"{"limit":[65]}"#,
+    ] {
+        expectResponseFailure(.invalidToolArguments) { try parse(arguments) }
+    }
+}
+
 @Test func providerAcceptsHTTPAndHTTPSIPAddressesWithoutChangingRequestScheme() throws {
     for endpoint in ["http://192.168.1.20:11434/v1", "https://192.168.1.20:8443/v1", "http://[::1]:8080/v1"] {
         let configuration = try OpenAIChatConfiguration(

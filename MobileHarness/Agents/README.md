@@ -111,6 +111,8 @@ Writer is the current public creative executor. It owns its control/content mode
 
 Writer's admitted edits continue through an injected ArtifactStreaming port rather than per-chunk Gateway calls. Cancel/pause/stop revoke that continuation and join model, preview and Actions release before finishing or resuming the run. Gateway tool completion only acknowledges its finite operation; it does not end the creative task. The detailed contract belongs to [Writer](Writer/README.md) and its direct execution counterpart [Artifacts](../Actions/Artifacts/README.md#执行与续写生命周期).
 
+Writer declares its [workspace read compatibility](Writer/Workflow/README.md) through the neutral Chat tool definition. The Responses adapter handles wire conversion before tool dispatch.
+
 ## Lifetime, inputs and failures
 
 <a id="agent-container"></a>

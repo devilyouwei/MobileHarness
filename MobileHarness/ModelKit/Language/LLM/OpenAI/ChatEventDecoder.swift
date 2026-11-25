@@ -5,9 +5,14 @@ import ModelKit
 /// Incremental SSE framing. Only the current frame is retained; completed frames release their bytes.
 struct ChatEventDecoder {
     let toolNames: [String: String]
+    private let integerStringParameters: [String: Set<String>]
     private let timing: ChatTiming?
-    init(toolNames: [String: String] = [:], timing: ChatTiming? = nil) {
+    init(
+        toolNames: [String: String] = [:], integerStringParameters: [String: Set<String>] = [:],
+        timing: ChatTiming? = nil
+    ) {
         self.toolNames = toolNames
+        self.integerStringParameters = integerStringParameters
         self.timing = timing
     }
     private struct Pending {
@@ -166,7 +171,9 @@ struct ChatEventDecoder {
             for (index, item) in output.enumerated() {
                 if item["type"] as? String == "function_call" {
                     let call = try functionCall(item, index: index)
-                    guard calls[index]?.completed == call, ids.insert(call.id).inserted else {
+                    guard calls[index]?.arguments == (item["arguments"] as? String), calls[index]?.completed == call,
+                        ids.insert(call.id).inserted
+                    else {
                         throw failure(
                             .toolSequence, stage: .completion, field: "output", index: index,
                             name: item["name"] as? String)
@@ -306,12 +313,36 @@ struct ChatEventDecoder {
         guard let name = toolNames[wireName] else {
             throw failure(.undeclaredTool, stage: .completion, field: "name", index: index, name: wireName)
         }
-        guard let arguments = item["arguments"] as? String,
-            (try? JSONDecoder().decode([String: String].self, from: Data(arguments.utf8))) != nil
+        guard let raw = item["arguments"] as? String,
+            let arguments = stringArguments(raw, acceptingIntegers: integerStringParameters[name] ?? [])
         else {
             throw failure(.invalidToolArguments, stage: .toolEnd, field: "arguments", index: index, name: wireName)
         }
         return ChatToolCall(id: id, name: name, argumentsJSON: arguments)
+    }
+
+    private func stringArguments(_ raw: String, acceptingIntegers allowed: Set<String>) -> String? {
+        let data = Data(raw.utf8)
+        if (try? JSONDecoder().decode([String: String].self, from: data)) != nil { return raw }
+        guard !allowed.isEmpty, let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        var strings: [String: String] = [:]
+        for (key, value) in fields {
+            if let string = value as? String {
+                strings[key] = string
+                continue
+            }
+            guard allowed.contains(key), let number = value as? NSNumber,
+                CFGetTypeID(number) != CFBooleanGetTypeID(),
+                !["f", "d"].contains(String(cString: number.objCType)),
+                let integer = Int(number.stringValue)
+            else { return nil }
+            strings[key] = String(integer)
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return (try? encoder.encode(strings)).map { String(decoding: $0, as: UTF8.self) }
     }
 
     private func validateNonCallItem(_ item: [String: Any]) throws {
