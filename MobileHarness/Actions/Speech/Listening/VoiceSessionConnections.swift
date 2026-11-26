@@ -8,6 +8,7 @@ import FunctionContracts
         public let endpoints: ActionEndpoints
         public let interactionSessionID: String
         public let cancelReply: @MainActor () async throws -> Void
+        public let preparePlayback: @Sendable (String) async throws -> Void
         public let playbackChanged: @Sendable (String, Bool, ContinuousClock.Instant) async -> Void
         public let playbackSpectrum: @MainActor ([Float], Bool) -> Void
         public let adaptFailure: @Sendable (any Error) -> any Error
@@ -15,6 +16,7 @@ import FunctionContracts
             endpoints: ActionEndpoints, interactionSessionID: String,
             cancelReply: @escaping @MainActor () async throws -> Void,
             adaptFailure: @escaping @Sendable (any Error) -> any Error,
+            preparePlayback: @escaping @Sendable (String) async throws -> Void = { _ in },
             playbackChanged: @escaping @Sendable (String, Bool, ContinuousClock.Instant) async -> Void = { _, _, _ in },
             playbackSpectrum: @escaping @MainActor ([Float], Bool) -> Void = { _, _ in }
         ) {
@@ -22,6 +24,7 @@ import FunctionContracts
             self.interactionSessionID = interactionSessionID
             self.cancelReply = cancelReply
             self.adaptFailure = adaptFailure
+            self.preparePlayback = preparePlayback
             self.playbackChanged = playbackChanged
             self.playbackSpectrum = playbackSpectrum
         }

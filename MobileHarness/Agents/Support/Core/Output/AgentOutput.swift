@@ -23,6 +23,7 @@ public enum AgentOutput: Equatable, Sendable {
     case toolCall(ToolCall)
     case control(String)
     case scheduling(SchedulingDirective)
+    case roundStarted(String)
     case roundFinished(String)
     public var kind: OutputKind {
         switch self {
@@ -32,19 +33,34 @@ public enum AgentOutput: Equatable, Sendable {
         case .toolCall: .toolCall
         case .control: .control
         case .scheduling: .scheduling
-        case .roundFinished: .control
+        case .roundStarted, .roundFinished: .control
         }
     }
 }
 
-/// Runtime acknowledgment after ordered admission, Tool joins and Action tree closure.
-public struct GenerationRoundResult: Codable, Equatable, Sendable {
-    public let roundID: String
+public struct ExecutionEnd: Codable, Equatable, Sendable {
+    public enum Reason: String, Codable, Sendable { case completed, interrupted, cancelled, failed }
+    public let id: String
+    public let reason: Reason
+    public let cleanupConfirmed: Bool
     public let failure: String?
-    public init(roundID: String, failure: String? = nil) {
-        self.roundID = roundID
+    public init(id: String, reason: Reason = .completed, cleanupConfirmed: Bool = true, failure: String? = nil) {
+        self.id = id
+        self.reason = reason
+        self.cleanupConfirmed = cleanupConfirmed
         self.failure = failure.map { String($0.prefix(512)) }
     }
+}
+
+/// Addressed runtime feedback. An Action, a model round and a session interruption have distinct identities.
+public enum ExecutionFeedback: Codable, Equatable, Sendable {
+    public static let contract = "action.execution.feedback.v1"
+    case actionStarted(roundID: String, callID: String)
+    case actionFinished(ActionResult)
+    case roundStarted(String)
+    case roundFinished(ExecutionEnd)
+    case interruptionStarted(String)
+    case interruptionFinished(ExecutionEnd)
 }
 
 public enum OutputKind: String, Codable, Sendable {

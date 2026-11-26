@@ -371,6 +371,7 @@ extension LiveRuntimeTests {
     #expect(
         Set(speech.publications.map(\.protocol)) == [
             "user.input.speech.v1", "perception.speech.activity.v1", "perception.audio.source.v1",
+            AssistantInterrupt.contract,
         ])
     #expect(
         Set(assistant.publications) == [
@@ -382,7 +383,7 @@ extension LiveRuntimeTests {
     #expect(speech.subscriptions.allSatisfy { $0.sources == ["assistant"] })
 
     #expect(assistant.requests.isEmpty)
-    #expect(Set(assistant.feedback) == ["action.result.v1", "agent.round.result.v1"])
+    #expect(Set(assistant.feedback) == [ExecutionFeedback.contract])
     #expect(assistant.subscriptions.contains { $0.channel == "agent.interruption" })
 }
 

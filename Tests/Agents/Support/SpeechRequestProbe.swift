@@ -9,6 +9,7 @@ actor SpeechRequestProbe: AssistantSpeechProducing {
     var requests: [String: String] = [:]
     private(set) var cancelledInputs: Set<String> = []
     var playing: Bool?
+    private var playback = SpeechPlaybackSnapshot()
     var beforePrepare: (@Sendable () async throws -> Void)?
     var prepared: (@Sendable (String, String) async -> Void)?
     init(
@@ -30,6 +31,8 @@ actor SpeechRequestProbe: AssistantSpeechProducing {
     func stop() {}
     func isPlaying(sessionID: String) -> Bool? { playing }
     func setPlaying(_ value: Bool) { playing = value }
+    func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot { playback }
+    func setPlaybackSnapshot(_ value: SpeechPlaybackSnapshot) { playback = value }
     func text(_ id: String) -> String? { requests[id] }
     func restored(_ output: AgentOutput) -> AgentOutput {
         guard case .actionCall(let call) = output, let id = call.parameters["audioID"], let text = requests[id] else {
@@ -43,8 +46,7 @@ private protocol FixtureSpeechBindable: Sendable {
     func bindSpeechOutput(_ value: any AssistantSpeechProducing) async throws
 }
 extension AssistantChatWorker: FixtureSpeechBindable {}
-func bindSpeechRequests(_ agent: any Agent) async throws -> SpeechRequestProbe {
-    let probe = SpeechRequestProbe()
+func bindSpeechRequests(_ agent: any Agent, probe: SpeechRequestProbe = .init()) async throws -> SpeechRequestProbe {
     guard let target = agent as? any FixtureSpeechBindable else { throw HarnessError.unsupportedInput }
     try await target.bindSpeechOutput(probe)
     try await bindFixtureCommunications(
@@ -90,16 +92,19 @@ struct FixtureGenerationOutputs: AsyncSequence {
                         let owner = ExecutionOwner(
                             agent: envelope.source, incarnation: UUID().uuidString,
                             sessionID: envelope.sessionID)
-                        payload = .actionResult(
-                            .init(
-                                executionID: UUID().uuidString, owner: owner, path: call.actionPath,
-                                causality: SignalCausality(envelope: envelope),
-                                status: failure == nil ? .succeeded : .failed,
-                                effect: failure == nil ? .contractCompleted : .unknown,
-                                completion: completion, failure: failure,
-                                callID: envelope.callID, roundID: roundID))
+                        payload = .executionFeedback(
+                            .actionFinished(
+                                .init(
+                                    executionID: UUID().uuidString, owner: owner, path: call.actionPath,
+                                    causality: SignalCausality(envelope: envelope),
+                                    status: failure == nil ? .succeeded : .failed,
+                                    effect: failure == nil ? .contractCompleted : .unknown,
+                                    completion: completion, failure: failure,
+                                    callID: envelope.callID, roundID: roundID)))
+                    case .roundStarted:
+                        payload = .executionFeedback(.roundStarted(roundID))
                     case .roundFinished:
-                        payload = .roundResult(.init(roundID: roundID))
+                        payload = .executionFeedback(.roundFinished(.init(id: roundID)))
                     default: payload = nil
                     }
                     if let payload {
@@ -117,11 +122,36 @@ struct FixtureGenerationOutputs: AsyncSequence {
                             guard case .actionCall = envelope.output else { throw CommunicationError.unauthorized }
                         }
                     }
-                    if case .roundFinished = envelope.output { continue }
+                    switch envelope.output {
+                    case .roundStarted, .roundFinished: continue
+                    default: break
+                    }
                 }
                 return envelope
             }
             return nil
+        }
+    }
+}
+
+extension AssistantChatWorker {
+    func holdDispatchForFixture() { executionCancellationBarrier = true }
+
+    func bindFixtureInputInterruption(_ work: @escaping @Sendable (String) async throws -> Void) {
+        bindInputInterruption { [weak self] session, id in
+            guard let self else { throw CommunicationError.unavailableTarget }
+            func receipt(_ feedback: ExecutionFeedback) -> AgentInput {
+                let payload = InputPayload.executionFeedback(feedback)
+                return AgentInput(
+                    id: UUID().uuidString, sessionID: session, payload: payload,
+                    metadata: InputMetadata(payload: payload, source: "runtime", origin: .runtime, rootID: id))
+            }
+            try await self.receive(receipt(.interruptionStarted(id)))
+            try await work(session)
+            try await self.interruptionGenerationJoined(id)
+            if await self.activeInterruption?.id == id {
+                try await self.receive(receipt(.interruptionFinished(.init(id: id, reason: .interrupted))))
+            }
         }
     }
 }

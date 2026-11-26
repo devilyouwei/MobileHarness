@@ -76,6 +76,8 @@ flowchart TD
  ModelKitNemotron[ModelKitNemotron]
  ModelKitMossNano[ModelKitMossNano]
  ModelKitKokoro[ModelKitKokoro]
+ ModelKitZipformer[ModelKitZipformer]
+ ModelKitSmartTurn[ModelKitSmartTurn]
  ModelKitSilero[ModelKitSilero]
  ModelKitEnergy[ModelKitEnergy]
  ModelKitYOLOPose[ModelKitYOLOPose]
@@ -89,6 +91,9 @@ flowchart TD
  ModelKitDefaults --> ModelKitAppleSpeech
  ModelKitDefaults --> ModelKitNemotron
  ModelKitDefaults --> ModelKitMossNano
+ ModelKitDefaults --> ModelKitKokoro
+ ModelKitDefaults --> ModelKitZipformer
+ ModelKitDefaults --> ModelKitSmartTurn
  ModelKitDefaults --> ModelKitSilero
  ModelKitDefaults --> ModelKitEnergy
  ModelKitDefaults --> ModelKitYOLOPose
@@ -103,6 +108,10 @@ flowchart TD
  ModelKitNemotron --> ModelKit
  ModelKitMossNano --> ModelKit
  ModelKitKokoro --> ModelKit
+ ModelKitZipformer --> ModelKit
+ ModelKitZipformer --> ModelKitCoreML
+ ModelKitSmartTurn --> ModelKit
+ ModelKitSmartTurn --> ModelKitCoreML
  ModelKitSilero --> ModelKit
  ModelKitSilero --> ModelKitCoreML
  ModelKitEnergy --> ModelKit
@@ -128,12 +137,12 @@ The existing speech selector accepts a host-provided locale reader for automatic
 | --- | --- |
 | Chat | Gemma 4 E2B QAT on supported hardware, Apple system chat when available, or explicitly configured Responses cloud |
 | Recognition | Enabled, installed and available Nemotron; otherwise Apple SpeechAnalyzer |
-| Synthesis | Enabled, installed and available MOSS Nano; otherwise Apple PCM TTS |
-| Voice activity | Installed and available Silero; otherwise Energy, independent of ASR preference |
+| Synthesis | Selected, installed and available MOSS Nano or Kokoro 82M, otherwise Apple PCM TTS |
+| Voice activity | Energy by default, or the explicitly selected installed Silero |
 | Pose | YOLO26n-Pose |
 | Decision | D3 Edge, Vela 3 Fast, Vela 3.1 Fast and Laya Multilingual when the selected artifact and platform are available. Agents owns the exclusive local or cloud selection and enqueues with an error notice on failure; ModelKit never switches providers. |
 
-Custom ASR/TTS switches default off and are independent. Kokoro is an explicitly provisioned optional provider without Defaults registration. Selection occurs before admission; failure during active inference never switches provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
+Each speech capability has an independent selection by model ID. ASR/TTS default to Apple; noise suppression and keyword spotting default to off. Kokoro exposes its supported English and Mandarin voice IDs to the settings layer. The synthesis facade snapshots the provider and voice before admission. Failure during active inference propagates through that provider. Local inference never initiates artifact downloads. The simulator local-chat binding reports unavailable; the Gemma package's native framework requirements still apply at compilation.
 
 ## Lifecycle, streams and failures
 
@@ -228,7 +237,7 @@ localModelPreparationStep accepts a caller-owned asynchronous local-model select
 
 ## Speech enhancement interface
 
-`speech.enhancement.enhance(_:)` exposes [bounded utterance noise suppression](Speech/Enhancement/README.md). DeepFilterNet3 is independently registered and provisioned. App optionally preloads installed artifacts; SpeechPerception uses the bounded window adapter when its denoising preference is enabled. Speech consumers own capture/resampling/segmentation; ModelKit owns DSP and model resources.
+`speech.enhancement.enhance(_:)` exposes [bounded utterance noise suppression](Speech/Enhancement/README.md). DeepFilterNet3 is independently registered and provisioned. App prepares the selected enhancement resource; SpeechPerception uses the bounded window adapter when its denoising preference is enabled. Speech consumers own capture/resampling/segmentation; ModelKit owns DSP and model resources.
 
 Decision exposes independent choice, noul and multi-question decide interfaces through ModelDecisionContainer; [JEV](Language/JEV/README.md) owns their types and execution semantics. Consumers choose the interface; the SDK does not interpret interruption or queue state.
 
@@ -239,3 +248,16 @@ Artifact revision observations use the SDK-owned [StateSignalListener](Support/C
 The language port projects registered Chat and Decision candidates as `LocalModelDescriptor`. Public IDs are stable across registrations and distinct from resource IDs. Descriptors combine registration capabilities, bundled artifact names and current install/system availability. The typed local binding uses the same registry as the directory. Cloud discovery and actual response metadata stay provider-owned.
 
 `InferenceSession.metadata` returns facts for the individual invocation while the event stream delivers output. ModelKit binds identity before dispatch and captures provider timing, usage and finish evidence where supplied. The local queue and Chat Decision adapter share the provider’s request recorder. See [management](Support/Management/README.md), [session contract](Support/Core/README.md) and [Chat](Language/LLM/README.md).
+
+## Foreground speech detectors
+
+`speech.keywordSpotting` supplies the [streaming keyword capability](Speech/KWS/README.md).
+The root owns a foreground task that warms the installed artifact on entry and
+when installation becomes visible. The task joins during suspension and shutdown.
+Opening a session leases a ready resource without initiating a load. The same foreground task prepares installed Smart Turn. `speech.endpointConfirmation` scores the current turn tail only with the selected, ready [endpoint provider](Speech/VAD/README.md#end-of-turn-confirmation).
+
+## Managed model resources
+
+`ManagedModelResource` binds a resolved ID and display name to `status`, `load` and `unload(cancelActive:)`. ModelContainer resolves selected speech, Assistant and cloud client handles without exposing the manager. Load includes provider initialization. The handle checks required local artifacts and reports missing installations to its caller. Cancelling unload closes resource admission, requests cancellation of in-flight work, joins lease release and leaves the resource reloadable.
+
+The App turns off the standalone installed-detector observer and prepares selected detectors alongside the rest of its configured models. ModelContainer hosts that enable the standalone observer can prepare installed detectors on foreground entry and installation.

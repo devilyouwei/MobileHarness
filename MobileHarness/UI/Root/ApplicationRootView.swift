@@ -65,19 +65,19 @@
                 }
                 .overlay(alignment: .top) {
                     if let notice = container?.homeNotices.transientToast {
-                        Label(
-                            notice.text,
-                            systemImage: notice.tone == .error ? "exclamationmark.triangle.fill" : "info.circle.fill"
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                        .padding(.horizontal, 24)
-                        .padding(.top, 60)
-                        .accessibilityIdentifier("application.transientToast")
-                        .allowsHitTesting(false)
+                        toast("application.transientToast") {
+                            Label(
+                                notice.text,
+                                systemImage: notice.tone == .error
+                                    ? "exclamationmark.triangle.fill" : "info.circle.fill")
+                        }
+                    } else if assembly.navigation.path.isEmpty, case .preparing(let model) = assembly.homePreparation {
+                        toast("application.modelLoadingToast") {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                Text(appCopy.format("Loading %@…", appCopy.text(model)))
+                            }
+                        }
                     }
                 }
                 .environment(\.navigationContext, assembly.navigation)
@@ -206,14 +206,12 @@
                         Text(appCopy.text("Records are temporarily unavailable"))
                     }
                 }
-            case .recognition, .synthesis, .vision:
+            case .speech, .recognition, .synthesis, .vision:
                 ModelResourcesView(
                     state: assembly.modelResources, controls: assembly.modelResourceControls,
-                    group: destination == .recognition
-                        ? .recognition
-                        : (destination == .synthesis ? .synthesis : .vision),
-                    audioDetection: destination == .recognition ? container?.audioDetectionState : nil,
-                    audioDetectionRequests: destination == .recognition ? container?.audioDetectionRequests : nil)
+                    group: destination == .vision ? .vision : .recognition,
+                    audioDetection: destination == .vision ? nil : container?.audioDetectionState,
+                    audioDetectionRequests: destination == .vision ? nil : container?.audioDetectionRequests)
             }
         }
         private func saveSettings(_ change: BrainSettingsChange) async -> Bool {
@@ -232,6 +230,19 @@
                 if arguments.contains("-gemma4-validation") { return true }
             #endif
             return arguments.contains("-moss-benchmark")
+        }
+
+        private func toast<Content: View>(_ id: String, @ViewBuilder content: () -> Content) -> some View {
+            content()
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 24)
+                .padding(.top, 60)
+                .accessibilityIdentifier(id)
+                .allowsHitTesting(false)
         }
 
         private var startupContent: some View {

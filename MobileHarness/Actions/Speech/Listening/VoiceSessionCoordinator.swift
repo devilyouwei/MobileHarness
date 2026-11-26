@@ -173,7 +173,8 @@ public enum VoiceReplyCancellation {
             set { projection.conversationPresentation = newValue }
         }
         private func updatePhase() { state.present(.voicePhase(playbackActive ? .speaking : presentationPhase)) }
-        private var changingSettings = false
+        private var settingsChanges = 0
+        private var changingSettings: Bool { settingsChanges > 0 }
         public var beforeVoiceStart: @MainActor () async -> Void = {}
         private var startupTask: Task<Void, Error>?
         private var startupID: String?
@@ -511,7 +512,7 @@ public enum VoiceReplyCancellation {
         }
 
         public func beginSettingsChange() async {
-            changingSettings = true
+            settingsChanges += 1
             stopVoice()
             await cleanupTask?.value
             await replyCancellationTask?.value
@@ -524,7 +525,9 @@ public enum VoiceReplyCancellation {
             await replyCancellationTask?.value
         }
 
-        public func endSettingsChange() { changingSettings = false }
+        public func endSettingsChange() {
+            settingsChanges = max(0, settingsChanges - 1)
+        }
 
         public func prepareListening(pressed: Bool, invocation: any FunctionInput) async throws {
             try Task.checkCancellation()
@@ -907,6 +910,8 @@ public enum VoiceReplyCancellation {
         }
 
         private func play(_ stream: AudioStream, audioID: String, envelope: ActionExecutionContext) async throws {
+            try await runtime.preparePlayback(audioID)
+            var started = false
             try await nativeEffects.play(
                 stream, context: envelope,
                 validate: { [weak self] in
@@ -916,7 +921,8 @@ public enum VoiceReplyCancellation {
                 }, currentSession: { [weak self] in self?.accepts(session: envelope.sessionID) ?? false },
                 activeChanged: { [weak self] active, time in
                     guard let self else { return }
-                    self.playbackActive = active
+                    if active { started = true }
+                    if started { self.playbackActive = active }
                     await self.runtime.playbackChanged(audioID, active, time)
                 })
         }

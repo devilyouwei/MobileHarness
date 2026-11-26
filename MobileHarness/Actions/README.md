@@ -168,6 +168,8 @@ Speech detection preferences are persisted by System/ModelResources and exposed 
 
 Model resource preferences include independent speech denoising enablement. Actions owns installed-resource validation, persistence and settings transactions, and exposes a read-only preference to Agents through App. PCM remains inside SpeechPerception and ModelKit.
 
-Speech 的播放事实回调携带 audioID、active 和原生单调时刻，经 ActionsBusinessBindings 与宿主装配转交角色；Actions 负责配对开始/结束及清理加入，语音识别的动态起声门槛由 Agents 拥有。
+Speech 经 ActionsBusinessBindings 在调度 PCM 前向宿主登记 audioID，再回报播放状态和原生单调时刻。Actions 等待原生结束并纳入执行清理回报。Agents 使用实际播放区间调整语音识别起声门槛，并用独立的轮次与打断范围终态管理旧执行。
+
+The execution Shell exposes separate start and terminal facts for feedback-enabled calls. The terminal retains the result, effect and failure evidence. Session cancellation closes matching admissions, joins all selected work and reports whether native cleanup was confirmed. Gateway and Agents own model-round and interruption-scope feedback. See [execution feedback](Support/Shell/README.md#results-and-feedback).
 
 Agent–Action feedback retains [ActionInvocationSnapshot](Support/Contracts/README.md): Agents captures the function/arguments before Gateway dispatch, Storage archives large snapshots, and Gateway carries the value through success/failure. Actions continues to own business execution and real completion. Camera and NexArm external facts use producer-owned media/state listeners injected through existing ports.

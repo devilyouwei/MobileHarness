@@ -37,3 +37,7 @@ Defaults independently selects installed available Silero or Energy. Energy's bi
 [`Energy/`](Energy/)
 
 [EnergyVoiceActivity.swift](Energy/EnergyVoiceActivity.swift) scores 16 kHz mono Float32 PCM with 512-sample RMS windows, an adaptive quiet-noise floor and separate start/end thresholds. Each call accepts at most 16,000 samples, produces at most 32 scores and retains fewer than 512 residual samples. Reset clears the floor and position, finish scores the remainder, and cancellation releases the operation lease. Scores indicate acoustic activity. The caller interprets speech and endpointing.
+
+## End-of-turn confirmation
+
+[SpeechEndpointCapability](SpeechEndpointCapability.swift) independently scores the likelihood that the current turn is complete. It accepts a tail of 16 kHz mono Float32 samples and returns a probability or nil when no provider is ready. [SmartTurn.swift](SmartTurn.swift) owns the Core ML adapter in the ModelKitSmartTurn target. It leases only a ready graph for one prediction, zero-pads the audio on the left to `[1, 128000]`, and checks the `[1, 1]` probability output. The graph owns waveform normalization and feature extraction and uses CPU + Neural Engine compute. The adapter releases its lease after success, cancellation, or failure. Endpoint policy and audio retention belong to the caller.

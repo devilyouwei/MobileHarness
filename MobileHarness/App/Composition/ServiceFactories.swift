@@ -140,25 +140,18 @@ import UI
         let home = uiContainer.home
         let homePreparation = ForegroundPreparation(
             steps: {
-                let steps =
-                    model.preparationSteps(for: agents.foregroundModelRequirements)
-                    + [
-                        model.localModelPreparationStep(id: "decision") {
-                            try await agents.foregroundDecisionModelID()
-                        },
-                        model.localModelPreparationStep(id: "enhancement") {
-                            try await model.artifacts.prepare()
-                            let installed = try await model.artifacts.artifactSnapshots().contains {
-                                $0.artifact.id == "deepfilternet3" && $0.phase == .installed
-                            }
-                            return installed ? "deepfilternet3" : nil
-                        },
-                    ]
-                return steps.map { step in
+                let selections = try await actionAssembly.homeModels(
+                    using: model, vision: agents.foregroundModelRequirements.contains(.vision))
+                return selections.map { resource in
                     ForegroundPreparation.Step(
-                        id: step.id, isReady: step.isReady,
+                        id: resource.identity.displayName ?? resource.identity.modelID,
+                        isReady: {
+                            let state = try await resource.status()
+                            return state == .ready || state == .unmanaged
+                        },
                         prepare: { report in
-                            try await step.prepare { await report($0) }
+                            report(true)
+                            try await resource.load()
                         })
                 }
             }, canPrepare: { !home.conversation.hasActiveInteraction },
@@ -168,7 +161,9 @@ import UI
                 case .inactive: value = .inactive
                 case .checking: value = .checking
                 case .preparing(let component): value = .preparing(component)
-                case .ready: value = .ready
+                case .ready:
+                    value = .ready
+                    actionAssembly.releaseModelConsumers(using: model)
                 case .deferred: value = .deferred
                 case .failed(let component, let message): value = .failed(component: component, message: message)
                 }
@@ -179,6 +174,14 @@ import UI
                 containerFailures.report(
                     module: "app", component: "homePreparation", operation: "verify." + component, error: error)
             })
+        actionAssembly.homePreparation = homePreparation
+        agents.beginModelConfigurationChange = { [weak actionAssembly] change in
+            guard let actionAssembly else { throw CancellationError() }
+            try await actionAssembly.beginModelChange(change, using: model)
+        }
+        agents.endModelConfigurationChange = { [weak actionAssembly] in
+            actionAssembly?.finishModelChange(using: model)
+        }
         return Services(
             registry: registry, containerFailures: containerFailures,
             uiContainer: uiContainer, platform: platform, storage: storage, model: model,

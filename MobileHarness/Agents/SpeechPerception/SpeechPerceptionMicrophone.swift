@@ -29,9 +29,10 @@ extension SpeechPerceptionAgent {
             guard nativeInputEpoch == epoch else { throw CancellationError() }
             _ = try admitsMicrophone(sessionID: sessionID)
             try await configureEnhancement()
+            let keywordDetection = await readKeywordDetection()
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }
-            bindMicrophoneGeneration(capture.generation)
+            bindMicrophoneGeneration(capture.generation, keywordDetection: keywordDetection)
             await publishSpeech(SpeechActivity(.captureStarted, generation: epoch.uuidString))
             try Task.checkCancellation()
             guard nativeInputEpoch == epoch else { throw CancellationError() }

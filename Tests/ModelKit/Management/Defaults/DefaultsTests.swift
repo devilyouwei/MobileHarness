@@ -2,7 +2,29 @@ import Foundation
 import ModelKit
 import ModelKitDefaults
 import ModelKitRuntime
+import Synchronization
 import Testing
+
+@available(macOS 27, iOS 27, *)
+@Test @MainActor func configuredManagementHandlesMatchLocaleAndEnabledSpeechModels() async throws {
+    let locale = Mutex("en-US")
+    let root = ModelContainer(
+        resources: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),
+        recognitionLocale: { locale.withLock { $0 } }, preparesInstalledSpeechDetectors: false)
+    try await root.start()
+    let english = try #require(try await root.configuredSpeechResource(.recognition))
+    #expect(english.identity.modelID == "apple-recognition")
+    locale.withLock { $0 = "zh-CN" }
+    let chinese = try #require(try await root.configuredSpeechResource(.recognition))
+    #expect(chinese.identity.modelID == "apple-recognition-zh-CN")
+    #expect(english.identity.modelID == "apple-recognition")
+    #expect(try await root.configuredSpeechResource(.endpointConfirmation) == nil)
+    try await root.speech.configureSpeechModels(["endpointConfirmation": "smart-turn"])
+    let smartTurn = try #require(try await root.configuredSpeechResource(.endpointConfirmation))
+    #expect(smartTurn.identity.displayName == "Smart Turn v3.2")
+    #expect(try await smartTurn.status() == .registered)
+    try await root.stop()
+}
 
 @available(macOS 27, iOS 27, *)
 @Test @MainActor func modelRootsAreIsolatedLazyAndTerminal() async throws {

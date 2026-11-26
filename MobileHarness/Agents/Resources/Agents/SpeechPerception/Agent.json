@@ -20,6 +20,10 @@
         "protocol": "perception.speech.activity.v1"
       },
       {
+        "channel": "agent.interruption",
+        "protocol": "agent.interruption.v1"
+      },
+      {
         "channel": "perception.audio.source",
         "protocol": "perception.audio.source.v1"
       }

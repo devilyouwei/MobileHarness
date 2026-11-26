@@ -60,7 +60,8 @@ extension AgentObservationAccess {
         self.input = input
         self.cognitive = configuration
         self.configuration = GatewayConfiguration(
-            engine: engine, deliverResult: { await input.deliverActionResult($0.agentValue) })
+            engine: engine, deliverResult: { await input.deliverActionResult($0.agentValue) },
+            deliverStart: { await input.deliverActionStart($0) })
     }
     public func bind(ports: GatewayCapabilities, observations: GatewayObservationAccess) -> AgentGatewayCapabilities {
         let output = OutputGateway(

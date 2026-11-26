@@ -38,15 +38,18 @@ import UI
     public let sessionID: String
     public let cancelReply: @MainActor () async throws -> Void
     public let detection: AudioDetectionConnections
+    public let preparePlayback: @Sendable (String) async throws -> Void
     public let playbackChanged: @Sendable (String, Bool, ContinuousClock.Instant) async -> Void
     public init(
         sessionID: String, cancelReply: @escaping @MainActor () async throws -> Void,
         detection: AudioDetectionConnections,
+        preparePlayback: @escaping @Sendable (String) async throws -> Void = { _ in },
         playbackChanged: @escaping @Sendable (String, Bool, ContinuousClock.Instant) async -> Void = { _, _, _ in }
     ) {
         self.sessionID = sessionID
         self.cancelReply = cancelReply
         self.detection = detection
+        self.preparePlayback = preparePlayback
         self.playbackChanged = playbackChanged
     }
 }
@@ -96,6 +99,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
     public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
     public let output: @Sendable (ActionOutputObservation) async -> Void
     public let speechEnhancementEnabled: @Sendable () async throws -> Bool
+    public let keywordDetection: @Sendable () async throws -> (enabled: Bool, threshold: Double)
     public let speechDetection: @Sendable () async throws -> (windows: Int, threshold: Double)
     public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
     public let makeVoice: @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
@@ -120,6 +124,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
         output: @escaping @Sendable (ActionOutputObservation) async -> Void,
         speechEnhancementEnabled: @escaping @Sendable () async throws -> Bool = { false },
+        keywordDetection: @escaping @Sendable () async throws -> (enabled: Bool, threshold: Double) = { (false, 0.25) },
         speechDetection: @escaping @Sendable () async throws -> (windows: Int, threshold: Double) = { (8, 0.65) },
         decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
         makeVoice: @escaping @MainActor (AgentVoiceHost) throws -> AgentVoiceExecution
@@ -143,6 +148,7 @@ public typealias AgentBusinessRequest = ActionAssemblyRequest<
         self.observeTranscript = observeTranscript
         self.output = output
         self.speechEnhancementEnabled = speechEnhancementEnabled
+        self.keywordDetection = keywordDetection
         self.speechDetection = speechDetection
         self.decodeResources = decodeResources
         self.makeVoice = makeVoice

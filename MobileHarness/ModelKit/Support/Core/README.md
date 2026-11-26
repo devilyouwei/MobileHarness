@@ -76,3 +76,9 @@ SignalListener.swift defines ModelKit-owned SignalListener and StateSignalListen
 ## Invocation metadata
 
 `InferenceMetadata.swift` defines the neutral identity, timing and usage values. Each `InferenceSession` exposes its read-only metadata snapshot. Provider and forwarding sessions can share one request-local recorder through the adapter SPI. A prepared or queued session can carry identity before execution. Timing starts beyond the preparation boundary. Terminal metadata is available after joining cleanup, and partial evidence stays readable on failure or cancellation. Optional fields express missing observations.
+
+A consumer that cannot wait for a load uses `ModelResource.acquireIfReady()`.
+It checks admission and residency atomically, and acquires a lease only when the
+resource is immediately usable.
+
+Cancelling unload is nonterminal. It cancels the load task, invokes admitted lease cancellation callbacks, handles callbacks installed during the transition, and joins release before clearing residency.

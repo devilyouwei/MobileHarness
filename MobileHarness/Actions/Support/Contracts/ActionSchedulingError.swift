@@ -2,6 +2,7 @@ public enum ActionSchedulingError: Error, Equatable, Sendable {
     case unavailable
     case signalsAlreadyBound
     case resultDeliveryFailed(executionID: String, path: String, state: String)
+    case cleanupUnconfirmed
     case resultCapacityExceeded
     case channelCapacityExceeded(String)
     case channelCountExceeded

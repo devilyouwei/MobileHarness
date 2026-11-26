@@ -85,6 +85,10 @@ import StorageFiles
             ]
         }
         public var onModelConfigurationChanged: (@MainActor () -> Void)?
+        public var beginModelConfigurationChange: @MainActor @Sendable (ModelSettingsChange) async throws -> Void = {
+            _ in
+        }
+        public var endModelConfigurationChange: @MainActor @Sendable () -> Void = {}
         private let runtimeLog: (any RuntimeLogWriting)?
         private let homeUI: UIHomeContainer
         private let settingsUI: UISettingsContainer
@@ -261,6 +265,15 @@ import StorageFiles
                     }
                     try await self.speechModels.configure(recognition: recognition, synthesis: synthesis)
                 },
+                bindSpeechModels: { [weak self] models, voice in
+                    guard let self else { throw CancellationError() }
+                    await self.speechPerception.beginSettingsChange()
+                    defer {
+                        self.speechPerception.endSettingsChange()
+                        self.onModelConfigurationChanged?()
+                    }
+                    try await self.speechModels.configureSpeechModels(models, synthesisVoice: voice)
+                },
                 beginSettings: { [weak self] in await self?.speechPerception.beginSettingsChange() },
                 endSettings: { [weak self] in
                     self?.speechPerception.endSettingsChange()
@@ -269,7 +282,12 @@ import StorageFiles
                 resourcesPresented: { [weak self] in
                     self?.applicationControl.acceptResourceSnapshot()
                     if let service = self?.inputDecisionService { Task { await service.resetLocalFailure() } }
-                })
+                },
+                beginModelChange: { [weak self] change in
+                    guard let self else { throw CancellationError() }
+                    try await self.beginModelConfigurationChange(change)
+                },
+                endModelChange: { [weak self] in self?.endModelConfigurationChange() })
             let makeDecision: @MainActor (AgentBusinessBindings) -> AssistantInputDecision = { business in
                 let configuration = business.decisionConfiguration
                 let reportDecision = business.decisionStatus
@@ -340,6 +358,42 @@ import StorageFiles
         public func foregroundDecisionModelID() async throws -> String? {
             guard let configuration = try runtime().business.decisionConfiguration else { return nil }
             return try await configuration().0
+        }
+        private var voiceModelChangeHeld = false
+        private var assistantModelChangeHeld = false
+        public func cancelWorkForModelChange(_ roles: Set<ModelSettingsChange.Role>) async throws {
+            if roles.contains(.assistant) {
+                assistantModelChangeHeld = true
+                assistant.setInputAvailable(false)
+            }
+            if roles.contains(.decision) { await inputDecisionService?.beginModelChange() }
+            if roles.contains(.writer) { await writer.beginModelChange() }
+            let voiceRoles: Set<ModelSettingsChange.Role> = [
+                .assistant, .recognition, .synthesis, .voiceActivity, .enhancement, .keywordSpotting,
+                .endpointConfirmation,
+            ]
+            if !voiceModelChangeHeld, !roles.isDisjoint(with: voiceRoles) {
+                voiceModelChangeHeld = true
+                await speechPerception.beginSettingsChange()
+                await speechPerception.suspend()
+            }
+            if roles.contains(.assistant), let runtime = runtimeValue {
+                try await runtime.interaction.interruptConversation(sessionID: runtime.interactionSessionID)
+            }
+            if roles.contains(.vision) { await camera.pauseVisionForModelMaintenance() }
+        }
+
+        public func endModelChange(_ roles: Set<ModelSettingsChange.Role>) async {
+            if voiceModelChangeHeld {
+                voiceModelChangeHeld = false
+                speechPerception.endSettingsChange()
+            }
+            if roles.contains(.assistant) {
+                assistantModelChangeHeld = false
+                assistant.setInputAvailable(foreground && isAvailable)
+            }
+            if roles.contains(.decision) { await inputDecisionService?.endModelChange() }
+            if roles.contains(.writer) { await writer.endModelChange() }
         }
         public var foregroundModelRequirements: [ModelPreparationRequirement] {
             var requirements: [ModelPreparationRequirement] = [.language, .recognition, .synthesis, .voiceActivity]
@@ -426,7 +480,7 @@ import StorageFiles
             try await startNativeServices()
         }
         private func setInputAvailable(_ value: Bool) {
-            assistant.setInputAvailable(value)
+            assistant.setInputAvailable(value && !assistantModelChangeHeld)
             applicationControl.setInputAvailable(value)
             memory.setInputAvailable(value)
             photographer.setInputAvailable(value)

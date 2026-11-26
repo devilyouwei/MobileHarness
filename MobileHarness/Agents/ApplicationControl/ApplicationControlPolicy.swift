@@ -6,6 +6,7 @@ enum ApplicationControlResourcePolicy {
     static func preferenceFailureReason(_ code: String?) -> String {
         switch code {
         case "resource.selection.recognition": "recognitionRequired"
+        case "resource.selection.keywordInterrupt": "keywordInterruptRequired"
         case "resource.selection.synthesis": "synthesisRequired"
         case "resource.source.invalid": "invalidSource"
         default: "execution"
@@ -26,18 +27,23 @@ enum ApplicationControlResourcePolicy {
         let endpoint: String
         let allowsCellular: Bool
         let useSpeechEnhancement: Bool?
+        let useKeywordInterrupt: Bool?
+        let speechModels: [String: String]?
+        let synthesisVoice: String?
         let useCustomRecognition: Bool
         let useCustomSynthesis: Bool
         let useLocalDecision: Bool?
         let vadOnsetWindows: Int?
         let vadThreshold: Double?
+        let keywordThreshold: Double?
     }
     static func preferenceValue(_ raw: String) throws -> PreferenceValue {
         guard raw.utf8.count <= 2048,
             let keys = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any],
             Set(keys.keys).isSubset(of: [
                 "endpoint", "allowsCellular", "useCustomRecognition", "useCustomSynthesis", "useLocalDecision",
-                "vadOnsetWindows", "vadThreshold", "useSpeechEnhancement",
+                "vadOnsetWindows", "vadThreshold", "useSpeechEnhancement", "useKeywordInterrupt", "speechModels",
+                "synthesisVoice", "keywordThreshold",
             ])
         else { throw CommunicationError.invalidPayload }
         let value = try JSONDecoder().decode(PreferenceValue.self, from: Data(raw.utf8))
@@ -47,7 +53,8 @@ enum ApplicationControlResourcePolicy {
         let windows = value.vadOnsetWindows ?? 8
         let threshold = value.vadThreshold ?? 0.65
         guard (1...16).contains(windows), threshold.isFinite, (0.05...0.95).contains(threshold),
-            abs(threshold * 20 - (threshold * 20).rounded()) < 0.00001
+            abs(threshold * 20 - (threshold * 20).rounded()) < 0.00001,
+            (0.10...0.60).contains(value.keywordThreshold ?? 0.25)
         else { throw CommunicationError.invalidPayload }
         return value
     }

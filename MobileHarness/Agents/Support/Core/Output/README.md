@@ -41,7 +41,7 @@ OutputEnvelope retains input/session/task/turn, root/parent/hops, round/call and
 
 ## Completion and failure
 
-ActionResult and ToolResult use action.result.v1; GenerationRoundResult uses agent.round.result.v1. Direct Agent requests return AgentRequestReply without a receipt input. Publish confirms bounded admission only. Sealing a round does not finish a reply. Completion values are not truncated or rejected by a delivery-byte quota; model projections are caller-owned.
+Assistant consumes `action.execution.feedback.v1`. The six independently correlated events cover Action start and terminal, model-round start and terminal, and interruption-scope start and terminal. Action terminal retains the execution result; the other terminals carry reason and cleanup confirmation. Direct model Tools return `ToolResult` and remain subject to round settlement. Roles declaring `action.result.v1` receive their existing per-call results. Direct Agent requests return `AgentRequestReply`. Publish confirms bounded admission. Completion values are owned by the caller’s projection.
 
 AgentActionReport permits at most 256 entries, paths up to 128 bytes, codes of 1–64 bytes and at most 16 detail keys per entry (keys up to 64 bytes, values up to 512). Partial success, failure, timeout and cancellation remain distinct. Explicit values, including an empty string, are business output. Reports/completed/activity handles are completion evidence; real failures may permit continuation, pure cancellation does not. Tool results without completion retain value semantics; Action results normalize missing completion to completed.
 

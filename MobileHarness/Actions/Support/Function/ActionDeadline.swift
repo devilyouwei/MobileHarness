@@ -15,9 +15,11 @@ enum ActionDeadline {
             let returned: ActionReport?
             switch result {
             case .success(.report(let report)): returned = report
+            case .failure(let error as NativeCleanupFailure): return .report(ActionReport.failureReport(for: error))
             case .failure(let error): returned = (error as? any ActionReportProviding)?.actionReport
             default: returned = nil
             }
+            if let returned, !returned.cleanupConfirmed { return .report(returned) }
             let stored = await snapshot()
             return .report(
                 (stored ?? returned ?? .executionFailed(.timedOut)).withExecutionFailure(

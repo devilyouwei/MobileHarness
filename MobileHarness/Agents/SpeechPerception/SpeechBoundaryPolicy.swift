@@ -6,7 +6,9 @@ struct SpeechBoundaryPolicy {
     private static let preRollSamples = 4096
     private static let longSilenceWindows = 25
     private static let shortSilenceWindows = 16
+    private static let maximumEndpointSilenceSamples = 32000
     private static let maximumSegmentSamples = 192000
+    private static let rearmSilenceSamples = 2560
     // VAD normally emits 512-sample windows; preserve padding by samples, not window count.
     private static let endpointPaddingSamples = 3072
 
@@ -17,14 +19,23 @@ struct SpeechBoundaryPolicy {
     private var candidate = 0
     var hasOnsetCandidate: Bool { !isSpeaking && candidate > 0 }
     private var silentWindows = 0
+    private var silentSamples = 0
+    private(set) var endpointConfirmationPending = false
+    private var endpointDeferred = false
     private var duration = 0
     private var hasSpeech = false
+    private var rearmSilence: Int?
     mutating func consume(
         _ frame: AudioFrame, probability: Float, threshold: Float, onsetWindows: Int = 8,
         useShortEndpoint: Bool = false,
-        onsetThreshold: Float? = nil
+        onsetThreshold: Float? = nil, confirmEndpoint: Bool = false
     ) -> VoiceSegmentEnd? {
         streamEvents = []
+        if let quiet = rearmSilence {
+            let quietSamples = probability < threshold ? quiet + frame.sampleCount : 0
+            rearmSilence = quietSamples >= Self.rearmSilenceSamples ? nil : quietSamples
+            return nil
+        }
         let threshold = isSpeaking ? threshold : (onsetThreshold ?? threshold)
         if probability >= threshold { hasSpeech = true }
         if !isSpeaking {
@@ -50,16 +61,20 @@ struct SpeechBoundaryPolicy {
             }
         }
         silentWindows = probability >= threshold ? 0 : silentWindows + 1
+        silentSamples = probability >= threshold ? 0 : silentSamples + frame.sampleCount
+        if silentWindows == 0 { endpointDeferred = false }
         let silenceLimit = useShortEndpoint ? Self.shortSilenceWindows : Self.longSilenceWindows
-        if silentWindows >= silenceLimit {
-            // Keep 192 ms of endpoint padding; retain in-sentence silence in full.
-            if hasSpeech {
-                streamEvents.append(.audio(Self.prefix(holdback, sampleLimit: Self.endpointPaddingSamples)))
+        if endpointDeferred {
+            if silentSamples >= Self.maximumEndpointSilenceSamples {
+                endAtSilence()
+                return .silence
             }
-            streamEvents.append(.end(.silence))
-            let nextPreRoll = Self.suffix(holdback, sampleLimit: Self.preRollSamples)
-            reset()
-            preRoll = nextPreRoll
+        } else if silentWindows >= silenceLimit {
+            if confirmEndpoint, silentSamples < Self.maximumEndpointSilenceSamples {
+                endpointConfirmationPending = true
+                return nil
+            }
+            endAtSilence()
             return .silence
         }
         if duration >= Self.maximumSegmentSamples {
@@ -72,6 +87,26 @@ struct SpeechBoundaryPolicy {
             return .maximumDuration
         }
         return nil
+    }
+
+    mutating func resolveEndpoint(complete: Bool) {
+        endpointConfirmationPending = false
+        if complete {
+            endAtSilence()
+        } else {
+            endpointDeferred = true
+        }
+    }
+
+    private mutating func endAtSilence() {
+        // Keep 192 ms of endpoint padding; retain in-sentence silence in full.
+        if hasSpeech {
+            streamEvents.append(.audio(Self.prefix(holdback, sampleLimit: Self.endpointPaddingSamples)))
+        }
+        streamEvents.append(.end(.silence))
+        let nextPreRoll = Self.suffix(holdback, sampleLimit: Self.preRollSamples)
+        reset()
+        preRoll = nextPreRoll
     }
     private static func prefix(_ frames: [AudioFrame], sampleLimit: Int) -> [AudioFrame] {
         var result: [AudioFrame] = []
@@ -87,14 +122,18 @@ struct SpeechBoundaryPolicy {
         Array(prefix(Array(frames.reversed()), sampleLimit: sampleLimit).reversed())
     }
     var uncommittedFrames: [AudioFrame] { isSpeaking ? holdback : [] }
-    mutating func reset() {
+    mutating func reset(requireFreshOnset: Bool = false) {
         preRoll.removeAll(keepingCapacity: true)
         holdback.removeAll(keepingCapacity: true)
         candidate = 0
         silentWindows = 0
+        silentSamples = 0
+        endpointConfirmationPending = false
+        endpointDeferred = false
         duration = 0
         hasSpeech = false
         isSpeaking = false
+        rearmSilence = requireFreshOnset ? 0 : nil
     }
 }
 
@@ -115,5 +154,19 @@ struct SpeechOnsetPolicy: Equatable {
         onsetThreshold = min(Self.maximumProbability, Float(threshold) + increase)
         let raised = (1...Self.maximumWindows).contains(windows) && playing
         onsetWindows = raised ? min(Self.maximumWindows, windows + Self.playbackWindowIncrease) : windows
+    }
+}
+
+extension SpeechPlaybackSnapshot {
+    func state(at time: ContinuousClock.Instant) -> (playing: Bool, known: Bool) {
+        let offset = Self.offset(at: time)
+        if let retainedSince, offset < retainedSince { return (false, false) }
+        for period in periods.reversed() where offset >= period.start {
+            if let end = period.end, offset >= end + .milliseconds(200) {
+                continue
+            }
+            return (true, true)
+        }
+        return (false, true)
     }
 }

@@ -28,7 +28,8 @@ public final class UINavigationContainer {
 }
 
 public enum AppDestination: String, Codable, Hashable, Sendable {
-    case settings, language, recognition, synthesis, vision, decision, bluetooth, assistantHistory, writerHistory, album
+    case settings, language, speech, recognition, synthesis, vision, decision, bluetooth, assistantHistory,
+        writerHistory, album
     case assistantBrain, writerBrain
     var agentBrain: AgentBrain? {
         switch self {

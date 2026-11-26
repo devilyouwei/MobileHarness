@@ -17,12 +17,15 @@ public final class GatewayAdmission: Sendable {
 public struct GatewayConfiguration: Sendable {
     public let engine: any ActionExecutionEngine
     public let deliverResult: @Sendable (ExecutionResult) async -> ActionResultDelivery
+    public let deliverStart: @Sendable (ExecutionStart) async -> ActionResultDelivery
     public init(
         engine: any ActionExecutionEngine,
-        deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed }
+        deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed },
+        deliverStart: @escaping @Sendable (ExecutionStart) async -> ActionResultDelivery = { _ in .closed }
     ) {
         self.engine = engine
         self.deliverResult = deliverResult
+        self.deliverStart = deliverStart
     }
 }
 public struct GatewayCapabilities: Sendable {
@@ -133,7 +136,7 @@ public struct GatewayObservationAccess: Sendable {
         try configuration.engine.bindSignals(
             ActionSignalBinding(
                 validate: { try await signals.validateExecution($0, owner: $1) },
-                deliver: configuration.deliverResult))
+                deliver: configuration.deliverResult, deliverStart: configuration.deliverStart))
         return GatewayCapabilities(
             admission: admission, signals: signals,
             execution: GatewayExecution(engine: configuration.engine, admission: admission))

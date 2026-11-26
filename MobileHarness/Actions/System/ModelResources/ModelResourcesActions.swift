@@ -1,5 +1,6 @@
 import Foundation
 import FunctionContracts
+import ModelKitDefaults
 
 extension SystemActions {
     @Action(
@@ -36,16 +37,23 @@ extension SystemActions {
         let args = ActionArguments(invocation.call.parameters)
         try args.validateAllowedKeys([
             "endpoint", "allowsCellular", "recognition", "synthesis", "decision", "vadOnsetWindows", "vadThreshold",
-            "enhancement",
+            "enhancement", "keywordInterrupt", "speechModels", "synthesisVoice", "keywordThreshold",
         ])
         guard let windows = Int(invocation.call.parameters["vadOnsetWindows"] ?? "8"),
             let threshold = Double(invocation.call.parameters["vadThreshold"] ?? "0.65"),
             (1...16).contains(windows), threshold.isFinite, (0.05...0.95).contains(threshold),
             abs(threshold * 20 - (threshold * 20).rounded()) < 0.00001
         else { throw ActionArguments.ValidationError.invalidValue("speechDetection") }
+        guard let keywordThreshold = Double(invocation.call.parameters["keywordThreshold"] ?? "0.25"),
+            ModelResourcePreferences.isValidKeywordThreshold(keywordThreshold)
+        else { throw ActionArguments.ValidationError.invalidValue("keywordThreshold") }
         let enhancement = invocation.call.parameters["enhancement"] ?? "false"
         guard ["true", "false"].contains(enhancement) else {
             throw ActionArguments.ValidationError.invalidValue("enhancement")
+        }
+        let keywordInterrupt = invocation.call.parameters["keywordInterrupt"] ?? "false"
+        guard ["true", "false"].contains(keywordInterrupt) else {
+            throw ActionArguments.ValidationError.invalidValue("keywordInterrupt")
         }
         let decision = invocation.call.parameters["decision"] ?? "false"
         guard ["true", "false"].contains(decision) else {
@@ -64,7 +72,9 @@ extension SystemActions {
                 endpoint: endpoint, allowsCellular: flags[0] == "true",
                 useCustomRecognition: flags[1] == "true", useCustomSynthesis: flags[2] == "true",
                 useLocalDecision: decision == "true", vadOnsetWindows: windows, vadThreshold: threshold,
-                useSpeechEnhancement: enhancement == "true")
+                useSpeechEnhancement: enhancement == "true", useKeywordInterrupt: keywordInterrupt == "true",
+                speechModels: try speechModels(invocation), synthesisVoice: try synthesisVoice(invocation),
+                keywordThreshold: keywordThreshold)
         ).encoded()
     }
 
@@ -77,14 +87,36 @@ extension SystemActions {
     {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
-        try arguments.validateAllowedKeys(["recognition", "synthesis"])
+        try arguments.validateAllowedKeys(["recognition", "synthesis", "speechModels", "synthesisVoice"])
         let recognition = try arguments.requiredString("recognition", maximumUTF8Bytes: 5)
         let synthesis = try arguments.requiredString("synthesis", maximumUTF8Bytes: 5)
         guard ["true", "false"].contains(recognition), ["true", "false"].contains(synthesis) else {
             throw ActionArguments.ValidationError.invalidValue("speechPreference")
         }
-        try await resources.configureSpeech(recognition: recognition == "true", synthesis: synthesis == "true")
+        let voice = try synthesisVoice(invocation)
+        if let models = try speechModels(invocation) {
+            try await resources.configureSpeechModels(models, synthesisVoice: voice)
+        } else {
+            guard voice == nil else { throw ActionArguments.ValidationError.invalidValue("synthesisVoice") }
+            try await resources.configureSpeech(recognition: recognition == "true", synthesis: synthesis == "true")
+        }
         try Task.checkCancellation()
+    }
+
+    private static func synthesisVoice(_ invocation: any FunctionInput) throws -> String? {
+        guard invocation.call.parameters["synthesisVoice"] != nil else { return nil }
+        return try ActionArguments(invocation.call.parameters).requiredString("synthesisVoice", maximumUTF8Bytes: 64)
+    }
+
+    private static func speechModels(_ invocation: any FunctionInput) throws -> [String: String]? {
+        guard let raw = invocation.call.parameters["speechModels"] else { return nil }
+        let capabilityCount = Set(SpeechModelOption.catalog.map(\.capability)).count
+        guard raw.utf8.count <= 1024,
+            let models = try? JSONDecoder().decode([String: String].self, from: Data(raw.utf8)),
+            models.count <= capabilityCount,
+            models.allSatisfy({ $0.key.utf8.count <= 32 && $0.value.utf8.count <= 64 })
+        else { throw ActionArguments.ValidationError.invalidValue("speechModels") }
+        return models
     }
 
     @Action(

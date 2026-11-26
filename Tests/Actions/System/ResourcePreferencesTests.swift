@@ -1,4 +1,3 @@
-import Actions
 import AgentCore
 import ExecutionRuntime
 import Foundation
@@ -9,12 +8,31 @@ import StorageCore
 import StorageFiles
 import Testing
 
+@testable import Actions
 @testable import Agents
 @testable import UI
 
 private actor InstalledPreferenceFixture {
     var ids: Set<String> = []
     func set(_ ids: Set<String>) { self.ids = ids }
+}
+
+@Test func speechPreferenceModelImpactIncludesParameterChangesOnlyForTheirModels() {
+    let previous = ModelResourcePreferences(
+        speechModels: ["voiceActivity": "energy-vad", "keywordSpotting": "zipformer-kws", "synthesis": "kokoro-82m"],
+        synthesisVoice: "zf_099")
+    var changed = previous
+    changed.endpoint = "https://hf-mirror.com"
+    #expect(ModelResourcePreferencesService.modelChange(from: previous, to: changed).roles.isEmpty)
+    changed.vadThreshold = 0.55
+    changed.keywordThreshold = 0.40
+    changed.synthesisVoice = "af_heart"
+    let parameters = ModelResourcePreferencesService.modelChange(from: previous, to: changed)
+    #expect(parameters.roles == [.voiceActivity, .keywordSpotting, .synthesis])
+    #expect(parameters.modelIDs.isEmpty)
+    changed.speechModels?["voiceActivity"] = "silero"
+    changed.speechModels?["keywordSpotting"] = "off"
+    #expect(ModelResourcePreferencesService.modelChange(from: previous, to: changed).modelIDs == ["silero"])
 }
 private func preferencesService(
     _ store: FileDocumentStore<ModelResourcePreferences>, installed: InstalledPreferenceFixture
@@ -44,6 +62,19 @@ private actor PreferenceBindingFixture: ModelResourceCapability {
     func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws {}
     func cancel(_ id: String) async throws {}
     func remove(_ id: String) async throws {}
+}
+
+private actor SpeechModelBindingFixture: ModelResourceCapability {
+    var selected: [String: String] = [:]
+    var voice: String?
+    func configureSpeechModels(_ models: [String: String], synthesisVoice: String?) {
+        selected = models
+        voice = synthesisVoice
+    }
+    func configureSpeech(recognition: Bool, synthesis: Bool) throws { throw ModelResourcePreferenceError.invalidSource }
+    func download(_ id: String, endpoint: String, allowsCellular: Bool) {}
+    func cancel(_ id: String) {}
+    func remove(_ id: String) {}
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
@@ -506,4 +537,140 @@ func resourceSourceDefaultsFollowSystemLanguageAndKeepSavedChoice(language: Stri
             .utf8)
     #expect(try !JSONDecoder().decode(ModelResourcePreferences.self, from: legacy).useSpeechEnhancement)
     #expect(try !JSONDecoder().decode(ModelResourceSourceDraft.self, from: legacy).useSpeechEnhancement)
+}
+
+@Test(.actionCatalog) func keywordInterruptPreferenceUsesResourceGatewayAndResetsAfterRemoval() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try FileDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let installed = InstalledPreferenceFixture()
+    let service = preferencesService(store, installed: installed)
+    await #expect(throws: ModelResourcePreferenceError.keywordInterruptRequired) {
+        try await service.saveSource(.init(useKeywordInterrupt: true))
+    }
+
+    await installed.set(["zipformer-kws"])
+    let runtime = try await resourceRuntime(PreferenceBindingFixture(), preferences: service)
+    let result = try await runtime.preferences(
+        .saveSource(
+            endpoint: "https://huggingface.co", allowsCellular: true,
+            recognition: false, synthesis: false, keywordInterrupt: true, keywordThreshold: 0.20))
+    let saved = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: Data(result.utf8))
+    #expect(saved.useKeywordInterrupt)
+    #expect(saved.keywordThreshold == 0.20)
+    #expect(try await store.refresh()?.value.useKeywordInterrupt == true)
+    await installed.set([])
+    let restored = try await runtime.preferences(.restoreSource)
+    let afterRemoval = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: Data(restored.utf8))
+    #expect(!afterRemoval.useKeywordInterrupt)
+    #expect(afterRemoval.keywordThreshold == 0.20)
+    #expect(try await store.refresh()?.value.useKeywordInterrupt == false)
+    await runtime.shutdown()
+
+    let legacy = Data(
+        #"{"endpoint":"https://huggingface.co","allowsCellular":true,"useCustomRecognition":false,"useCustomSynthesis":false}"#
+            .utf8)
+    #expect(try !JSONDecoder().decode(ModelResourcePreferences.self, from: legacy).useKeywordInterrupt)
+    #expect(try !JSONDecoder().decode(ModelResourceSourceDraft.self, from: legacy).useKeywordInterrupt)
+    #expect(try JSONDecoder().decode(ModelResourcePreferences.self, from: legacy).keywordThreshold == 0.25)
+    #expect(try JSONDecoder().decode(ModelResourceSourceDraft.self, from: legacy).keywordThreshold == 0.25)
+}
+
+@Test func speechSelectionMigratesPreferencesAndKeepsInstalledSileroOptIn() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try FileDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let installed = InstalledPreferenceFixture()
+    await installed.set(["silero", "nemotron", "deepfilternet3"])
+    let service = preferencesService(store, installed: installed)
+    try await store.save(.init(useCustomRecognition: true, useSpeechEnhancement: true), expecting: nil)
+    var restored = try await service.restoreSource()
+    #expect(restored.speechModels?["voiceActivity"] == "energy-vad")
+    #expect(restored.speechModels?["recognition"] == "nemotron-local")
+    #expect(restored.speechModels?["enhancement"] == "deepfilternet3")
+    #expect(restored.speechModels?["keywordSpotting"] == "off")
+    restored.speechModels?["voiceActivity"] = "silero"
+    #expect(try await service.saveSource(restored).speechModels?["voiceActivity"] == "silero")
+    await installed.set(["nemotron", "deepfilternet3"])
+    let afterRemoval = try await service.restoreSource()
+    #expect(afterRemoval.speechModels?["voiceActivity"] == "energy-vad")
+    #expect(afterRemoval.speechModels?["recognition"] == "nemotron-local")
+    #expect(afterRemoval.speechModels?["enhancement"] == "deepfilternet3")
+}
+
+@Test func smartTurnSelectionRequiresInstallationAndRestoresOffAfterRemoval() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try FileDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let installed = InstalledPreferenceFixture()
+    let service = preferencesService(store, installed: installed)
+    var source = try await service.restoreSource()
+    #expect(source.speechModels?["endpointConfirmation"] == "off")
+    source.speechModels?["endpointConfirmation"] = "smart-turn"
+    await #expect(throws: ModelResourcePreferenceError.endpointConfirmationRequired) {
+        try await service.saveSource(source)
+    }
+    await installed.set(["smart-turn"])
+    #expect(try await service.saveSource(source).speechModels?["endpointConfirmation"] == "smart-turn")
+    await installed.set([])
+    #expect(try await service.restoreSource().speechModels?["endpointConfirmation"] == "off")
+}
+
+@Test(.actionCatalog) func speechSelectionUsesResourceGatewayToBindModelIDs() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = try FileDocumentStore<ModelResourcePreferences>(
+        url: root.appendingPathComponent("source.json"), maximumBytes: 4096)
+    let installed = InstalledPreferenceFixture()
+    await installed.set(["silero", "zipformer-kws", "smart-turn", "kokoro-82m"])
+    let binding = SpeechModelBindingFixture()
+    let runtime = try await resourceRuntime(binding, preferences: preferencesService(store, installed: installed))
+
+    let result = try await runtime.preferences(
+        .saveSource(
+            endpoint: "https://huggingface.co", allowsCellular: true, recognition: false, synthesis: false,
+            speechModels: [
+                "voiceActivity": "silero", "keywordSpotting": "zipformer-kws", "endpointConfirmation": "smart-turn",
+                "synthesis": "kokoro-82m",
+            ],
+            synthesisVoice: "zf_099"))
+    let saved = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: Data(result.utf8))
+    #expect(saved.speechModels == (await binding.selected))
+    #expect(saved.speechModels?["voiceActivity"] == "silero")
+    #expect(saved.speechModels?["keywordSpotting"] == "zipformer-kws")
+    #expect(saved.speechModels?["endpointConfirmation"] == "smart-turn")
+    #expect(saved.useKeywordInterrupt)
+    #expect(saved.synthesisVoice == "zf_099")
+    #expect(await binding.voice == saved.synthesisVoice)
+    guard case .source(var draft) = try await runtime.resources.requests.submit(.restore) else {
+        Issue.record("Expected restored speech settings")
+        return
+    }
+    try #require(draft.speechModels?.count == 6)
+    draft.speechModels?["endpointConfirmation"] = "off"
+    guard case .source(let updated) = try await runtime.resources.requests.submit(.save(draft)) else {
+        Issue.record("Expected saved speech settings")
+        return
+    }
+    #expect(updated.speechModels == draft.speechModels)
+    #expect(await binding.selected == draft.speechModels)
+    #expect(updated.synthesisVoice == "zf_099")
+    var invalid = try #require(try await store.refresh()?.value)
+    invalid.synthesisVoice = "jf_alpha"
+    await #expect(throws: ModelResourcePreferenceError.invalidSpeechModel) {
+        _ = try await preferencesService(store, installed: installed).saveSource(invalid)
+    }
+
+    await installed.set(["silero"])
+    _ = try await runtime.preferences(.restoreSource)
+    let restored = await binding.selected
+    #expect(restored["voiceActivity"] == "silero")
+    #expect(restored["keywordSpotting"] == "off")
+    #expect(restored["endpointConfirmation"] == "off")
+    #expect(restored["synthesis"] == "apple-synthesis")
+    #expect(await binding.voice == "zf_099")
+    await runtime.shutdown()
 }

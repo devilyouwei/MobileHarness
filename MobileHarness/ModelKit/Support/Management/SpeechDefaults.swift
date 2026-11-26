@@ -3,10 +3,13 @@ import ModelKit
 import ModelKitAppleSpeech
 import ModelKitDeepFilterNet3
 import ModelKitEnergy
+import ModelKitKokoro
 import ModelKitMossNano
 import ModelKitNemotron
 @_spi(ModelAssembly) import ModelKitRuntime
 import ModelKitSilero
+import ModelKitSmartTurn
+import ModelKitZipformer
 
 extension DefaultModelAssembly {
     @available(iOS 27, macOS 27, *)
@@ -18,6 +21,22 @@ extension DefaultModelAssembly {
                     enhancement: try DeepFilterNet3(
                         context: context, artifacts: resources.appendingPathComponent("DeepFilterNet3")))
             }, defaults: [.enhancement])
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID("zipformer-kws"), capabilities: [.keywordSpotting], artifactID: "zipformer-kws"
+            ) { context in
+                ProvidedCapabilities(
+                    keywordSpotting: try ZipformerKeywordSpotter(
+                        context: context, artifacts: resources.appendingPathComponent("ZipformerKWS")))
+            }, defaults: [.keywordSpotting])
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID("smart-turn"), capabilities: [.endpointConfirmation], artifactID: "smart-turn"
+            ) { context in
+                ProvidedCapabilities(
+                    endpointConfirmation: try SmartTurn(
+                        context: context, artifacts: resources.appendingPathComponent("SmartTurn")))
+            })
         try await manager.register(
             ModelRegistration(id: ModelID("silero"), capabilities: [.voiceActivity], artifactID: "silero") {
                 context in
@@ -42,6 +61,13 @@ extension DefaultModelAssembly {
                 let model = try MossSpeechSynthesis(
                     context: context, artifacts: resources.appendingPathComponent("MossTTSNano"))
                 return ProvidedCapabilities(warmup: { try await model.warmup() }, synthesis: model)
+            })
+        try await manager.register(
+            ModelRegistration(
+                id: ModelID(KokoroVoiceCatalog.modelID), capabilities: [.synthesis], memoryPolicy: .releaseWhenIdle,
+                artifactID: KokoroVoiceCatalog.modelID
+            ) { context in
+                ProvidedCapabilities(synthesis: try KokoroSpeechSynthesis(context: context, artifacts: resources))
             })
         for (locale, id) in SpeechSelection.appleRecognitionModels {
             try await manager.register(

@@ -54,7 +54,7 @@ public struct CommunicationContracts: Sendable {
     private let entries: [String: CommunicationContract]
     public static let standard = CommunicationContracts(standard: [
         .init(name: "action.result.v1", kind: .actionResult),
-        .init(name: "agent.round.result.v1", kind: .roundResult),
+        .init(name: ExecutionFeedback.contract, kind: .executionFeedback),
     ])
     private init(standard: [CommunicationContract]) {
         entries = Dictionary(uniqueKeysWithValues: standard.map { ($0.name, $0) })
@@ -129,7 +129,7 @@ public struct CommunicationDeclaration: Codable, Sendable {
         // Every role has the unified entry for authenticated dynamic Task observations.
         var kinds: Set<InputKind> = [.observation]
         if feedback.contains("action.result.v1") { kinds.formUnion([.actionResult, .toolResult]) }
-        if feedback.contains("agent.round.result.v1") { kinds.insert(.roundResult) }
+        if feedback.contains(ExecutionFeedback.contract) { kinds.formUnion([.executionFeedback, .toolResult]) }
         return kinds
     }
     public func validate(contracts: CommunicationContracts = .standard, agentID: AgentID = .init(rawValue: "unbound"))
@@ -149,7 +149,9 @@ public struct CommunicationDeclaration: Codable, Sendable {
             requests.allSatisfy({
                 SignalIdentifier.protocol($0) && contracts[$0]?.kind == .observation && contracts[$0]?.channel == nil
             }),
-            feedback.allSatisfy({ ["action.result.v1", "agent.round.result.v1"].contains($0) && contracts[$0] != nil }),
+            feedback.allSatisfy({
+                ["action.result.v1", ExecutionFeedback.contract].contains($0) && contracts[$0] != nil
+            }),
             publications.allSatisfy({
                 SignalIdentifier.channel($0.channel) && contracts[$0.protocol]?.channel == $0.channel
             }),
@@ -220,8 +222,11 @@ public struct CommunicationPolicy: Sendable {
     public func accepts(_ input: AgentInput, target: AgentID) -> Bool {
         guard input.metadata.version == 1, let declaration = agents[target] else { return false }
         switch input.payload.kind {
-        case .actionResult, .toolResult: return declaration.feedback.contains("action.result.v1")
-        case .roundResult: return declaration.feedback.contains("agent.round.result.v1")
+        case .actionResult: return declaration.feedback.contains("action.result.v1")
+        case .toolResult:
+            return declaration.feedback.contains("action.result.v1")
+                || declaration.feedback.contains(ExecutionFeedback.contract)
+        case .executionFeedback: return declaration.feedback.contains(ExecutionFeedback.contract)
         case .activityEvent: return input.metadata.origin == .runtime
         case .observation:
             // Host feedback is authenticated by its execution-owner delivery port.

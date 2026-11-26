@@ -48,7 +48,7 @@ print 要求非空 text，最多 2000 UTF-8 字节；setTranscript 允许空文�
 
 playCue 默认为 wake、volume=0.85；vibrate 默认为 heavy、intensity=1、count=1、intervalMS=80。六种 cue 和五种触觉风格是封闭枚举；volume/intensity 为有限 0…1，count 为 1…3，intervalMS 为 40…250。原生音频准入和触觉可用性属于宿主。
 
-资源呈现使用正 UInt64 generation；错误文本限 2048 字节，偏好错误 reason 为 invalidSource/recognitionRequired/synthesisRequired/execution。Provider 呈现使用 ID requestID，可选失败码最多 64 字节且以 provider. 开头，不传递 URL/密钥。导航目标为 home/settings/language/recognition/synthesis/vision/bluetooth/history。
+资源呈现使用正 UInt64 generation；错误文本限 2048 字节，偏好错误 reason 为 invalidSource/recognitionRequired/synthesisRequired/keywordInterruptRequired/execution。Provider 呈现使用 ID requestID，可选失败码最多 64 字节且以 provider. 开头，不传递 URL/密钥。导航目标为 home/settings/language/speech/vision/bluetooth/history，recognition 和 synthesis 仍可作为 speech 的兼容入口。
 
 [Actions 设计](../README.md) · [公共函数契约](../Support/Contracts/README.md)
 

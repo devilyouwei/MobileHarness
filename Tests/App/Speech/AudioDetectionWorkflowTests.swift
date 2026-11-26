@@ -43,6 +43,34 @@ private enum DetectionFixtureError: LocalizedError {
     throw DetectionFixtureError.timeout
 }
 
+@Test @MainActor func audioDetectionProjectsKeywordHitsOnlyForTheKeywordRequest() async throws {
+    let state = AudioDetectionState()
+    let audio = DetectionEndpoint()
+    let keyword = DetectionEndpoint()
+    let workflow = AudioDetectionPresentation(state: state, endpoint: audio, keywordEndpoint: keyword)
+    let trial = Task { try await workflow.run(readiness: AudioDetectionReadiness(keywordTest: true)) }
+    try await detectionWait { state.phase == .running }
+    #expect(audio.calls == 0)
+    #expect(keyword.calls == 1)
+    let update = try #require(keyword.updates.first)
+    var snapshot = AudioDetectionSnapshot()
+    snapshot.capturedAt = .now
+    snapshot.keywordHit = .init(phrase: "停下", silentTail: false)
+    update(snapshot)
+    #expect(state.snapshot.keywordTest)
+    #expect(state.snapshot.keywordHit == .init(phrase: "停下", silentTail: false))
+    await workflow.stopAndWait()
+    _ = await trial.result
+
+    let standard = Task { try await workflow.run(readiness: AudioDetectionReadiness()) }
+    try await detectionWait { state.phase == .running }
+    update(snapshot)
+    #expect(!state.snapshot.keywordTest)
+    #expect(state.snapshot.keywordHit == nil)
+    await workflow.stopAndWait()
+    _ = await standard.result
+}
+
 @Test @MainActor func audioDetectionJoinsCleanupBeforeRestartAndIgnoresLateSnapshots() async throws {
     let state = AudioDetectionState()
     let endpoint = DetectionEndpoint()

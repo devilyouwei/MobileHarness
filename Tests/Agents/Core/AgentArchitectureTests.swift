@@ -178,7 +178,7 @@ func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration {
             "version": 9, "category": "cognition", "id": id, "actions": actions, "tools": [],
             "signals": [
                 "requests": parent ? [] : ["agent.task.v1"],
-                "feedback": parent ? [] : ["action.result.v1", "agent.round.result.v1"],
+                "feedback": parent ? [] : ["action.result.v1", "action.execution.feedback.v1"],
                 "subscriptions": [],
                 "publications": [["channel": "agent.task", "protocol": "agent.task.events.v1"]],
             ],
@@ -301,8 +301,10 @@ private actor TaskFixtureAgent: Agent {
                     callID: callID, value: value, isError: result.status != .succeeded,
                     completion: result.completion, roundID: roundID), roundID: roundID)
             try await context.update { $0.state.effects.append(value) }
-        case .roundResult(let result):
-            guard input.metadata.origin == .runtime, result.roundID == round?.id, result.failure == nil,
+        case .executionFeedback(.roundStarted(let id)):
+            guard input.metadata.origin == .runtime, id == round?.id else { throw CommunicationError.unauthorized }
+        case .executionFeedback(.roundFinished(let result)):
+            guard input.metadata.origin == .runtime, result.id == round?.id, result.reason == .completed,
                 round?.complete == true, let active
             else { throw CommunicationError.unauthorized }
             worker = Task { await drive(active) }
@@ -341,6 +343,7 @@ private actor TaskFixtureAgent: Agent {
                 round = AgentRoundCoordinator(id: decision, taskID: scope.id)
                 try round?.register(id: id)
                 try round?.seal()
+                try emit(.roundStarted(decision), input: input, roundID: decision)
                 try emit(.actionCall(call), input: input, roundID: decision, callID: id)
                 try emit(.roundFinished(decision), input: input, roundID: decision)
             } else {

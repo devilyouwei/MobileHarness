@@ -30,6 +30,8 @@ ApplicationRootProviding exposes the UI-owned web capability. ApplicationRootVie
 
 Settings routes assistantHistory/writerHistory directly to the injected record view, preserving recordContextID and agentRecords/conversation/turn navigation confirmations. Root does not parse task or model data.
 
+Settings routes the Speech item to the combined speech settings page. The recognition and synthesis destinations also open that page for existing navigation requests.
+
 artifact窗口将WindowPresentation.subtitle注入WebPageView工具栏；Root只组合通用显示值，不生成作品名或解释Writer状态。
 
 Camera photoAspect updates use zero reserved controls height: the camera content renders live video beneath its translucent controls overlay. Root still only forwards window sizing metadata.
@@ -45,3 +47,5 @@ Root 在常驻导航容器外层渲染通用 transientToast，首页与设置/�
 Root 向 Agent Models 和子页注入共享 Settings 与模型资源接口。总页 Provider 草稿随 Agent Models 路径保留，离开该路径清理；子页草稿由各自页面持有。根只组合接口和导航。
 
 全局 transientToast 覆盖层按 HomeNotice.tone 选择提示或错误图标；错误通知选择 toast 位置后，在设置页面与助手回复显示期间仍可见，根不解析 Decision 业务。
+
+首页顶部 Toast 在模型准备状态携带名称时显示「正在加载 %@…」。它与现有错误 Toast 共用样式和位置，错误优先。离开首页、加载完成或取消会移除加载 Toast；眼睛动画由原有准备状态驱动。

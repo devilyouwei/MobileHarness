@@ -343,9 +343,10 @@ private func roundHarness(
         displayName: "Runtime", kind: .finite, completion: "Actual completion.", protocols: [.tool],
         executionPolicy: .direct,
         completing: handler)
-    let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: definitions)) {
-        deliverActionFeedback ? await input.deliverActionResult($0) : .closed
-    }
+    let scheduler = ChannelScheduler(
+        registry: try ActionRegistry(definitions: definitions),
+        deliverResult: { deliverActionFeedback ? await input.deliverActionResult($0) : .closed },
+        deliverStart: { await input.deliverActionStart($0) })
     let gateway = await OutputGateway(
         manager: manager, requests: input,
         tools: try ToolRegistry(modules: [RoundTools(definitions: [tool] + cameraBindings)]), actions: scheduler,
@@ -1963,8 +1964,8 @@ func fullDuplexMergesReadyNativeResultsAndQueuedUserInput() async throws {
     _ = await pump.result
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)))
-func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [true, false])
+func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput(cleanupConfirmed: Bool) async throws {
     let gate = DuplexActionGate()
     let classifier = DecisionCloudFixture(events: [
         .text("true"), .finished(.stop),
@@ -1974,7 +1975,10 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
     let harness = try await roundHarness(
         action: true, toolCount: 0, fullDuplex: true, decision: decision, speechSessionID: session
     ) { _ in
-        try await gate.execute()
+        do { try await gate.execute() } catch {
+            if !cleanupConfirmed { throw NativeCleanupFailure(errors: [RoundFailure.expected]) }
+            throw error
+        }
         return .completed
     }
     let agent = try #require(harness.agent as? AssistantAgent)
@@ -2000,26 +2004,50 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput() async throws {
         #expect(await gate.exited)
         await feedback.receive(id)
     }
-    await agent.bindInputInterruption { session in
-        await agent.setExecutionCancellationBarrier(true)
-        async let outputs: Void = harness.gateway.cancelCalls(for: agent, sessionID: session)
-        async let generation: Void = agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
-        _ = try await (outputs, generation)
-        try await agent.settleInterruptedExecution(sessionID: session)
-        await agent.setExecutionCancellationBarrier(false)
+    let capture = "capture"
+    func activity(_ value: SpeechActivity) -> AgentInput {
+        let payload = InputPayload.observation(value.message())
+        let id = UUID().uuidString
+        return AgentInput(
+            id: id, sessionID: session, payload: payload,
+            metadata: .init(
+                payload: payload, source: AgentID.speechPerception.rawValue, incarnation: "fixture", origin: .agent,
+                rootID: id, topic: SpeechActivity.channel))
+    }
+    try await agent.receive(activity(SpeechActivity(.captureStarted, generation: capture)))
+    await agent.bindInputInterruption { scope, id in
+        async let outputs: Void = harness.gateway.cancelCalls(for: agent, sessionID: scope, interruptionID: id)
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: scope))
+        try await agent.interruptionGenerationJoined(id)
+        try await outputs
     }
     try await agent.receive(next)
+    for _ in 0..<1000 where await agent.speechContinuationProbe == nil {
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    let probe = try #require(await agent.speechContinuationProbe)
+    try await agent.receive(activity(SpeechActivity(.continuationReady, generation: capture, continuation: probe)))
     for _ in 0..<1000 {
         let turns = try await harness.store.snapshot().current.turns
-        if turns.first(where: { $0.id == next.id })?.state == .completed { break }
+        if cleanupConfirmed, turns.first(where: { $0.id == next.id })?.state == .completed { break }
+        if !cleanupConfirmed, turns.first(where: { $0.id == first.id })?.state == .failed { break }
         try await Task.sleep(for: .milliseconds(10))
     }
     let turns = try await harness.store.snapshot().current.turns
-    #expect(turns.first(where: { $0.id == first.id })?.state == .interrupted)
-    #expect(turns.first(where: { $0.id == next.id })?.state == .completed)
-    #expect(await harness.model.requests.count == 2)
+    #expect(turns.first(where: { $0.id == first.id })?.state == (cleanupConfirmed ? .interrupted : .failed))
+    if cleanupConfirmed {
+        let failures = await harness.log.failures
+        let nextTurn = turns.first { $0.id == next.id }
+        #expect(nextTurn?.state == .completed, "failures: \(failures); error: \(nextTurn?.error ?? "none")")
+        #expect(await harness.model.requests.count == 2)
+        #expect(await feedback.values == [next.id])
+    } else {
+        #expect(turns.first(where: { $0.id == next.id })?.state != .completed)
+        #expect(await harness.model.requests.count == 1)
+        #expect(await agent.executionCancellationBarrier)
+        #expect(await agent.status().queuedInputs > 0)
+    }
     #expect(await !gate.released)
-    #expect(await feedback.values == [next.id])
     await harness.close()
     pump.cancel()
     _ = await pump.result
@@ -2063,7 +2091,9 @@ func fullDuplexPauseCancelsParkedRoundWithoutReplayingOnResume() async throws {
     }
     let turns = try await harness.store.snapshot().current.turns
     #expect(turns.first(where: { $0.id == first.id })?.state == .cancelled)
-    #expect(turns.first(where: { $0.id == next.id })?.state == .completed)
+    let failures = await harness.log.failures
+    let nextTurn = turns.first { $0.id == next.id }
+    #expect(nextTurn?.state == .completed, "failures: \(failures); error: \(nextTurn?.error ?? "none")")
     #expect(await harness.model.requests.count == 2)
     #expect(await gate.count == 1)
     await harness.close()
@@ -2105,7 +2135,7 @@ func duplexSemanticResultsShareQueueCapacityWhileSettlementKeepsReservedSlot(spe
         try await Task.sleep(for: .milliseconds(10))
     }
     #expect(await gate.entered)
-    await agent.setExecutionCancellationBarrier(true)
+    await agent.holdDispatchForFixture()
     await gate.release()
     for _ in 0..<1000 {
         if await agent.status().queuedInputs == 2 { break }

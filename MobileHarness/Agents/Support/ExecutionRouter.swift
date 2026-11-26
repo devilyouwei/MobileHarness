@@ -4,6 +4,7 @@ import AgentCore
 enum ExecutionRouter {
     enum Route {
         case communication(CommunicationAction)
+        case roundStarted
         case roundFinished
         case action(ActionCall)
         case tool(ToolCall)
@@ -17,6 +18,7 @@ enum ExecutionRouter {
         switch output {
         case .communication(let call): .communication(call)
         case .rejectedCall(let rejection): throw rejection
+        case .roundStarted: .roundStarted
         case .roundFinished: .roundFinished
         case .actionCall(let token): .action(token)
         case .scheduling(let directive): .scheduling(directive)

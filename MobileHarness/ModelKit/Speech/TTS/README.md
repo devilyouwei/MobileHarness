@@ -24,7 +24,7 @@ flowchart LR
 
 Request rejects blank text/locale and retains InferenceContext. audio events carry independently validated AudioFrame with continuous provider sequencing; finished marks synthesis only. No speaker/permission/microphone is opened. Consumer explicitly cancels on early stop.
 
-Defaults selects enabled installed available MOSS, otherwise Apple. Kokoro is an optional isolated provider without production registration/download. Output admission, language conversion and native cleanup are provider-specific and documented below.
+The synthesis facade resolves selected, installed and available MOSS or Kokoro before admission and uses Apple for the default or unavailable selection. For Kokoro it passes the voice chosen in Settings with the request. Output admission, language conversion and native cleanup are provider-specific and documented below.
 
 ## Related design
 

@@ -65,6 +65,8 @@ Roles produce OutputEnvelope with local processing identity. OutputGateway authe
 
 InputGateway registers neutral endpoints. Broadcast requires exact subscription; directed messages and runtime feedback require declared inputs. OutputGateway constructs broadcast metadata from registered contracts. Gateway transports opaque payloads under its own endpoint/envelope/capacity/scope checks. Action/Tool completion values have no observation-byte quota; trusted identity, Task permissions and result consistency remain mandatory. Model context selection is separate.
 
+OutputGateway correlates model-round start and terminal events with the initiating input. It joins session-scoped cancellation with action admission, direct work, scheduled cleanup, and per-round delivery before sending the interruption terminal. The Assistant declares the unified execution feedback contract. InputGateway preserves the per-call legacy projection for roles declaring it.
+
 AgentGatewayAssembly receives SignalTransport and GatewayAdmission, prepares communication and a neutral GatewayConfiguration, then binds returned execution/observation capabilities. App alone configures GatewayContainer. No adapter searches or configures an upstream root. Camera/device ports exclude scene, root shutdown and native idle-join controls.
 
 ## Lifetime, capacity and failures

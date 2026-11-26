@@ -17,9 +17,13 @@ flowchart LR
  Consumer --> ASR[Recognition capability]
  Consumer --> TTS[Synthesis capability]
  Consumer --> VAD[Activity capability]
+ Consumer --> KWS[Keyword capability]
+ Consumer --> Endpoint[Speech endpoint capability]
  ASR -->|Transcript| Consumer
  TTS -->|PCM| Consumer
  VAD -->|Sample-aligned scores| Consumer
+ KWS -->|Configured phrase matches| Consumer
+ Endpoint -->|Turn completion probability| Consumer
 ```
 
 ## Provider implementation relationships
@@ -32,12 +36,14 @@ flowchart LR
  MOSS[TTS/MossNano] --> MossEngine[LocalMossEngine and model-owned graph pipeline]
  Kokoro[TTS/Kokoro] --> KokoroEngine[LocalKokoroEngine, Mandarin frontend and FluidAudio]
  Silero[VAD/Silero] --> CoreML[Support/Backends/CoreML]
+ SmartTurn[VAD/SmartTurn] --> CoreML
+ Zipformer[KWS/Zipformer] --> CoreML
  Energy[VAD/Energy] --> RMS[Provider-local RMS and hysteresis]
 ```
 
 ## Composition
 
-ASR provides Nemotron/Apple; TTS provides MOSS/Apple plus isolated Kokoro; VAD provides Silero/Energy; Support/Speech/Apple supplies codec helpers. Custom ASR/TTS preference is independent; VAD selection is independent of ASR. Missing/unavailable local speech selects system capability before admission, never after failed active inference.
+ASR provides Nemotron/Apple; TTS provides Apple, MOSS Nano and Kokoro; VAD provides Silero/Energy; Support/Speech/Apple supplies codec helpers. SpeechModelOption publishes independently selectable providers by capability and stable model ID. VAD defaults to Energy. Unavailable selections resolve to the capability default before admission, and an admitted session retains its lease. Kokoro receives the bound voice ID from the synthesis facade for the lifetime of the request.
 
 Apple's transcriber/detector share analyzer state; normal detector activity callbacks are not assumed usable, so consumers use a separate VoiceActivityCapability for endpoint interpretation. Local graph resources are provisioned through Management, never during inference.
 
@@ -47,4 +53,15 @@ Apple's transcriber/detector share analyzer state; normal detector activity call
 
 ## Enhancement
 
-[Enhancement](Enhancement/README.md) provides independent, bounded 48 kHz PCM utterance denoising through DeepFilterNet3 and the shared CoreML backend. It remains independent of ASR/TTS/VAD selection. App optionally preloads installed artifacts; SpeechPerception applies the window adapter before VAD/ASR when enabled.
+[Enhancement](Enhancement/README.md) provides independent, bounded 48 kHz PCM utterance denoising through DeepFilterNet3 and the shared CoreML backend. It remains independent of ASR/TTS/VAD selection. App prepares the selected enhancement resource; SpeechPerception applies the window adapter before VAD/ASR when enabled.
+
+## Keyword spotting
+
+[KWS](KWS/README.md) owns the resident Zipformer Core ML encoder, decoder and
+joiner, streaming filterbanks and bounded keyword sessions. The host supplies
+phrases and PCM through `KeywordSpottingCapability`. Opening a session only
+uses a ready graph; an absent or loading model returns nil.
+
+## End-of-turn confirmation
+
+[Smart Turn](VAD/README.md#end-of-turn-confirmation) scores the current audio tail when the consumer identifies candidate silence. Selection defaults to Off and is independent of the acoustic VAD provider. The consumer owns whether to keep or close the speech turn.

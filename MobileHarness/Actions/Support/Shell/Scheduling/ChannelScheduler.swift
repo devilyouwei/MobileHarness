@@ -54,6 +54,7 @@ public actor ChannelScheduler {
         var acceptedActions = 0
         var pending = 0
         var failure: (any Error)?
+        var cleanupConfirmed = true
         var finishing = false
         var cancelling = false
         var retainCancelledBoundary = false
@@ -146,6 +147,7 @@ public actor ChannelScheduler {
     private let resources: ResourceCoordinator?
     private var resultLedger: ActionResultLedger
     private let deliverResult: @Sendable (ExecutionResult) async -> ActionResultDelivery
+    private let deliverStart: @Sendable (ExecutionStart) async -> ActionResultDelivery
     private var deliveryWorker: Task<Void, Never>?
     private var deliveryAttempt: Task<Void, Never>?
     private var deliveryAttemptID: String?
@@ -153,14 +155,20 @@ public actor ChannelScheduler {
     public func finishRoundDelivery(_ roundID: String) async throws {
         while true {
             try Task.checkCancellation()
-            let records = resultLedger.snapshot().filter { $0.result?.roundID == roundID }
+            let records = resultLedger.snapshot().filter { $0.roundID == roundID }
+            if records.contains(where: { $0.state == .pending || $0.state == .reserved }) {
+                try await Task.sleep(for: .milliseconds(10))
+                continue
+            }
+            if records.contains(where: { $0.result?.completion?.cleanupConfirmed == false }) {
+                throw NativeCleanupFailure(errors: [ActionSchedulingError.cleanupUnconfirmed])
+            }
             if let failed = records.first(where: { $0.state == .closed || $0.state == .expired }) {
                 throw ActionSchedulingError.resultDeliveryFailed(
                     executionID: failed.executionID,
                     path: failed.result?.path.description ?? "unknown", state: failed.state.rawValue)
             }
-            if !records.contains(where: { $0.state == .pending || $0.state == .reserved }) { return }
-            try await Task.sleep(for: .milliseconds(10))
+            return
         }
     }
 
@@ -201,7 +209,8 @@ public actor ChannelScheduler {
         resultDeliveryTimeout: Duration = .seconds(60), admission: ActionsAdmission? = nil,
         validateScope: @escaping @Sendable (FunctionInvocation, ExecutionOwner?) async throws -> Void = { _, _ in },
         deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed },
-        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil,
+        deliverStart: @escaping @Sendable (ExecutionStart) async -> ActionResultDelivery = { _ in .accepted }
     ) {
         precondition(capacityPerChannel > 0 && maximumTrackedInputs > 0 && maximumChannels > 0)
         self.admission = admission
@@ -210,6 +219,7 @@ public actor ChannelScheduler {
         self.resources = resources
         self.resultLedger = ActionResultLedger(capacity: resultCapacity, deliveryTimeout: resultDeliveryTimeout)
         self.deliverResult = deliverResult
+        self.deliverStart = deliverStart
         self.onExecutionSnapshot = onExecutionSnapshot
         self.diagnostics = ActionDiagnostics(capacity: diagnosticCapacity)
         self.capacityPerChannel = capacityPerChannel
@@ -294,6 +304,7 @@ public actor ChannelScheduler {
             guard !isShutdown else { throw ActionSchedulingError.shutdown }
             try admission?.check()
             try await validateScope(invocation.execution, invocation.owner)
+            try Task.checkCancellation()
             try resultLedger.checkCapacity(invocation)
             let channel = invocation.channel
             let key = InputKey(source: invocation.envelope.source, inputID: invocation.envelope.schedulingID)
@@ -454,17 +465,23 @@ public actor ChannelScheduler {
         for task in tasks { task.cancel() }
         for task in tasks { _ = await task.result }
     }
-    public func cancel(endpoint: String, incarnation: String, sessionID: String? = nil) async {
-        await joinAdmissions {
-            $0.owner?.endpoint == endpoint && $0.owner?.incarnation == incarnation
-                && (sessionID == nil || $0.envelope.sessionID == sessionID)
-        }
+    @discardableResult public func cancel(endpoint: String, incarnation: String, sessionID: String? = nil)
+        async -> Bool
+    {
         let selected = inputs.filter { key, state in
             key.source == endpoint && (sessionID == nil || state.sessionID == sessionID)
                 && state.producerIncarnation == incarnation
         }
-        for key in selected.keys { beginCancellation(key, retainBoundary: sessionID != nil) }
+        for key in selected.keys {
+            beginCancellation(key, retainBoundary: sessionID != nil, reschedule: false)
+        }
+        await joinAdmissions {
+            $0.owner?.endpoint == endpoint && $0.owner?.incarnation == incarnation
+                && (sessionID == nil || $0.envelope.sessionID == sessionID)
+        }
+        startEligibleChannels()
         for state in selected.values { _ = await state.completion.value }
+        return selected.values.allSatisfy(\.cleanupConfirmed)
     }
 
     public func cancel(resources revoked: Set<ResourceID>) async {
@@ -519,6 +536,8 @@ public actor ChannelScheduler {
                     started = true
                     self.executionTransition(job.id, to: .running)
                     self.diagnostics.record(job.invocation, kind: job.kind, phase: .started, effect: .unknown)
+                    self.resultLedger.started(job.invocation)
+                    self.startResultDelivery()
                     let completion: ActionCompletion
                     guard let ticket = job.invocation.prepared else { throw ActionExecutionError.invalidInvocation }
                     let executor = self.executor
@@ -567,6 +586,7 @@ public actor ChannelScheduler {
         state.pending -= 1
         switch outcome {
         case .success(let completion):
+            if !completion.cleanupConfirmed { state.cleanupConfirmed = false }
             let report: ActionReport?
             if case .report(let value) = completion { report = value } else { report = nil }
             let status = report?.status ?? .succeeded
@@ -592,6 +612,7 @@ public actor ChannelScheduler {
                 effect: status == .succeeded ? .contractCompleted : .unknown)
         case .failure(let error):
             let report = ActionReport.failureReport(for: error)
+            if !report.cleanupConfirmed { state.cleanupConfirmed = false }
             let cancelled = report.isCancellationOnly
             executionTransition(
                 job.id, to: cancelled ? .cancelled : .failed, completion: .report(report),
@@ -615,14 +636,14 @@ public actor ChannelScheduler {
         startEligibleChannels()
         startResultDelivery()
     }
-    private func beginCancellation(_ key: InputKey, retainBoundary: Bool = false) {
+    private func beginCancellation(_ key: InputKey, retainBoundary: Bool = false, reschedule: Bool = true) {
         guard let state = inputs[key] else { return }
         state.retainCancelledBoundary = retainBoundary
         state.cancelling = true
         state.failure = state.failure ?? CancellationError()
         cancelJobs(key: key)
         finalizeIfReady(key)
-        startEligibleChannels()
+        if reschedule { startEligibleChannels() }
     }
     private func decrementChannel(_ name: String, by count: Int) {
         guard count > 0 else { return }
@@ -640,15 +661,13 @@ public actor ChannelScheduler {
                         let executor = self.executor
                         discards[job.id] = Task {
                             await executor.discard(ticket)
-                            self.discardFinished(job.id)
+                            self.discardFinished(job)
                         }
+                    } else {
+                        recordUnstartedCancellation(job)
                     }
-                    executionTransition(job.id, to: .cancelled)
-                    resultLedger.complete(job.invocation, status: .cancelled, effect: .notStarted, failure: .cancelled)
-                    diagnostics.record(job.invocation, kind: job.kind, phase: .cancelled, effect: .notStarted)
                 }
                 let count = queued.count
-                state.pending -= count
                 decrementChannel(name, by: count)
                 state.phases[phase].lanes[name]?.queued.removeAll()
                 if let running = state.phases[phase].lanes[name]?.running {
@@ -659,7 +678,18 @@ public actor ChannelScheduler {
         }
         startResultDelivery()
     }
-    private func discardFinished(_ id: String) { discards[id] = nil }
+    private func recordUnstartedCancellation(_ job: Job) {
+        inputs[job.inputKey]?.pending -= 1
+        executionTransition(job.id, to: .cancelled)
+        resultLedger.complete(job.invocation, status: .cancelled, effect: .notStarted, failure: .cancelled)
+        diagnostics.record(job.invocation, kind: job.kind, phase: .cancelled, effect: .notStarted)
+    }
+    private func discardFinished(_ job: Job) {
+        discards[job.id] = nil
+        recordUnstartedCancellation(job)
+        finalizeIfReady(job.inputKey)
+        startResultDelivery()
+    }
 
     private func finalizeIfReady(_ key: InputKey) {
         guard let state = inputs[key], state.pending == 0,
@@ -689,14 +719,18 @@ extension ChannelScheduler {
                 let attemptID = UUID().uuidString
                 deliveryAttemptID = attemptID
                 deliveryAttempt = Task {
-                    let outcome = await deliverResult(result)
+                    let outcome =
+                        switch result {
+                        case .started(let started): await deliverStart(started)
+                        case .finished(let finished): await deliverResult(finished)
+                        }
                     pair.continuation.yield(outcome)
                     pair.continuation.finish()
                     self.finishDeliveryAttempt(attemptID)
                 }
                 var iterator = pair.stream.makeAsyncIterator()
                 let outcome = await iterator.next() ?? .closed
-                resultLedger.delivered(result.executionID, outcome: outcome)
+                resultLedger.delivered(result, outcome: outcome)
                 if deliveryAttemptID == attemptID { deliveryAttempt?.cancel() }
             } else {
                 do { try await Task.sleep(for: .milliseconds(100)) } catch { return }

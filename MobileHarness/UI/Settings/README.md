@@ -172,7 +172,7 @@ Assistant 请求详情的 User Request / Assistant Response 使用完整业务�
 
 Assistant 历史仅呈现实际发起的模型请求。列表对打断了此前回复的请求显示红色 Interrupt decision（打断决策）标签，未打断不显示标签；被打断的请求显示 Interrupted（已中断）状态；列表中的状态按含义着色（生成中蓝、已完成绿、失败红、已取消灰、已中断橙）。详情的 Interrupt decision 区块显示是否打断（是/否；没有决策时，例如空闲时的首条输入，区块改称 Input source 且不显示该行）、来源、采集时间标记、决策路径及批次关联；旧记录中的字符串决策按 true/interrupt 为是、其余为否读取。discard 不产生历史条目。状态词（Generating/Completed/Failed/Cancelled/Interrupted）、响应状态、Token 报告及详情页文案均经 AppLanguage 解析，记录原文、ID、角色名和路径保持原样。真实模型请求无正文且无工具调用时显示生成中、失败、取消、中断或结束无输出的具体状态；只有工具调用时保留完整调用信息。协调证据随导出和清理日志后的投影保留。
 
-下载源选择与 speech 页面一致，无独立保存按钮；编辑通过根拥有的防抖工作流持久化，点击下载先保存当前源。进行中的下载保留接纳时的源，后续选择只用于新下载。
+下载源选择与语音页一致，无独立保存按钮；编辑通过根拥有的防抖工作流持久化，点击下载先保存当前源。进行中的下载保留接纳时的源，后续选择只用于新下载。
 
 各模型页面共用下载源名称 Hugging Face、HF Mirror (China) 和 Custom domain；Hugging Face 名称不附加 Official／官方修饰。
 
@@ -182,8 +182,21 @@ Assistant 历史仅呈现实际发起的模型请求。列表对打断了此前�
 
 模型评分显示“推荐指数”（Recommendation），Decision四模型的星级是人工审阅的打断任务推荐等级，优先少误打断，再参考召回、延迟和跨模板稳定性；不是准确率或置信度。Vela 3 Fast为3星、D3 Edge为2.5星、Vela 3.1 Fast为2星、Laya为1.5星，界面标注仅供Mac实验参考，中文可靠性与真机表现仍待验证。依据见[二分类验证](../../../docs/validation/Decision-Binary-Interrupt-Mac-Comparison.md)。设置说明只呈现下载前提、保存步骤、删除影响和必要使用提示；普通模型列表显示状态、大小与许可证，不显示 revision 哈希。模型页不解释内部思考档位、工具调用、上下文容量或消息队列。中英文文案由共享 String Catalog 同步维护，历史记录与执行证据保留原始内容。
 
-Speech Recognition includes persisted speech-onset (1…16 windows, step 1) and probability (0.05…0.95, step 0.05) sliders, defaulting to 8 and 0.65. Slider release submits both values through ModelResourcesControlling; saving disables editing, failures remain visible and restore confirmed values. Labels show onset duration at 32 ms/window and next-listening activation.
+## 语音模型
 
-## Recognition noise suppression
+设置的 AI 模型入口依次为语音、视觉、智能体。语音页面按 VAD、语句结束确认、降噪、关键词检测、
+ASR、TTS 排列模型菜单，由 ModelKit 候选清单与已安装状态决定可选项。VAD 的起声
+窗口（1…16 帧，默认 8）和概率阈值（0.05…0.95，默认 0.65）位于该能力下；
+音频检测位于语音页顶部，模型菜单连续排列。关键词菜单下的测试面板显示麦克风电平、首次命中的词和尾部静音判定。下载区首行是共用的下载源，随后使用同一能力分类及既有的下载、
+进度、取消和删除操作。
 
-Speech Recognition includes DeepFilterNet3 in the existing model list and an independent Noise suppression switch. Download/progress/cancel/delete reuse resource controls. The switch persists through the existing source transaction, shows failure without committing a draft, and explains next-listening application and roughly 400 ms buffering. Installed-model startup loading is independent of the switch. Deleting DeepFilterNet3 turns denoising off without changing the selected ASR.
+默认选择能量 VAD、关闭语句结束确认、降噪和关键词检测，以及 Apple 系统识别与语音。模型安装只
+改变可选状态；模型选择通过原有偏好事务保存，失败恢复已确认值。移除当前模型后，
+对应能力回到默认。降噪和关键词检测用于下一次语音采集，未就绪或未命中的关键词
+继续走最终 ASR Decision。
+
+关键词检测菜单下提供置信度滑块，默认 0.25，范围 0.10…0.60，步进 0.05。松开时保存；正式聆听和关键词测试均在下一次开始时采用保存值。
+
+语音合成菜单包含 Apple、MOSS TTS Nano 和 Kokoro 82M。选择 Kokoro 后显示语音语言
+和音色菜单。切换语言会选择该语言的默认音色，音色菜单只列出该语言的候选项。
+音色随合成偏好保存，下一条 Kokoro 合成请求使用已应用的选择。

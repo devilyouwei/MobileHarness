@@ -76,12 +76,13 @@ Delete gates every referencing resource before host quiescence, drains/unloads, 
 | --- | --- |
 | Chat | Gemma 4 E2B QAT; explicit cloud configuration replaces chat only |
 | Recognition | Enabled installed available Nemotron, else modern Apple |
-| Synthesis | Enabled installed available MOSS, else Apple |
-| VAD | Installed available Silero, else Energy, independent of ASR preference |
+| Synthesis | Selected installed available MOSS or Kokoro, else Apple |
+| VAD | Energy by default; Silero requires an explicit selection and an installed artifact |
+| End-of-turn confirmation | Off by default; Smart Turn requires an explicit selection and an installed artifact |
 | Pose | yolo26n-pose only |
 | Judgment | No default; missingDefault |
 
-Stable speech facades select before an operation; active inference failure does not switch provider. Custom recognition/synthesis default off. Local adapters never auto-download. Kokoro is not registered. Apple recognition combines transcriber/detector; ordinary silence timing uses external Silero/Energy rather than assumed native activity callbacks.
+Stable speech facades select before an operation; active inference failure does not switch provider. Custom recognition/synthesis default off. Local adapters never auto-download. Kokoro’s model and optional voice ID are updated together and resolved for each synthesis request. Apple recognition combines transcriber/detector; ordinary silence timing uses external Silero/Energy rather than assumed native activity callbacks.
 
 Automatic Apple recognition reads the host locale at provider selection. Apple English and Simplified Chinese each use a registered managed resource. Availability, preparation, and transcription resolve through the same selector. Explicit recognition locales remain available through Nemotron when it is selected.
 
@@ -93,9 +94,9 @@ configureChat updates the language scope’s selected Chat binding. Cloud reques
 
 ## Preparation and residency
 
-Registration is lazy. Explicit voice admission/diagnostics prepares selected capabilities and drains real synthetic TTS warmup without playback; initialization does not warm. Failure propagates. Independent per-model leases let ASR/VAD cooperate but reject overlap on the same model.
+Registration is lazy. App includes selected Zipformer and Smart Turn in the home preparation scope. Standalone ModelContainer clients can use installed-detector observation. Explicit voice admission/diagnostics prepares other selected capabilities and drains real synthetic TTS warmup without playback. Failure propagates. Independent per-model leases let ASR/VAD cooperate but reject overlap on the same model.
 
-Large local Gemma/Nemotron/MOSS and pose releaseWhenIdle opt into memory-pressure policy; Silero/system speech retain. Local Gemma requires supported OS/hardware/artifacts; explicit cloud works without Gemma artifacts. Native simulator CoreAI support is a separate backend constraint.
+Large local Gemma/Nemotron/MOSS/Kokoro and pose releaseWhenIdle opt into memory-pressure policy; Silero/system speech retain. Local Gemma requires supported OS/hardware/artifacts; explicit cloud works without Gemma artifacts. Native simulator CoreAI support is a separate backend constraint.
 
 [HuggingFace transfer](HuggingFace/README.md) · [Core lifecycle mechanisms](../Core/README.md)
 
@@ -178,3 +179,9 @@ ArtifactStore.observeChanges returns ModelKit.StateSignalListener<UInt64>. Its p
 ## Selectable language registrations
 
 Chat and native Decision registrations declare a stable selectable ID, supported modes and associated artifact ID. Manager indexes the existing registrations. The language port projects public descriptors and resolves the same IDs to execution bindings and preparation. Gemma’s resource ID is `chat`, its selectable ID and artifact ID are `gemma4-e2b`. Artifact-backed display names come from the bundled catalog. Apple declares its system identity and supplies OS availability through its lightweight provider.
+
+Zipformer registers as `keywordSpotting` under the speech defaults. Its
+artifact has an independent install receipt and maintenance fence. Foreground
+preparation observes the catalog state; only an installed artifact is warmed.
+
+ModelManager supports ordinary unload and cancelling unload by concrete registration ID. It reserves the registration before awaiting work and releases the fence only after the resource is drained. Required artifact checks run against the configured installation state.

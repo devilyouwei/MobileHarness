@@ -28,6 +28,18 @@ import Testing
     #expect(throws: CapabilityError.self) { try KokoroInput.validate(text: "안녕하세요", locale: "auto") }
 }
 
+@Test func selectedKokoroVoiceRoutesOnlyToItsOwnLanguage() throws {
+    let catalog = KokoroVoiceCatalog.voicesByLanguage
+    #expect(catalog["en"]?.count == 28)
+    #expect(catalog["zh"]?.count == 103)
+    #expect(KokoroVoiceCatalog.voice(for: .english, preferred: "bf_emma") == "bf_emma")
+    #expect(KokoroVoiceCatalog.voice(for: .mandarin, preferred: "bf_emma") == "zf_001")
+    #expect(KokoroVoiceCatalog.voice(for: .mandarin, preferred: "zm_100") == "zm_100")
+    #expect(KokoroVoiceCatalog.voice(for: .english, preferred: "zm_100") == "af_heart")
+    let segments = try KokoroInput.segments(text: "2026", locale: "auto", preferredLanguage: .mandarin)
+    #expect(segments.map(\.language) == [.mandarin])
+}
+
 @Test func chunkingPreservesWordsAndBounds() throws {
     let text = Array(repeating: "hello", count: 60).joined(separator: " ")
     let chunks = try KokoroInput.chunks(text) { $0.count + 2 }

@@ -30,17 +30,33 @@ extension InputPayload {
     }
 }
 
-/// Whether the Assistant has reply work or playback in the speech session. SpeechPerception only caches it to choose
-/// its silence endpoint; the Assistant remains the sole owner of the fact.
+/// Reply activity drives the silence endpoint. Native playback intervals also align onset policy to capture time.
 public struct ReplyActivitySignal: Codable, Sendable, Equatable {
     public static let contract = "agent.reply.activity.v1"
     public static let channel = "agent.reply"
+    static let maximumBytes = 4096
     public let active: Bool
+    public let replyID: UUID?
+    public let playback: SpeechPlaybackSnapshot?
+    public let continuation: SpeechContinuationProbe?
 
-    public init(active: Bool) { self.active = active }
+    public init(
+        active: Bool, replyID: UUID? = nil, playback: SpeechPlaybackSnapshot? = nil,
+        continuation: SpeechContinuationProbe? = nil
+    ) {
+        self.active = active
+        self.replyID = replyID
+        self.playback = playback
+        self.continuation = continuation
+    }
+
+    func validate() throws {
+        guard playback?.isValid ?? true else { throw CommunicationError.invalidPayload }
+    }
 
     public func message() -> AgentMessage {
-        AgentMessage(contract: Self.contract, content: self, maximumBytes: 256, validate: { _ in })
+        AgentMessage(
+            contract: Self.contract, content: self, maximumBytes: Self.maximumBytes, validate: { try $0.validate() })
     }
 }
 
@@ -78,11 +94,15 @@ extension AssistantChatWorker {
         repeat {
             replyActivityDirty = false
             let active = await hasActiveReply(sessionID: speechSessionID)
-            guard active != publishedReplyActivity else { continue }
-            publishedReplyActivity = active
+            let playback = await speechOutput?.playbackSnapshot(sessionID: speechSessionID) ?? .init()
+            let target = active && decisionTurn?.sessionID == speechSessionID ? decisionTurn?.id : nil
+            let activity = ReplyActivitySignal(
+                active: active, replyID: target, playback: playback, continuation: speechContinuationProbe)
+            guard activity != publishedReplyActivity else { continue }
+            publishedReplyActivity = activity
             let parent = AgentInput(
                 id: UUID().uuidString, sessionID: speechSessionID, payload: .event("reply.activity"))
-            do { try await messaging.publish(ReplyActivitySignal(active: active).message(), parent: parent) } catch {
+            do { try await messaging.publish(activity.message(), parent: parent) } catch {
                 publishedReplyActivity = nil
                 Logger(subsystem: "dev.mobileharness", category: "AssistantSpeech").error(
                     "reply activity not published: \(String(describing: error), privacy: .public)")

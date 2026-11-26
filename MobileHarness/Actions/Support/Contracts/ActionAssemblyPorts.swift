@@ -1,25 +1,47 @@
 import Foundation
 
+public struct ModelSettingsChange: Sendable {
+    public enum Role: String, Sendable {
+        case assistant, writer, decision, vision
+        case recognition, synthesis, voiceActivity, enhancement, keywordSpotting, endpointConfirmation
+    }
+    public var roles: Set<Role>
+    public var modelIDs: Set<String>
+    public init(roles: Set<Role> = [], modelIDs: Set<String> = []) {
+        self.roles = roles
+        self.modelIDs = modelIDs
+    }
+}
+
 @MainActor public struct ActionMaintenancePorts<Artifacts: Sendable> {
     public let artifacts: @MainActor () async throws -> Artifacts
     public let quiesce: @MainActor (String) async -> Void
     public let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
+    public let bindSpeechModels: (@MainActor ([String: String], String?) async throws -> Void)?
     public let beginSettings: @MainActor () async -> Void
     public let endSettings: @MainActor () -> Void
     public let resourcesPresented: @MainActor () -> Void
+    public let beginModelChange: @MainActor @Sendable (ModelSettingsChange) async throws -> Void
+    public let endModelChange: @MainActor @Sendable () -> Void
     public init(
         artifacts: @escaping @MainActor () async throws -> Artifacts,
         quiesce: @escaping @MainActor (String) async -> Void,
         bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void,
+        bindSpeechModels: (@MainActor ([String: String], String?) async throws -> Void)? = nil,
         beginSettings: @escaping @MainActor () async -> Void, endSettings: @escaping @MainActor () -> Void,
-        resourcesPresented: @escaping @MainActor () -> Void
+        resourcesPresented: @escaping @MainActor () -> Void,
+        beginModelChange: @escaping @MainActor @Sendable (ModelSettingsChange) async throws -> Void = { _ in },
+        endModelChange: @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.artifacts = artifacts
         self.quiesce = quiesce
         self.bindSpeech = bindSpeech
+        self.bindSpeechModels = bindSpeechModels
         self.beginSettings = beginSettings
         self.endSettings = endSettings
         self.resourcesPresented = resourcesPresented
+        self.beginModelChange = beginModelChange
+        self.endModelChange = endModelChange
     }
 }
 @MainActor

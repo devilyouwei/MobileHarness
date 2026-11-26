@@ -12,7 +12,7 @@ import UI
 extension AgentManager {
     func receiveLocally(_ input: AgentInput, to target: AgentID) async throws -> DeliveryReport {
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult, .activityEvent:
+        case .actionResult, .toolResult, .executionFeedback, .activityEvent:
             throw CommunicationError.unauthorized
         default: break
         }
@@ -94,12 +94,14 @@ extension AgentManager {
         case .restoreSource: value = .restore
         case .saveSource(
             let endpoint, let cellular, let recognition, let synthesis, let decision, let windows, let threshold,
-            let enhancement):
+            let enhancement, let keywordInterrupt, let models, let voice, let keywordThreshold):
             value = .save(
                 .init(
                     endpoint: endpoint, allowsCellular: cellular,
                     useCustomRecognition: recognition, useCustomSynthesis: synthesis, useLocalDecision: decision,
-                    vadOnsetWindows: windows, vadThreshold: threshold, useSpeechEnhancement: enhancement))
+                    vadOnsetWindows: windows, vadThreshold: threshold, useSpeechEnhancement: enhancement,
+                    useKeywordInterrupt: keywordInterrupt, speechModels: models, synthesisVoice: voice,
+                    keywordThreshold: keywordThreshold ?? 0.25))
         default: throw CommunicationError.unauthorized
         }
         guard case .source(let result) = try await resources.requests.submit(value) else {

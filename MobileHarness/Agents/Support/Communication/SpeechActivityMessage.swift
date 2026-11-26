@@ -1,6 +1,21 @@
 import AgentCore
 import Foundation
 
+enum SpeechSignalClock {
+    private static let origin = ContinuousClock.now
+    static func offset(at instant: ContinuousClock.Instant) -> Duration { origin.duration(to: instant) }
+}
+
+public struct SpeechContinuationProbe: Codable, Sendable, Equatable {
+    public static let windowCount = 64
+    public let id: UUID
+    public let since: Duration
+    init(id: UUID = UUID(), since: ContinuousClock.Instant = .now) {
+        self.id = id
+        self.since = SpeechSignalClock.offset(at: since)
+    }
+}
+
 /// Speech facts SpeechPerception publishes for any subscriber: capture generations and utterance onset/lifecycle.
 /// No audio or text; the final text travels as `user.input.speech.v1`.
 public struct SpeechActivity: Codable, Sendable, Equatable {
@@ -8,6 +23,7 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
         case captureStarted, captureStopped
         /// Whether the current capture generation cancels echo, so full duplex may be used.
         case duplexSupport
+        case continuationReady
         /// A voice-activity onset candidate began, or ended before it was confirmed as speech.
         case onsetStarted, onsetCleared
         /// The candidate was confirmed; `utterance` identifies the new utterance.
@@ -25,12 +41,17 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
     public let generation: String?
     public let utterance: String?
     public let fullDuplex: Bool?
+    public let continuation: SpeechContinuationProbe?
 
-    public init(_ kind: Kind, generation: String? = nil, utterance: String? = nil, fullDuplex: Bool? = nil) {
+    public init(
+        _ kind: Kind, generation: String? = nil, utterance: String? = nil, fullDuplex: Bool? = nil,
+        continuation: SpeechContinuationProbe? = nil
+    ) {
         self.kind = kind
         self.generation = generation
         self.utterance = utterance
         self.fullDuplex = fullDuplex
+        self.continuation = continuation
     }
 
     func validate() throws {
@@ -38,6 +59,7 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
         switch kind {
         case .captureStarted, .captureStopped: valid = generation != nil
         case .duplexSupport: valid = fullDuplex != nil
+        case .continuationReady: valid = generation != nil && continuation != nil
         case .onsetConfirmed, .utteranceEnded: valid = utterance != nil
         case .onsetStarted, .onsetCleared, .utterancesCleared, .ended: valid = true
         }

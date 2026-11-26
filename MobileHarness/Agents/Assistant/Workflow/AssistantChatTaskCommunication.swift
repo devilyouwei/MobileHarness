@@ -68,10 +68,16 @@ extension AssistantChatWorker {
 
     public func ownsFeedback(_ input: AgentInput) -> Bool {
         switch input.payload {
-        case .roundResult(let value): return value.roundID == roundID || pendingRounds[value.roundID] != nil
-        case .actionResult(let value):
-            return value.roundID != nil
-                && (value.roundID == roundID || value.roundID.map { pendingRounds[$0] != nil } == true)
+        case .executionFeedback(.roundFinished(let value)):
+            return executionRoundSources[value.id] != nil
+        case .executionFeedback(.roundStarted(let id)), .executionFeedback(.actionStarted(let id, _)):
+            return executionRoundSources[id] != nil
+        case .executionFeedback(.interruptionStarted(let id)):
+            return activeInterruption?.id == id
+        case .executionFeedback(.interruptionFinished(let value)):
+            return activeInterruption?.id == value.id
+        case .executionFeedback(.actionFinished(let value)):
+            return value.roundID.map { ownsExecutionRound($0, input: input) } == true
         case .toolResult(let value):
             return roundCalls.contains { $0.id == value.callID }
                 || pendingRounds.values.contains { $0.calls.contains { $0.id == value.callID } }

@@ -80,7 +80,7 @@ public struct PhotographerSignalPreprocessor: SignalPreprocessor {
     public func classify(_ input: AgentInput, state: PhotographerContextState) throws -> SignalDisposition {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult: return .feedback
+        case .actionResult, .toolResult, .executionFeedback: return .feedback
         case .text: return .enqueue(priority: 0)
         case .observation(let message):
             if message.contract == CameraStateObservation.contract { return .replaceLatest(key: "camera") }

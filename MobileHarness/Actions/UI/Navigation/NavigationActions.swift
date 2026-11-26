@@ -9,7 +9,7 @@ extension UIActions {
             .init(
                 "destination", type: .string, required: true, description: "Existing application destination.",
                 constraints:
-                    "home, settings, language, recognition, synthesis, vision, bluetooth, assistantHistory, writerHistory or album."
+                    "home, settings, language, speech, recognition, synthesis, vision, bluetooth, assistantHistory, writerHistory or album."
             )
         ], timeout: .seconds(5))
     public static func open(invocation: any FunctionInput, using presentation: any ResourcePresentationCapability)
@@ -20,7 +20,8 @@ extension UIActions {
         let destination = try args.requiredString("destination", maximumUTF8Bytes: 32)
         guard
             [
-                "home", "settings", "language", "recognition", "synthesis", "vision", "bluetooth", "assistantHistory",
+                "home", "settings", "language", "speech", "recognition", "synthesis", "vision", "bluetooth",
+                "assistantHistory",
                 "writerHistory", "album",
             ]
             .contains(destination)

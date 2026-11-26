@@ -109,7 +109,7 @@ struct FixtureNativeChatState: AssistantChatState {
     }
     static func preprocess(_ input: AgentInput, state: Self) throws -> SignalDisposition {
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult: return .feedback
+        case .actionResult, .toolResult, .executionFeedback: return .feedback
         default: return .enqueue(priority: 0)
         }
     }

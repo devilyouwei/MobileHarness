@@ -1,7 +1,8 @@
 import Foundation
 
 public enum NavigationPage: String, Encodable, Sendable {
-    case home, settings, language, recognition, synthesis, vision, decision, bluetooth, assistantHistory, writerHistory,
+    case home, settings, language, speech, recognition, synthesis, vision, decision, bluetooth, assistantHistory,
+        writerHistory,
         album, assistantBrain, writerBrain
     case albumPhoto, agentRecords, conversation, turn
 }
@@ -76,6 +77,7 @@ extension AppDestination {
         switch self {
         case .settings: .settings
         case .language: .language
+        case .speech: .speech
         case .recognition: .recognition
         case .synthesis: .synthesis
         case .vision: .vision

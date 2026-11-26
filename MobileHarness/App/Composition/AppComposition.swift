@@ -13,6 +13,7 @@ import UI
     private let snapshot: Mutex<AppLanguage>
     private(set) var preference: AppLanguagePreference
     private(set) var language: AppLanguage
+    @ObservationIgnored var effectiveLanguageChanged: (@MainActor () -> Void)?
 
     init(
         defaults: UserDefaults = .standard,
@@ -41,6 +42,7 @@ import UI
         guard language != resolved else { return }
         snapshot.withLock { $0 = resolved }
         language = resolved
+        effectiveLanguageChanged?()
     }
 }
 
@@ -75,6 +77,7 @@ import UI
         connect()
     }
     private func connect() {
+        languageSettings.effectiveLanguageChanged = { [weak self] in self?.languageChanged() }
         services.agents.writer.bindBackgroundExecution(writerBackground.start)
         let selected = scopeID
         features.bootstrap = { [weak self] in
@@ -122,6 +125,15 @@ import UI
         let selected = scopeID
         do { try await startScope() } catch is CancellationError {} catch {
             if selected == scopeID { features.reportStartupFailure(error) }
+        }
+    }
+    private func languageChanged() {
+        features.updateLanguage()
+        guard (try? owner.get().state) == .running else { return }
+        services.actionAssembly.languageChanged(using: services.model) {
+            [containerFailures = services.containerFailures] error in
+            containerFailures.report(
+                module: "app", component: "homePreparation", operation: "changeLanguage", error: error)
         }
     }
     func setForeground(_ foreground: Bool) {

@@ -60,14 +60,16 @@
         func endSettingsChange() { interaction?.lifecycle.endSettingsChange() }
         func start(
             recognition: any SpeechRecognitionCapability, vad: any VoiceActivityCapability,
-            enhancement: any SpeechEnhancementCapability,
+            enhancement: any SpeechEnhancementCapability, keywordSpotting: (any KeywordSpottingCapability)?,
+            endpointConfirmation: (any SpeechEndpointCapability)?,
             input: any AudioCaptureObserving, spectrum: any SpectrumPresenting,
             runtime: VoiceRuntimeDependencies
         ) async throws -> any VoicePerceptionHandling {
             guard !closed else { throw AgentContainerError.stopped }
             guard agent == nil else { throw AgentContainerError.busy }
             let value = try runtime.makePerception(
-                recognition, vad, runtime.interactionSessionID, input, spectrum, enhancement)
+                recognition, vad, runtime.interactionSessionID, input, spectrum, enhancement, keywordSpotting,
+                endpointConfirmation)
             try await runtime.manager.register(value)
             agent = value
             manager = runtime.manager

@@ -547,7 +547,7 @@ public actor ApplicationControlAgent: Agent {
 
     private func acceptsPassive(_ input: AgentInput) -> Bool {
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult: return true
+        case .actionResult, .toolResult, .executionFeedback: return true
         case .observation(let message):
             if case .retire? = message.resourceIntent {
                 return input.metadata.origin == .local && input.metadata.source == "runtime"
@@ -730,15 +730,20 @@ public actor ApplicationControlAgent: Agent {
                 case .restoreSource: call = try ApplicationControlFunctions.restoration.call([:])
                 case .saveSource(
                     let endpoint, let cellular, let recognition, let synthesis, let decision, let windows,
-                    let threshold, let enhancement
+                    let threshold, let enhancement, let keywordInterrupt, let models, let voice, let keywordThreshold
                 ):
-                    call = try ApplicationControlFunctions.saving.call([
+                    var arguments = [
                         "endpoint": endpoint, "allowsCellular": cellular ? "true" : "false",
                         "recognition": recognition ? "true" : "false", "synthesis": synthesis ? "true" : "false",
                         "decision": decision ? "true" : "false",
                         "vadOnsetWindows": String(windows), "vadThreshold": String(threshold),
                         "enhancement": enhancement ? "true" : "false",
-                    ])
+                        "keywordInterrupt": keywordInterrupt ? "true" : "false",
+                    ]
+                    if let models { arguments["speechModels"] = try Self.encodeSpeechModels(models) }
+                    arguments["synthesisVoice"] = voice
+                    if let keywordThreshold { arguments["keywordThreshold"] = String(keywordThreshold) }
+                    call = try ApplicationControlFunctions.saving.call(arguments)
                 default: throw CommunicationError.invalidPayload
                 }
                 preferenceRequest = input.id
@@ -855,10 +860,13 @@ public actor ApplicationControlAgent: Agent {
             }
             if preferenceFunction, !result.isError {
                 let value = try ApplicationControlResourcePolicy.preferenceValue(result.value)
-                let call = try ApplicationControlFunctions.speechBinding.call([
+                var arguments = [
                     "recognition": value.useCustomRecognition ? "true" : "false",
                     "synthesis": value.useCustomSynthesis ? "true" : "false",
-                ])
+                ]
+                if let models = value.speechModels { arguments["speechModels"] = try Self.encodeSpeechModels(models) }
+                arguments["synthesisVoice"] = value.synthesisVoice
+                let call = try ApplicationControlFunctions.speechBinding.call(arguments)
                 configurationCall = call.id
                 pending[call.id] = original
                 try emit(.toolCall(call), for: original)
@@ -875,6 +883,10 @@ public actor ApplicationControlAgent: Agent {
         }
         processed += 1
     }
+    private static func encodeSpeechModels(_ models: [String: String]) throws -> String {
+        String(decoding: try JSONEncoder().encode(models), as: UTF8.self)
+    }
+
     private func admitHostFailure(_ failure: ModelResourceHostFailure, message: AgentMessage, input: AgentInput)
         throws
     {

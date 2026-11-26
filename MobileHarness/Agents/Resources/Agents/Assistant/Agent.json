@@ -28,8 +28,7 @@
   "signals": {
     "requests": [],
     "feedback": [
-      "action.result.v1",
-      "agent.round.result.v1"
+      "action.execution.feedback.v1"
     ],
     "publications": [
       {
@@ -67,7 +66,8 @@
         "channel": "agent.interruption",
         "protocol": "agent.interruption.v1",
         "sources": [
-          "applicationControl"
+          "applicationControl",
+          "speechPerception"
         ]
       },
       {

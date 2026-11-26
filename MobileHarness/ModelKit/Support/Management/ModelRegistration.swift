@@ -24,7 +24,7 @@ public struct ModelID: Hashable, Sendable {
 }
 
 public enum ProvidedCapability: String, CaseIterable, Hashable, Sendable {
-    case chat, recognition, synthesis, decision, voiceActivity, enhancement, pose
+    case chat, recognition, synthesis, decision, voiceActivity, enhancement, keywordSpotting, endpointConfirmation, pose
 }
 
 public enum ModelRegistrationError: Error, Equatable, Sendable {
@@ -45,7 +45,9 @@ public struct ProvidedCapabilities: Sendable {
     public let synthesis: (any SpeechSynthesisCapability)?
     public let decision: (any DecisionCapability)?
     public let pose: (any PoseCapability)?
+    public let keywordSpotting: (any KeywordSpottingCapability)?
     public let enhancement: (any SpeechEnhancementCapability)?
+    public let endpointConfirmation: (any SpeechEndpointCapability)?
     public let voiceActivity: (any VoiceActivityCapability)?
 
     public init(
@@ -53,8 +55,11 @@ public struct ProvidedCapabilities: Sendable {
         chat: (any ChatCapability)? = nil, recognition: (any SpeechRecognitionCapability)? = nil,
         synthesis: (any SpeechSynthesisCapability)? = nil, decision: (any DecisionCapability)? = nil,
         enhancement: (any SpeechEnhancementCapability)? = nil,
-        voiceActivity: (any VoiceActivityCapability)? = nil, pose: (any PoseCapability)? = nil
+        keywordSpotting: (any KeywordSpottingCapability)? = nil,
+        voiceActivity: (any VoiceActivityCapability)? = nil,
+        endpointConfirmation: (any SpeechEndpointCapability)? = nil, pose: (any PoseCapability)? = nil
     ) {
+        self.keywordSpotting = keywordSpotting
         self.enhancement = enhancement
         self.warmup = warmup
         self.chat = chat
@@ -62,10 +67,13 @@ public struct ProvidedCapabilities: Sendable {
         self.synthesis = synthesis
         self.decision = decision
         self.voiceActivity = voiceActivity
+        self.endpointConfirmation = endpointConfirmation
         self.pose = pose
     }
     func availability(for kind: ProvidedCapability) async -> CapabilityAvailability {
         switch kind {
+        case .keywordSpotting:
+            return await keywordSpotting?.availability ?? .unavailable(reason: "Keyword spotter is not registered")
         case .enhancement:
             return await enhancement?.availability ?? .unavailable(reason: "Capability is not registered")
         case .pose: return await pose?.availability ?? .unavailable(reason: "Capability is not registered")
@@ -74,18 +82,22 @@ public struct ProvidedCapabilities: Sendable {
             return await recognition?.availability ?? .unavailable(reason: "Capability is not registered")
         case .synthesis: return await synthesis?.availability ?? .unavailable(reason: "Capability is not registered")
         case .decision: return await decision?.availability ?? .unavailable(reason: "Capability is not registered")
+        case .endpointConfirmation:
+            return await endpointConfirmation?.availability ?? .unavailable(reason: "Capability is not registered")
         case .voiceActivity:
             return await voiceActivity?.availability ?? .unavailable(reason: "Capability is not registered")
         }
     }
     public var supported: Set<ProvidedCapability> {
         var result: Set<ProvidedCapability> = []
+        if keywordSpotting != nil { result.insert(.keywordSpotting) }
         if enhancement != nil { result.insert(.enhancement) }
         if pose != nil { result.insert(.pose) }
         if chat != nil { result.insert(.chat) }
         if recognition != nil { result.insert(.recognition) }
         if synthesis != nil { result.insert(.synthesis) }
         if decision != nil { result.insert(.decision) }
+        if endpointConfirmation != nil { result.insert(.endpointConfirmation) }
         if voiceActivity != nil { result.insert(.voiceActivity) }
         return result
     }

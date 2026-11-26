@@ -15,7 +15,7 @@ The diagram shows runtime calls and data flow, not compilation dependencies.
 ```mermaid
 flowchart TB
  Store[ModelArtifactStore] -->|Artifact declaration and staging URL| Downloader[HuggingFaceArtifactDownloader]
- Downloader -->|Resolve metadata and selected paths| Hub[HubClient]
+ Downloader -->|Resolve paginated metadata and selected paths| Hub[Hub repository tree API]
  Hub -->|Validated file metadata| Plan[Persisted bounded transfer plan]
  Plan --> Transfer[HubBackgroundTransfer]
  Transfer --> Session[Native URLSession file tasks]
@@ -26,7 +26,7 @@ flowchart TB
 
 ## Planning and transfer
 
-HubClient resolves selected regular files from repository/revision/patterns and optional stripPrefix. Apply custom HTTPS endpoint/cellular per operation, without environment credentials. Persist plan ≤16,384 files/32 GiB/8 MiB JSON. Unsafe/reserved paths and length mismatches fail. Management owns two active/eight pending packages; HubBackgroundTransfer owns three active file tasks per package.
+The downloader reads the repository tree at the pinned revision through the Hub API, decoding the SDK’s tree metadata. Pagination follows links on the same origin and revision path, rejects repeats, and admits up to 64 pages and 16,384 entries. Patterns select regular files; optional stripPrefix maps them to installed paths. The selected set must cover every required file before any transfer begins. Apply custom HTTPS endpoint/cellular per operation, without environment credentials. Persist plan ≤16,384 files/32 GiB/8 MiB JSON. Unsafe/reserved paths and length mismatches fail. Management owns two active/eight pending packages; HubBackgroundTransfer owns three active file tasks per package.
 
 iOS uses stable generation-based background URLSession; macOS uses default session. Delegate completion moves files/submits next work independently of foreground/page tasks. isDiscretionary=false requests timely user-initiated transfers, not an OS guarantee. Relaunch reattaches tasks; completed files are validated before reuse.
 

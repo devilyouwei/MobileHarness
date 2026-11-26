@@ -2,6 +2,8 @@ import FunctionContracts
 
 public protocol ModelResourceCapability: Sendable {
     func configureSpeech(recognition: Bool, synthesis: Bool) async throws
+    func configureSpeechModels(_ models: [String: String]) async throws
+    func configureSpeechModels(_ models: [String: String], synthesisVoice: String?) async throws
     func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws
     func cancel(_ id: String) async throws
     func remove(_ id: String) async throws
@@ -44,5 +46,17 @@ public struct ModelResourcesModule: CapabilityModule {
                 try await SystemActions.remove(invocation: $0, using: resources)
             }),
         ]
+    }
+}
+
+extension ModelResourceCapability {
+    public func configureSpeechModels(_ models: [String: String], synthesisVoice: String?) async throws {
+        guard synthesisVoice == nil else { throw ModelResourcePreferenceError.invalidSpeechModel }
+        try await configureSpeechModels(models)
+    }
+
+    public func configureSpeechModels(_ models: [String: String]) async throws {
+        try await configureSpeech(
+            recognition: models["recognition"] == "nemotron-local", synthesis: models["synthesis"] == "moss-tts-nano")
     }
 }

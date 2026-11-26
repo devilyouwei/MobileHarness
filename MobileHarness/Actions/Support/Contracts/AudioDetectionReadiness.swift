@@ -17,8 +17,10 @@ public final class AudioDetectionReadiness: Sendable {
         }
     }
     public let events: AsyncStream<Void>
+    public let keywordTest: Bool
     private let continuation: AsyncStream<Void>.Continuation
-    public init() {
+    public init(keywordTest: Bool = false) {
+        self.keywordTest = keywordTest
         let stream = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         events = stream.stream
         continuation = stream.continuation

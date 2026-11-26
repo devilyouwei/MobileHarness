@@ -11,7 +11,8 @@ public enum SettingsModelResourcesAdapter {
     public static func validatePreferences(_ draft: ModelResourcePreferences) throws -> ModelResourcePreferences {
         guard (1...16).contains(draft.vadOnsetWindows), draft.vadThreshold.isFinite,
             (0.05...0.95).contains(draft.vadThreshold),
-            abs(draft.vadThreshold * 20 - (draft.vadThreshold * 20).rounded()) < 0.00001
+            abs(draft.vadThreshold * 20 - (draft.vadThreshold * 20).rounded()) < 0.00001,
+            ModelResourcePreferences.isValidKeywordThreshold(draft.keywordThreshold)
         else { throw ModelResourcePreferenceError.invalidDetection }
         do {
             let source = try ModelDownloadSource(endpoint: draft.endpoint, allowsCellular: true)
@@ -20,7 +21,9 @@ public enum SettingsModelResourcesAdapter {
                 useCustomRecognition: draft.useCustomRecognition, useCustomSynthesis: draft.useCustomSynthesis,
                 useLocalDecision: draft.useLocalDecision,
                 vadOnsetWindows: draft.vadOnsetWindows, vadThreshold: draft.vadThreshold,
-                useSpeechEnhancement: draft.useSpeechEnhancement)
+                useSpeechEnhancement: draft.useSpeechEnhancement, useKeywordInterrupt: draft.useKeywordInterrupt,
+                speechModels: draft.speechModels, synthesisVoice: draft.synthesisVoice,
+                keywordThreshold: draft.keywordThreshold)
         } catch { throw ModelResourcePreferenceError.invalidSource }
     }
     public static func localLanguageModels(using language: any ModelLanguageProviding) async throws -> [LocalModelFact]
@@ -97,6 +100,13 @@ public enum SettingsModelResourcesAdapter {
         }
         return ModelResourceViewSnapshot(
             items: items, installedGroups: Set(groups),
+            speechOptions: (inventory.speechOptions ?? []).compactMap { option in
+                SpeechCapability(rawValue: option.capability).map {
+                    .init(
+                        capability: $0, id: option.id, title: option.title, artifactID: option.artifactID,
+                        voicesByLanguage: option.voicesByLanguage)
+                }
+            },
             languageModels: (inventory.languageModels ?? []).map { model in
                 .init(
                     id: model.id, name: model.name, artifactID: model.artifactID,
@@ -114,19 +124,31 @@ public enum SettingsModelResourcesAdapter {
     private let artifacts: @MainActor () async throws -> any ModelArtifactsManaging
     private var speechPreference: [Bool]?
     private let bindSpeech: @MainActor (Bool, Bool) async throws -> Void
+    private let bindSpeechModels: (@MainActor ([String: String], String?) async throws -> Void)?
+    private var selectedSpeechModels: [String: String]?
+    private var selectedSynthesisVoice: String?
     private let quiesce: @MainActor (String) async -> Void
     public init(
         artifacts: @escaping @MainActor () async throws -> any ModelArtifactsManaging,
         quiesce: @escaping @MainActor (String) async -> Void,
         bindSpeech: @escaping @MainActor (Bool, Bool) async throws -> Void,
+        bindSpeechModels: (@MainActor ([String: String], String?) async throws -> Void)? = nil,
         languageModels: @escaping @Sendable () async throws -> [LocalModelFact] = { [] }
     ) {
         self.artifacts = artifacts
         self.languageModels = languageModels
         self.quiesce = quiesce
         self.bindSpeech = bindSpeech
+        self.bindSpeechModels = bindSpeechModels
     }
     public func localLanguageModels() async throws -> [LocalModelFact] { try await languageModels() }
+    public func speechModelOptions() async throws -> [SpeechModelFact] {
+        SpeechModelOption.catalog.map {
+            .init(
+                capability: $0.capability.rawValue, id: $0.id, title: $0.title, artifactID: $0.artifactID,
+                voicesByLanguage: $0.voicesByLanguage)
+        }
+    }
 
     public func snapshotResources() async throws -> [ModelResourceFact] {
         let manager = try await artifacts()
@@ -148,6 +170,25 @@ public enum SettingsModelResourcesAdapter {
         guard speechPreference != preference else { return }
         try await bindSpeech(recognition, synthesis)
         speechPreference = preference
+        selectedSpeechModels = nil
+        selectedSynthesisVoice = nil
+    }
+    public func configureSpeechModels(_ models: [String: String]) async throws {
+        try await configureSpeechModels(models, synthesisVoice: nil)
+    }
+    public func configureSpeechModels(_ models: [String: String], synthesisVoice: String?) async throws {
+        guard let bindSpeechModels else {
+            guard synthesisVoice == nil else { throw ModelResourcePreferenceError.invalidSpeechModel }
+            try await configureSpeech(
+                recognition: models["recognition"] == "nemotron-local",
+                synthesis: models["synthesis"] == "moss-tts-nano")
+            return
+        }
+        guard selectedSpeechModels != models || selectedSynthesisVoice != synthesisVoice else { return }
+        try await bindSpeechModels(models, synthesisVoice)
+        selectedSpeechModels = models
+        selectedSynthesisVoice = synthesisVoice
+        speechPreference = nil
     }
     public func download(_ id: String, endpoint: String, allowsCellular: Bool) async throws {
         let manager = try await artifacts()
@@ -218,6 +259,8 @@ public enum SettingsModelResourcesAdapter {
         try state.requirePresentation()
         guard invocation.context.sessionID == sessionID else { throw ResourcePresentationError.staleGeneration }
         switch reason {
+        case .keywordInterruptRequired:
+            state.presentInstallationNotice("Download Zipformer before enabling fast interrupt.")
         case .recognitionRequired, .synthesisRequired:
             state.presentInstallationNotice(
                 (reason == .recognitionRequired ? ModelResourceGroup.recognition : .synthesis).installationMessage)

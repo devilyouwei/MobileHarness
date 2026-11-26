@@ -53,18 +53,22 @@ public struct InputDecisionSnapshot: Sendable {
         self.currentAssistantReply = currentAssistantReply
         self.receivedAt = receivedAt
     }
-    func request() throws -> NoulRequest {
-        struct Context: Encodable {
-            let currentAssistantReply: String
-            let incomingUserInput: String
+
+    var isStandaloneSpokenStop: Bool {
+        guard case .transcript(let transcript, final: true)? = input.payload.perception else { return false }
+        let boundary = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
+        switch transcript.trimmingCharacters(in: boundary).lowercased() {
+        case "stop", "停下": return true
+        default: return false
         }
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let context = Context(currentAssistantReply: currentAssistantReply, incomingUserInput: text)
-        let text = String(decoding: try encoder.encode(context), as: UTF8.self)
+    }
+
+    func request() throws -> NoulRequest {
+        let owner = "Assistant/Input/InputDecision"
+        let context = try AgentPrompts.text(
+            owner, "context", ["assistantReply": currentAssistantReply, "userInput": text])
         return try NoulRequest(
-            text: text, instructions: AgentPrompts.text("Assistant/Input/InputDecision", "question"),
+            text: context, instructions: AgentPrompts.text(owner, "question"),
             context: .init(requestID: input.id + ".decision", scopeID: input.sessionID))
     }
 }
@@ -76,6 +80,8 @@ public actor AssistantInputDecision {
     private var activeLocalID: String?
     private var localMaintenance: Set<String> = []
     private var switchingLocal = false
+    private var modelChanging = false
+    private var modelConfigurationRevision: UInt64 = 0
     public typealias Configuration = (useLocal: Bool, cloud: (@Sendable () async throws -> any ChatCapability)?)
     typealias SelectedConfiguration = (localID: String?, cloud: (@Sendable () async throws -> ChatModel)?)
     private let configuration: @Sendable () async throws -> SelectedConfiguration
@@ -163,6 +169,17 @@ public actor AssistantInputDecision {
     }
 
     public func resetLocalFailure() { localFailure = nil }
+    func beginModelChange() async {
+        modelChanging = true
+        modelConfigurationRevision &+= 1
+        cancel("cloud")
+        await joinLocal()
+        await workers["cloud"]?.value
+        activeLocalID = nil
+        localFailure = nil
+    }
+
+    func endModelChange() { modelChanging = false }
     func quiesceLocal(_ id: String) async {
         guard activeLocalID == id else { return }
         localMaintenance.insert(id)
@@ -214,10 +231,14 @@ public actor AssistantInputDecision {
     func classify(
         receivedAt: ContinuousClock.Instant, request: @Sendable () throws -> NoulRequest
     ) async -> InputDecisionOutcome {
-        await AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
+        let revision = modelConfigurationRevision
+        return await AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
             let evidence = Mutex<InferenceMetadata?>(nil)
             var result = await classifyInput(receivedAt: receivedAt, request: request) { metadata in
                 if metadata.model != nil || metadata.startedAt != nil { evidence.withLock { $0 = metadata } }
+            }
+            guard revision == modelConfigurationRevision else {
+                return Self.supersededOutcome(requests: result.requests, modelName: result.modelName)
             }
             result.inference = evidence.withLock { $0 }
             if let model = result.inference?.model { result.modelName = model.displayName ?? model.modelID }
@@ -239,7 +260,7 @@ public actor AssistantInputDecision {
                 reason: reason,
                 requests: requests.withLock { $0 }, failure: failure, modelName: selectedModelName.withLock { $0 })
         }
-        guard !stopped, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
+        guard !stopped, !modelChanging, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
         let deadline = receivedAt.advanced(by: timeout)
         guard ContinuousClock.now < deadline else {
             return failedOutcome("Classification timed out", failure: .timedOut)
@@ -252,6 +273,7 @@ public actor AssistantInputDecision {
             await reportFailure(.settings)
             return failedOutcome("Could not read Decision settings: \(error.localizedDescription)", failure: .settings)
         }
+        guard !modelChanging, !Task.isCancelled else { return failedOutcome("Classification cancelled") }
         selectedModelName.withLock { $0 = route.localID }
         let prompt: NoulRequest
         do {
@@ -445,11 +467,11 @@ public actor AssistantInputDecision {
         let model = name ?? (key == "local" ? "Local Decision" : "Cloud Decision")
         let timeout = Attempt.failed("\(model) timed out", .timedOut)
         let id = UUID()
-        guard !stopped, !Task.isCancelled else { return .failed("Classification cancelled") }
+        guard !stopped, !modelChanging, !Task.isCancelled else { return .failed("Classification cancelled") }
         guard ContinuousClock.now < deadline else { return timeout }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard !stopped, !Task.isCancelled else {
+                guard !stopped, !modelChanging, !Task.isCancelled else {
                     continuation.resume(returning: .failed("Classification cancelled"))
                     return
                 }
@@ -471,7 +493,7 @@ public actor AssistantInputDecision {
     }
 
     private func startAttempt(_ key: String) {
-        guard !stopped, workers[key] == nil, let attempt = attempts[key] else { return }
+        guard !stopped, !modelChanging, workers[key] == nil, let attempt = attempts[key] else { return }
         guard ContinuousClock.now < attempt.deadline else {
             resolve(key, result: attempt.timeout)
             return
@@ -535,6 +557,7 @@ actor AssistantDecisionQueue {
     struct Job: Sendable {
         let snapshot: InputDecisionSnapshot
         let target: UUID?
+        var allowsStandaloneSpokenStop = false
         let interrupt: @Sendable (AssistantInterrupt, String) async throws -> AssistantInterruptResult
         let complete: @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) async -> Void
         let updated: @Sendable () async -> Void
@@ -576,7 +599,10 @@ actor AssistantDecisionQueue {
                         requests: result.requests, modelName: result.modelName)
                     result.inference = evidence
                 }
-                if result.modelResult == true {
+                let standaloneStop =
+                    result.signalStatus != "superseded" && job.allowsStandaloneSpokenStop
+                    && job.snapshot.isStandaloneSpokenStop
+                if result.modelResult == true || standaloneStop {
                     if let target = job.target {
                         do {
                             result.signalStatus = try await job.interrupt(

@@ -387,6 +387,45 @@ func homePreparationSkipsReadyAndSeriallyPreparesColdSteps() async {
 }
 
 @Test(.timeLimit(.minutes(1))) @MainActor
+func homeModelPreparationWaitsForSettingsAndLoadsOtherModelsWhenOneIsMissing() async {
+    var selected = ""
+    var loaded = false
+    var states: [ForegroundPreparation.State] = []
+    let failed = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let workflow = ForegroundPreparation(
+        steps: {
+            [
+                .init(id: "Missing", isReady: { throw LifecycleTestFailure.start }, prepare: { _ in }),
+                .init(
+                    id: selected, isReady: { loaded },
+                    prepare: { report in
+                        report(true)
+                        loaded = true
+                    }),
+            ]
+        },
+        canPrepare: { true },
+        project: {
+            states.append($0)
+            if case .failed = $0 { failed.continuation.yield(()) }
+        })
+    workflow.beginConfigurationChange()
+    workflow.setActive(true)
+    #expect(workflow.state == .checking)
+    selected = "Silero VAD"
+    workflow.endConfigurationChange()
+    for await _ in failed.stream { break }
+    #expect(loaded)
+    #expect(states.contains(.preparing("Silero VAD")))
+    if case .failed(let component, _) = workflow.state {
+        #expect(component == "Missing")
+    } else {
+        Issue.record("The missing artifact must remain visible")
+    }
+    await workflow.stop()
+}
+
+@Test(.timeLimit(.minutes(1))) @MainActor
 func homePreparationDeactivationFencesLateSuccessAndJoinsBeforeReplacement() async {
     let entered = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let release = PreparationTestLatch()

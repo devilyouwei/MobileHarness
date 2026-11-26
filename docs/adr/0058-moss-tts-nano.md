@@ -2,7 +2,7 @@
 
 Date: 2026-09-28. Supersedes ADR 0052's default synthesis and resource selection.
 
-Current resource delivery is [ADR0105](0105-local-model-resource-management.md): App bundles metadata/licenses only and installs MOSS through Settings; explicit voice admission performs warmup. Kokoro comparison code/tests remain optional, but its repository provisioning profile/wrapper/local weights are removed; real comparison tests require an external HARNESS_KOKORO_MODEL_ROOT.
+Resource delivery at the time of this decision moved to the system documented in [ADR0105](0105-local-model-resource-management.md). The App bundled metadata and licenses, installed MOSS through Settings, and warmed up on explicit voice admission. The optional Kokoro comparison code and tests remained, while the provisioning profile, wrapper and local weights were removed. Real comparison tests required an external HARNESS_KOKORO_MODEL_ROOT. The current selectable Kokoro design is documented in the [adapter README](../../MobileHarness/ModelKit/Speech/TTS/Kokoro/README.md).
 
 The user repeatedly reproduced a process crash on iPhone 17 Pro / iOS 27 before Kokoro speech began and explicitly requested MOSS-TTS-Nano Core ML. A Swift error fallback cannot recover a process abort. Remove Kokoro from production registration and packaged TTS resources; keep its isolated comparison code/tests without exposing an App fallback.
 

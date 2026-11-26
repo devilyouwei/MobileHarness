@@ -13,6 +13,10 @@
 
 ## 新增交互需求
 
+[录制 Assistant 的名字作为唤醒词](Assistant-Name-Wake.md)涵盖在语音设置中录制名字、本地保存 Zipformer 特征模板，以及在 `quiet` 下匹配录音特征并进入全双工。
+
+[Assistant 播报的两级声学抑制](Assistant-Speech-Energy-Suppression.md)涵盖起声确认后按外部语音能量降低播报音量、暂停及续播。
+
 [闹钟与倒计时](Alarms-and-Timers.md)涵盖通过 Assistant 设置、查询和取消闹钟或倒计时，以及由 iOS 到期提醒。
 
 [多云端模型、HTML 呈现与持续语音感知](Model-Web-Speech-Plan.md)：三项独立需求分别跟踪；WebKit浏览/截图和独立模型绘图功能已实现，实施与验证见[交付归档](../../completed/WebKit-Actions-Plan.md)，模型配置与持续语音验收保留原范围。

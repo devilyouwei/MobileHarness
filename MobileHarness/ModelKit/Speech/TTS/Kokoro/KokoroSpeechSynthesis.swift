@@ -33,8 +33,19 @@ import ModelKit
 
         /// One request, no pending queue. Finished audio is bounded to 60 seconds per request.
         public func synthesize(_ request: SpeechSynthesisRequest) async throws -> InferenceSession<SynthesisEvent> {
+            try await synthesize(request, preferredVoice: nil)
+        }
+
+        public func synthesize(_ request: SpeechSynthesisRequest, preferredVoice: String?) async throws
+            -> InferenceSession<SynthesisEvent>
+        {
             try Task.checkCancellation()
-            let segments = try KokoroInput.segments(text: request.text, locale: request.locale)
+            let preferredLanguage = preferredVoice.flatMap { KokoroVoiceCatalog.language(of: $0) }
+            guard preferredVoice == nil || preferredLanguage != nil else {
+                throw CapabilityError.invalidRequest("Unknown Kokoro voice")
+            }
+            let segments = try KokoroInput.segments(
+                text: request.text, locale: request.locale, preferredLanguage: preferredLanguage)
             if let previous = worker, previous.task.isCancelled { await previous.task.value }
             try Task.checkCancellation()
             guard worker == nil else { throw CapabilityError.inputBusy }
@@ -58,7 +69,9 @@ import ModelKit
                     do {
                         try Task.checkCancellation()
                         let sink = KokoroPCMEmitter(emitter: emitter)
-                        try await lease.model.synthesizeChunks(segments) { try await sink.emit($0) }
+                        try await lease.model.synthesizeChunks(segments, preferredVoice: preferredVoice) {
+                            try await sink.emit($0)
+                        }
                         try Task.checkCancellation()
                         await resource.release(lease.id)
                     } catch {

@@ -11,7 +11,7 @@ flowchart LR
  Provider -->|Equal-length PCM| Caller
 ```
 
-The published graph has internal recurrent state that resets per prediction and exposes no state tensors. This interface therefore makes no continuous streaming or real-time latency guarantee. App preloads installed artifacts without requiring the model to exist; SpeechPerception opts into windowed processing through its persisted setting.
+The published graph has internal recurrent state that resets per prediction and exposes no state tensors. This interface therefore makes no continuous streaming or real-time latency guarantee. The home preparation checks DeepFilterNet3 when selected; SpeechPerception opts into windowed processing through its persisted setting.
 
 ## Windowed adapter
 

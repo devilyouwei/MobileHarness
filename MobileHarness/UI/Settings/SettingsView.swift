@@ -31,14 +31,10 @@
                 }
                 Section(appCopy.text("AI Models")) {
                     destination(
-                        .recognition, title: "Speech Recognition", icon: "waveform",
-                        identifier: "settings.recognition.open")
-                    destination(
-                        .synthesis, title: "Speech Synthesis", icon: "speaker.wave.2",
-                        identifier: "settings.synthesis.open")
-                    destination(.language, title: "Agent Models", icon: "atom", identifier: "settings.language.open")
-                    destination(
-                        .vision, title: "Vision Recognition", icon: "viewfinder", identifier: "settings.vision.open")
+                        .speech, title: "Speech", icon: "waveform",
+                        identifier: "settings.speech.open")
+                    destination(.vision, title: "Vision", icon: "viewfinder", identifier: "settings.vision.open")
+                    destination(.language, title: "Agents", icon: "atom", identifier: "settings.language.open")
                 }
                 Section(appCopy.text("External Devices")) {
                     destination(

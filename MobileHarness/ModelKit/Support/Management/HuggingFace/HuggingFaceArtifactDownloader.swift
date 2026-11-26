@@ -38,8 +38,8 @@ public struct HuggingFaceArtifactDownloader: ModelArtifactDownloader {
             configuration.timeoutIntervalForRequest = 120
             let session = URLSession(configuration: configuration)
             defer { session.invalidateAndCancel() }
-            let client = HubClient(session: session, host: host, cache: nil)
-            let entries = try await client.listFiles(in: repo, revision: artifact.revision, recursive: true)
+            let entries = try await Self.repositoryFiles(
+                repo, revision: artifact.revision, host: host, session: session)
             let files = try Self.selectedFiles(entries, patterns: artifact.source.allowPatterns ?? [])
             let members = try files.map { entry -> HubBackgroundTransfer.Member in
                 var path = entry.path
@@ -51,6 +51,9 @@ public struct HuggingFaceArtifactDownloader: ModelArtifactDownloader {
                 let url = host.appendingPathComponent(repository).appendingPathComponent("resolve")
                     .appendingPathComponent(artifact.revision).appendingPathComponent(entry.path)
                 return HubBackgroundTransfer.Member(path: path, url: url, bytes: Int64(entry.size ?? 0))
+            }
+            guard Set(members.map(\.path)).isSuperset(of: artifact.requiredFiles) else {
+                throw ModelArtifactError.integrity
             }
             plan = HubBackgroundTransfer.Plan(
                 id: artifact.id, revision: artifact.revision, endpoint: source.endpoint, members: members)
@@ -67,6 +70,47 @@ public struct HuggingFaceArtifactDownloader: ModelArtifactDownloader {
             root: directory, plan: plan, allowsCellular: source.allowsCellular, progress: progress)
         try await transfer.run()
     }
+    static func repositoryFiles(_ repo: Repo.ID, revision: String, host: URL, session: URLSession) async throws
+        -> [Git.TreeEntry]
+    {
+        let tree = host.appendingPathComponent("api/models").appendingPathComponent(repo.description)
+            .appendingPathComponent("tree").appendingPathComponent(revision)
+        var url = tree.appending(queryItems: [URLQueryItem(name: "recursive", value: "true")])
+        var visited: Set<URL> = []
+        var entries: [Git.TreeEntry] = []
+        for _ in 0..<64 {
+            guard visited.insert(url).inserted else { throw ModelArtifactError.invalidCatalog }
+            let (data, response) = try await session.data(from: url)
+            guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            guard data.count <= 8 * 1024 * 1024 else { throw ModelArtifactError.invalidCatalog }
+            let page = try JSONDecoder().decode([Git.TreeEntry].self, from: data)
+            guard page.count <= 16384 - entries.count else { throw ModelArtifactError.invalidCatalog }
+            entries.append(contentsOf: page)
+            guard let link = response.value(forHTTPHeaderField: "Link"), let next = Self.nextPage(in: link) else {
+                return entries
+            }
+            guard let nextURL = URL(string: next, relativeTo: url)?.absoluteURL,
+                nextURL.scheme == tree.scheme, nextURL.host == tree.host, nextURL.port == tree.port,
+                nextURL.user == nil, nextURL.password == nil, nextURL.fragment == nil, nextURL.path == tree.path
+            else { throw ModelArtifactError.invalidCatalog }
+            url = nextURL
+        }
+        throw ModelArtifactError.invalidCatalog
+    }
+
+    private static func nextPage(in header: String) -> String? {
+        for link in header.split(separator: ",") {
+            let parts = link.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+            guard let target = parts.first, target.hasPrefix("<"), target.hasSuffix(">"),
+                parts.dropFirst().contains("rel=\"next\"")
+            else { continue }
+            return String(target.dropFirst().dropLast())
+        }
+        return nil
+    }
+
     static func selectedFiles(_ entries: [Git.TreeEntry], patterns: [String]) throws -> [Git.TreeEntry] {
         let files = entries.filter { entry in
             entry.type == .file && (patterns.isEmpty || patterns.contains { fnmatch($0, entry.path, 0) == 0 })

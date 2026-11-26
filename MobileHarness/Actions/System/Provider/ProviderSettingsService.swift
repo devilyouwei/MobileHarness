@@ -83,6 +83,9 @@ public final class ProviderSettingsService {
     }
     public func writerConfiguration() async throws -> ProviderSettings {
         let value = try await restore()
+        return try Self.writerConfiguration(value)
+    }
+    static func writerConfiguration(_ value: ProviderSettings) throws -> ProviderSettings {
         if value.writerUsesLocal {
             return ProviderSettings(
                 enabled: false, url: "", key: "", model: "", writerLocalModelID: value.resolvedWriterLocalModelID)
@@ -99,6 +102,8 @@ public final class ProviderSettingsService {
     private let runtime: ProviderSettingsRuntime
     private let legacyDecision: @Sendable () async throws -> Bool
     private let localModels: @Sendable () async throws -> [LocalModelFact]
+    private let beginModelChange: @MainActor @Sendable (ModelSettingsChange) async throws -> Void
+    private let endModelChange: @MainActor @Sendable () -> Void
     private var inheritedDecision = false
     private var saved: ProviderSettings?
     private var restored = false
@@ -108,12 +113,16 @@ public final class ProviderSettingsService {
     public init(
         store: any ProviderSettingsPersistence, runtime: ProviderSettingsRuntime,
         legacyDecision: @escaping @Sendable () async throws -> Bool = { false },
-        localModels: @escaping @Sendable () async throws -> [LocalModelFact] = { [] }
+        localModels: @escaping @Sendable () async throws -> [LocalModelFact] = { [] },
+        beginModelChange: @escaping @MainActor @Sendable (ModelSettingsChange) async throws -> Void = { _ in },
+        endModelChange: @escaping @MainActor @Sendable () -> Void = {}
     ) {
         self.store = store
         self.runtime = runtime
         self.legacyDecision = legacyDecision
         self.localModels = localModels
+        self.beginModelChange = beginModelChange
+        self.endModelChange = endModelChange
     }
     public func summary() throws -> String {
         guard restored else { throw ProviderSettingsError.busy }
@@ -201,6 +210,9 @@ public final class ProviderSettingsService {
                 || (!value.enabled && value.assistantLocalModelID != current.assistantLocalModelID)
                 || (value.enabled
                     && (value.url != current.url || value.key != current.key || value.model != current.model))
+            let impact = Self.modelChange(from: current, to: value, assistantChanged: assistantChanged)
+            if !impact.roles.isEmpty { try await beginModelChange(impact) }
+            defer { if !impact.roles.isEmpty { endModelChange() } }
             if !assistantChanged {
                 try await store.save(value)
                 saved = value
@@ -226,5 +238,38 @@ public final class ProviderSettingsService {
             restored = true
             return value
         } catch { throw ProviderSettingsError.safe(error) }
+    }
+
+    static func modelChange(from current: ProviderSettings, to value: ProviderSettings, assistantChanged: Bool)
+        -> ModelSettingsChange
+    {
+        var impact = ModelSettingsChange()
+        if assistantChanged {
+            impact.roles.insert(.assistant)
+            if !value.enabled { impact.modelIDs.insert(value.assistantLocalModelID) }
+        }
+        func provider(_ id: String?, in settings: ProviderSettings) -> ProviderSettings? {
+            settings.providers.first { $0.id == id }
+        }
+        if current.writerUsesLocal != value.writerUsesLocal
+            || current.resolvedWriterLocalModelID != value.resolvedWriterLocalModelID
+            || current.writerProviderID != value.writerProviderID || current.writerModel != value.writerModel
+            || current.writerThinking != value.writerThinking
+            || provider(current.writerProviderID, in: current) != provider(value.writerProviderID, in: value)
+        {
+            impact.roles.insert(.writer)
+            if current.writerUsesLocal { impact.modelIDs.insert(current.resolvedWriterLocalModelID) }
+            if value.writerUsesLocal { impact.modelIDs.insert(value.resolvedWriterLocalModelID) }
+        }
+        if current.decisionUsesLocal != value.decisionUsesLocal
+            || current.resolvedDecisionLocalModelID != value.resolvedDecisionLocalModelID
+            || current.decisionProviderID != value.decisionProviderID || current.decisionModel != value.decisionModel
+            || provider(current.decisionProviderID, in: current) != provider(value.decisionProviderID, in: value)
+        {
+            impact.roles.insert(.decision)
+            if current.decisionUsesLocal == true { impact.modelIDs.insert(current.resolvedDecisionLocalModelID) }
+            if value.decisionUsesLocal == true { impact.modelIDs.insert(value.resolvedDecisionLocalModelID) }
+        }
+        return impact
     }
 }

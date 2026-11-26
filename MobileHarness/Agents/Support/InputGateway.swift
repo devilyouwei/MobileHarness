@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 
 /// Agents-side adapter for internal Signals: role policy, authenticated endpoints, requests, events and Action feedback delivery to roles.
@@ -363,7 +364,7 @@ public actor InputGateway {
             }
         }
         switch input.payload {
-        case .actionResult(let result):
+        case .actionResult(let result), .executionFeedback(.actionFinished(let result)):
             guard result.owner.sessionID == input.sessionID, result.owner.agent.rawValue.utf8.count <= 64,
                 result.path.domain.utf8.count <= 64, result.path.module.utf8.count <= 64,
                 result.path.function.utf8.count <= 64,
@@ -528,13 +529,19 @@ public actor InputGateway {
         return try await deliver(input, targets: [(owner.agent, owner.incarnation)])
     }
 
-    func deliverRoundResult(_ result: GenerationRoundResult, owner: ExecutionOwner, envelope: OutputEnvelope)
+    func deliverExecutionFeedback(_ feedback: ExecutionFeedback, owner: ExecutionOwner, causality: SignalCausality)
         async throws
     {
-        guard envelope.roundID == result.roundID else { throw CommunicationError.invalidPayload }
-        let outcome = await deliverFeedback(
-            .roundResult(result), owner: owner, causality: SignalCausality(envelope: envelope))
-        guard outcome == .accepted else { throw CommunicationError.scopeClosed }
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(5)
+        repeat {
+            switch await deliverFeedback(.executionFeedback(feedback), owner: owner, causality: causality) {
+            case .accepted: return
+            case .closed: throw CommunicationError.scopeClosed
+            case .retry: try await clock.sleep(for: .milliseconds(20))
+            }
+        } while clock.now < deadline
+        throw CommunicationError.capacityExceeded
     }
 
     /// Only the stop observer may synthesize this terminal task protocol input.
@@ -556,8 +563,27 @@ public actor InputGateway {
                 owner: event.recipient)
         } catch { return .closed }
     }
+    private func usesUnifiedActionFeedback(_ owner: ExecutionOwner) async -> Bool {
+        guard let target = try? await manager.agent(owner.agent) else { return false }
+        return target.descriptor.inputs.contains(.executionFeedback)
+            && !target.descriptor.inputs.contains(.actionResult)
+    }
+
     public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {
-        await deliverFeedback(.actionResult(result), owner: result.owner, causality: result.causality)
+        let payload: InputPayload =
+            await usesUnifiedActionFeedback(result.owner)
+            ? .executionFeedback(.actionFinished(result)) : .actionResult(result)
+        return await deliverFeedback(payload, owner: result.owner, causality: result.causality)
+    }
+
+    func deliverActionStart(_ started: ExecutionStart) async -> ActionResultDelivery {
+        guard let round = started.envelope.roundID, let call = started.envelope.callID,
+            await usesUnifiedActionFeedback(started.owner)
+        else { return .accepted }
+        let causality = (started.envelope.correlation as? SignalCausality) ?? .root(id: started.envelope.inputID)
+        return await deliverFeedback(
+            .executionFeedback(.actionStarted(roundID: round, callID: call)), owner: started.owner, causality: causality
+        )
     }
 
     public func deliverActivityEvent(_ event: ActivityEvent) async -> ActionResultDelivery {

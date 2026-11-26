@@ -138,6 +138,7 @@ extension AssistantChatWorker {
     }
     public func stop() async {
         lifecycle = .stopped
+        retireExecutionInterruption()
         listening?.cancelJudgment()
         cancelInterruptionWait()
         clearSpeechUtterances()

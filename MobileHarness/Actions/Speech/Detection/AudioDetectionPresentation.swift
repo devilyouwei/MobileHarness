@@ -7,16 +7,25 @@ import UI
 @MainActor public final class AudioDetectionPresentation {
     private let state: any AudioDetectionPresenting
     private let endpoint: any AudioDetectionRunning
+    private let keywordEndpoint: (any AudioDetectionRunning)?
     private var task: Task<Void, any Error>?
     private var readiness: AudioDetectionReadiness?
-    public init(state: any AudioDetectionPresenting, endpoint: any AudioDetectionRunning) {
+    public init(
+        state: any AudioDetectionPresenting, endpoint: any AudioDetectionRunning,
+        keywordEndpoint: (any AudioDetectionRunning)? = nil
+    ) {
         self.state = state
         self.endpoint = endpoint
+        self.keywordEndpoint = keywordEndpoint
     }
     public func run(readiness: AudioDetectionReadiness) async throws {
         guard task == nil else { throw AudioDetectionError.busy }
+        let endpoint = readiness.keywordTest ? keywordEndpoint : self.endpoint
+        guard let endpoint else { throw AudioDetectionError.keywordModelNotReady }
         try state.requirePresentation()
-        state.present(.snapshot(AudioDetectionSnapshot()))
+        var initial = AudioDetectionSnapshot()
+        initial.keywordTest = readiness.keywordTest
+        state.present(.snapshot(initial))
         state.present(.error(nil))
         state.present(.phase(.preparing))
         self.readiness = readiness
@@ -34,6 +43,8 @@ import UI
             do {
                 try await endpoint.run { snapshot in
                     guard readiness.isActive, state.isPresentationAvailable, !Task.isCancelled else { return }
+                    var snapshot = snapshot
+                    snapshot.keywordTest = readiness.keywordTest
                     state.present(.snapshot(snapshot))
                     state.refresh()
                     if snapshot.capturedAt != nil {
@@ -51,7 +62,8 @@ import UI
                     state.present(
                         .error(
                             state.snapshot.permissionGranted == false
-                                ? "Allow microphone access in Settings." : "Detection failed"))
+                                ? "Allow microphone access in Settings."
+                                : (readiness.keywordTest ? error.localizedDescription : "Detection failed")))
                     state.present(.phase(.failed))
                 }
             }

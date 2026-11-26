@@ -48,8 +48,8 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
     }
     public var modelIDs: Set<String> {
         switch self {
-        case .recognition: ["nemotron", "silero", "deepfilternet3"]
-        case .synthesis: ["moss-tts-nano"]
+        case .recognition: ["nemotron", "silero", "deepfilternet3", "zipformer-kws", "smart-turn"]
+        case .synthesis: ["moss-tts-nano", "kokoro-82m"]
         case .language: []
         case .vision: ["yolo26n-pose"]
         case .decision: []
@@ -58,7 +58,7 @@ public enum ModelResourceGroup: String, Sendable, CaseIterable {
     public var installationMessage: String {
         switch self {
         case .recognition: "Download Nemotron first."
-        case .synthesis: "Download MOSS first."
+        case .synthesis: "Download the selected speech synthesis model first."
         case .language: "Download this model in Agent Models first."
         case .vision: "Download and install the YOLO pose model first."
         case .decision: "Download the selected Decision model before using it."
@@ -69,20 +69,28 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     public var endpoint: String
     public var allowsCellular: Bool
     public var useSpeechEnhancement: Bool
+    public var useKeywordInterrupt: Bool
     public var useCustomRecognition: Bool
     public var useCustomSynthesis: Bool
     public var vadOnsetWindows: Int
     public var vadThreshold: Double
+    public var keywordThreshold: Double
     public var useLocalDecision: Bool
+    public var speechModels: [String: String]?
+    public var synthesisVoice: String?
     private enum CodingKeys: String, CodingKey {
         case endpoint, allowsCellular, useCustomRecognition, useCustomSynthesis, useLocalDecision, vadOnsetWindows,
-            vadThreshold, useSpeechEnhancement
+            vadThreshold, useSpeechEnhancement, useKeywordInterrupt, speechModels, synthesisVoice, keywordThreshold
     }
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        synthesisVoice = try values.decodeIfPresent(String.self, forKey: .synthesisVoice)
+        speechModels = try values.decodeIfPresent([String: String].self, forKey: .speechModels)
         useSpeechEnhancement = try values.decodeIfPresent(Bool.self, forKey: .useSpeechEnhancement) ?? false
+        useKeywordInterrupt = try values.decodeIfPresent(Bool.self, forKey: .useKeywordInterrupt) ?? false
         vadOnsetWindows = try values.decodeIfPresent(Int.self, forKey: .vadOnsetWindows) ?? 8
         vadThreshold = try values.decodeIfPresent(Double.self, forKey: .vadThreshold) ?? 0.65
+        keywordThreshold = try values.decodeIfPresent(Double.self, forKey: .keywordThreshold) ?? 0.25
         endpoint = try values.decode(String.self, forKey: .endpoint)
         allowsCellular = try values.decode(Bool.self, forKey: .allowsCellular)
         useCustomRecognition = try values.decode(Bool.self, forKey: .useCustomRecognition)
@@ -92,11 +100,17 @@ public struct ModelResourceSourceDraft: Codable, Sendable {
     public init(
         endpoint: String = "https://huggingface.co", allowsCellular: Bool = true,
         useCustomRecognition: Bool = false, useCustomSynthesis: Bool = false, useLocalDecision: Bool = false,
-        vadOnsetWindows: Int = 8, vadThreshold: Double = 0.65, useSpeechEnhancement: Bool = false
+        vadOnsetWindows: Int = 8, vadThreshold: Double = 0.65, useSpeechEnhancement: Bool = false,
+        useKeywordInterrupt: Bool = false, speechModels: [String: String]? = nil, synthesisVoice: String? = nil,
+        keywordThreshold: Double = 0.25
     ) {
         self.useSpeechEnhancement = useSpeechEnhancement
+        self.useKeywordInterrupt = useKeywordInterrupt
+        self.speechModels = speechModels
+        self.synthesisVoice = synthesisVoice
         self.vadOnsetWindows = vadOnsetWindows
         self.vadThreshold = vadThreshold
+        self.keywordThreshold = keywordThreshold
         self.endpoint = endpoint
         self.allowsCellular = allowsCellular
         self.useCustomRecognition = useCustomRecognition
@@ -130,18 +144,54 @@ public struct LocalModelOption: Identifiable, Sendable {
     }
 }
 
+public enum SpeechCapability: String, CaseIterable, Sendable {
+    case voiceActivity, endpointConfirmation, enhancement, keywordSpotting, recognition, synthesis
+
+    public var title: String {
+        switch self {
+        case .voiceActivity: "Voice activity detection"
+        case .enhancement: "Noise suppression"
+        case .keywordSpotting: "Keyword spotting"
+        case .endpointConfirmation: "End-of-turn confirmation"
+        case .recognition: "Speech Recognition"
+        case .synthesis: "Speech Synthesis"
+        }
+    }
+}
+
+public struct SpeechModelChoice: Identifiable, Sendable {
+    public let capability: SpeechCapability
+    public let id: String
+    public let title: String
+    public let artifactID: String?
+    public let voicesByLanguage: [String: [String]]?
+
+    public init(
+        capability: SpeechCapability, id: String, title: String, artifactID: String?,
+        voicesByLanguage: [String: [String]]? = nil
+    ) {
+        self.capability = capability
+        self.id = id
+        self.title = title
+        self.artifactID = artifactID
+        self.voicesByLanguage = voicesByLanguage
+    }
+}
+
 /// Passive presentation snapshot; eligibility is supplied by the business layer.
 public struct ModelResourceViewSnapshot: Sendable {
     public let items: [ModelResourceItem]
     public let installedGroups: Set<ModelResourceGroup>
     public let languageModels: [LocalModelOption]
+    public let speechOptions: [SpeechModelChoice]
     public init(
         items: [ModelResourceItem], installedGroups: Set<ModelResourceGroup> = [],
-        languageModels: [LocalModelOption] = []
+        speechOptions: [SpeechModelChoice] = [], languageModels: [LocalModelOption] = []
     ) {
         self.items = items
         self.installedGroups = installedGroups
         self.languageModels = languageModels
+        self.speechOptions = speechOptions
     }
 }
 public enum ModelResourceOperation: Sendable { case download, remove, cancel }
@@ -153,8 +203,12 @@ public protocol ModelResourcesControlling: AnyObject {
     func refresh() async
     func saveSource() async
     func saveDownloadSource() async -> Bool
+    func selectSpeechModel(_ modelID: String, for capability: SpeechCapability) async
+    func selectSynthesisVoice(_ voice: String) async
     func setSpeechEnhancement(enabled: Bool) async
+    func setKeywordInterrupt(enabled: Bool) async
     func setSpeechDetection(windows: Int, threshold: Double) async
+    func setKeywordThreshold(_ threshold: Double) async
     func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async
     func perform(_ id: String, operation: ModelResourceOperation) async
 }
@@ -170,6 +224,10 @@ public final class ModelResourcesState {
     public internal(set) var items: [ModelResourceItem] = []
     public internal(set) var installedGroups: Set<ModelResourceGroup> = []
     public private(set) var languageModels: [LocalModelOption] = []
+    public private(set) var speechOptions: [SpeechModelChoice] = []
+    public func speechOptions(for capability: SpeechCapability) -> [SpeechModelChoice] {
+        speechOptions.filter { $0.capability == capability }
+    }
     public func localModels(for role: AgentBrain) -> [LocalModelOption] {
         languageModels.filter { $0.roles.contains(role) }
     }
@@ -202,6 +260,7 @@ public final class ModelResourcesState {
         items = snapshot.items
         installedGroups = snapshot.installedGroups
         languageModels = snapshot.languageModels
+        speechOptions = snapshot.speechOptions
         if refreshErrorGeneration != nil { error = nil }
         return true
     }
@@ -249,11 +308,15 @@ public final class ModelResourcesState {
         case .sourceEndpoint(let value): source.endpoint = value
         case .sourceAllowsCellular(let value): source.allowsCellular = value
         case .sourceUseSpeechEnhancement(let value): source.useSpeechEnhancement = value
+        case .sourceUseKeywordInterrupt(let value): source.useKeywordInterrupt = value
+        case .sourceSpeechModels(let value): source.speechModels = value
+        case .sourceSynthesisVoice(let value): source.synthesisVoice = value
         case .sourceUseCustomRecognition(let value): source.useCustomRecognition = value
         case .sourceUseCustomSynthesis(let value): source.useCustomSynthesis = value
         case .speechDetection(let windows, let threshold):
             source.vadOnsetWindows = windows
             source.vadThreshold = threshold
+        case .keywordThreshold(let value): source.keywordThreshold = value
         case .decisionStatus(let value): decisionStatus = value
         case .source(let value): source = value
         case .items(let value): items = value
@@ -275,7 +338,11 @@ public enum ModelResourcesUpdate {
     case sourceUseCustomRecognition(Bool)
     case sourceUseCustomSynthesis(Bool)
     case sourceUseSpeechEnhancement(Bool)
+    case sourceUseKeywordInterrupt(Bool)
+    case sourceSpeechModels([String: String]?)
+    case sourceSynthesisVoice(String?)
     case speechDetection(windows: Int, threshold: Double)
+    case keywordThreshold(Double)
     case decisionStatus(String)
     case source(ModelResourceSourceDraft)
     case items([ModelResourceItem])
@@ -291,6 +358,7 @@ public enum ModelResourcesUpdate {
 
 @MainActor
 public protocol ModelResourcesPresenting: UIPresentationAccess {
+    func speechOptions(for capability: SpeechCapability) -> [SpeechModelChoice]
     var source: ModelResourceSourceDraft { get }
     var items: [ModelResourceItem] { get }
     var installedGroups: Set<ModelResourceGroup> { get }

@@ -1,6 +1,7 @@
 {
   "version": 1,
   "templates": {
-    "question": "incoming_user_input 是否明确要求立即打断当前回复，例如停止、暂停、纠正或替换当前回复？仅用 current_assistant_reply 理解用户输入，回复可能不完整或为空。回答、引用、否定或延后停止、普通补充及新问题不属于打断。明确要求立即打断时回答 true，其余情况回答 false。"
+    "context": "当前你正在说“{{assistantReply}}”，此时用户对你说“{{userInput}}”，",
+    "question": "请问：用户说这句话是否包含打断你的意图？"
   }
 }

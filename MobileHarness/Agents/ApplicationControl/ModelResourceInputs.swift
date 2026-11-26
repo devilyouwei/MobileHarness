@@ -8,7 +8,10 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
     case restoreSource
     case saveSource(
         endpoint: String, allowsCellular: Bool, recognition: Bool, synthesis: Bool, decision: Bool = false,
-        vadOnsetWindows: Int = 8, vadThreshold: Double = 0.65, enhancement: Bool = false)
+        vadOnsetWindows: Int = 8, vadThreshold: Double = 0.65, enhancement: Bool = false,
+        keywordInterrupt: Bool = false, speechModels: [String: String]? = nil, synthesisVoice: String? = nil,
+        keywordThreshold: Double? = nil
+    )
     case configureSpeech(recognition: Bool, synthesis: Bool)
     case retire(String)
     case download(id: String, endpoint: String, allowsCellular: Bool)
@@ -22,9 +25,14 @@ public enum ModelResourceIntent: Codable, Sendable, Equatable {
         case .refreshPresentation(let generation):
             guard generation > 0 else { throw CommunicationError.invalidPayload }
             return
-        case .saveSource(let endpoint, _, _, _, _, let windows, let threshold, _):
+        case .saveSource(
+            let endpoint, _, _, _, _, let windows, let threshold, _, _, let models, let voice, let keywordThreshold):
             guard (1...16).contains(windows), threshold.isFinite, (0.05...0.95).contains(threshold),
-                !endpoint.isEmpty, endpoint.utf8.count <= 1024
+                !endpoint.isEmpty, endpoint.utf8.count <= 1024,
+                (voice?.utf8.count ?? 0) <= 64,
+                (0.10...0.60).contains(keywordThreshold ?? 0.25),
+                models?.allSatisfy({ $0.key.utf8.count <= 32 && $0.value.utf8.count <= 64 }) ?? true,
+                try models.map({ try JSONEncoder().encode($0).count <= 1024 }) ?? true
             else { throw CommunicationError.invalidPayload }
             return
         case .download(let value, let endpoint, _):

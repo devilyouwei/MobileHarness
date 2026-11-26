@@ -18,6 +18,8 @@
         private let stopDiagnostic: @MainActor () async throws -> Void
         private let recognition: any SpeechRecognitionCapability
         private let enhancement: any SpeechEnhancementCapability
+        private let endpointConfirmation: (any SpeechEndpointCapability)?
+        private let keywordSpotting: (any KeywordSpottingCapability)?
         private let vad: any VoiceActivityCapability
         private let synthesis: any SpeechSynthesisCapability
         private let voiceInput: any AudioCaptureObserving
@@ -29,7 +31,8 @@
                 do {
                     let store = try await voiceAgents.audioStore()
                     let perception = try await voiceAgents.start(
-                        recognition, vad: vad, enhancement: enhancement, synthesis: synthesis,
+                        recognition, vad: vad, enhancement: enhancement, keywordSpotting: keywordSpotting,
+                        endpointConfirmation: endpointConfirmation, synthesis: synthesis,
                         input: voiceInput, store: store)
                     try Task.checkCancellation()
                     try await lifecycle.start(perception: perception, audioStore: store)
@@ -107,6 +110,8 @@
             let synthesis = speech.synthesis
             self.recognition = recognition
             self.enhancement = speech.enhancement
+            self.keywordSpotting = speech.keywordSpotting
+            self.endpointConfirmation = speech.endpointConfirmation
             self.vad = vad
             self.synthesis = synthesis
             voiceInput = audio.io(.voice)
@@ -122,7 +127,13 @@
                     sessionID: runtime.interactionSessionID,
                     cancelReply: runtime.voiceDependencies.cancelReply,
                     detection: AudioDetectionAgentSession.connections(
-                        recognition: recognition, vad: vad, gateway: runtime.observations),
+                        recognition: recognition, vad: vad, keywordSpotting: speech.keywordSpotting,
+                        keywordThreshold: { [settings = runtime.business.keywordDetection] in
+                            try await settings().threshold
+                        },
+                        enhancement: speech.enhancement, enhancementEnabled: runtime.business.speechEnhancementEnabled,
+                        gateway: runtime.observations),
+                    preparePlayback: runtime.voiceDependencies.preparePlayback,
                     playbackChanged: runtime.voiceDependencies.playbackChanged))
             let spectrum = native.spectrum
             diagnostic = native.diagnostic

@@ -116,7 +116,8 @@
                     let manager = try await request.maintenance.artifacts()
                     return Set(
                         try await manager.artifactSnapshots().filter { $0.phase == .installed }.map { $0.artifact.id })
-                })
+                }, beginModelChange: request.maintenance.beginModelChange,
+                endModelChange: request.maintenance.endModelChange)
             let language = model.language
             let languageModels: @Sendable () async throws -> [LocalModelFact] = {
                 try await SettingsModelResourcesAdapter.localLanguageModels(using: language)
@@ -131,7 +132,8 @@
                     language: model.language,
                     beginChange: request.maintenance.beginSettings, endChange: request.maintenance.endSettings),
                 legacyDecision: { try await preferences.legacyDecisionSelection() },
-                localModels: languageModels)
+                localModels: languageModels, beginModelChange: request.maintenance.beginModelChange,
+                endModelChange: request.maintenance.endModelChange)
             let providerSettings = ProviderSettingsRequests(service: providerService)
             let discovery = ProviderDiscoveryRequests(discover: SettingsProviderAdapter.discoverModels)
             let providerPresentation = ProviderPresentationAdapter(
@@ -166,6 +168,7 @@
             let resourceAdapter = ModelResourceCapabilityAdapter(
                 artifacts: request.maintenance.artifacts,
                 quiesce: request.maintenance.quiesce, bindSpeech: request.maintenance.bindSpeech,
+                bindSpeechModels: request.maintenance.bindSpeechModels,
                 languageModels: languageModels)
             let album = PhotoAlbumService(
                 photos: photos, export: { [platform] data in try await platform.vision.savePhoto(data) },
@@ -278,6 +281,41 @@
                         model: selected.model, thinking: selected.writerThinking ? .enabled : .minimum)
                     return try await model.language.chatModel(configuration: configuration)
                 },
+                homeModelSelections: { [model] in
+                    let voice = try await preferences.configuredSource()
+                    try Task.checkCancellation()
+                    if let choices = voice.speechModels {
+                        try await model.speech.configureSpeechModels(choices, synthesisVoice: voice.synthesisVoice)
+                    }
+                    let value = try await providerService.decisionSnapshot()
+                    try Task.checkCancellation()
+                    func cloud(_ selected: ProviderSettings, thinking: Bool = false) async throws
+                        -> ManagedModelResource
+                    {
+                        let configuration = try OpenAIChatConfiguration(
+                            baseURL: OpenAIChatConfiguration.endpoint(selected.url), apiKey: selected.key,
+                            model: selected.model, thinking: thinking ? .enabled : .minimum)
+                        return try await model.cloudResource(configuration)
+                    }
+                    let writer: ManagedModelResource?
+                    if value.writerUsesLocal {
+                        writer = try await model.resource(value.resolvedWriterLocalModelID)
+                    } else if value.writerProviderID != nil {
+                        writer = try await cloud(
+                            ProviderSettingsService.writerConfiguration(value), thinking: value.writerThinking)
+                    } else {
+                        writer = nil
+                    }
+                    let decision: ManagedModelResource?
+                    if value.decisionUsesLocal == true {
+                        decision = try await model.resource(value.resolvedDecisionLocalModelID)
+                    } else if value.decisionProviderID != nil {
+                        decision = try await cloud(ProviderSettingsService.decisionConfiguration(value))
+                    } else {
+                        decision = nil
+                    }
+                    return (writer, decision)
+                },
                 decisionConfiguration: { [model] in
                     let saved = try await providerService.decisionSnapshot()
                     let localID = saved.decisionUsesLocal == true ? saved.resolvedDecisionLocalModelID : nil
@@ -306,6 +344,10 @@
                 observeTranscript: { text, session in try presentation.observeTranscript(text, sessionID: session) },
                 output: { await presentation.output($0) },
                 speechEnhancementEnabled: { try await preferences.restoreSource().useSpeechEnhancement },
+                keywordDetection: {
+                    let value = try await preferences.restoreSource()
+                    return (value.useKeywordInterrupt, value.keywordThreshold)
+                },
                 speechDetection: {
                     let value = try await preferences.restoreSource()
                     return (value.vadOnsetWindows, value.vadThreshold)
@@ -321,6 +363,7 @@
                     endpoints: endpoints,
                     interactionSessionID: host.sessionID, cancelReply: host.cancelReply,
                     adaptFailure: host.adaptFailure,
+                    preparePlayback: host.preparePlayback,
                     playbackChanged: host.playbackChanged,
                     playbackSpectrum: { [island = ui.island] values, active in
                         do { try island.spectrum(values, active: active, generation: island.generation) } catch {
@@ -339,13 +382,14 @@
             camera.releaseRecordingAudio = { [weak lifecycle] resume in
                 try await lifecycle?.endVideoAudio(resume: resume)
             }
+            let detectionExecution = AudioDetectionExecution(
+                audio: platform.audio.io(.detection),
+                beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() })
             let detection = AudioDetectionPresentation(
                 state: ui.diagnostics.audioDetection,
-                endpoint: Actions.AudioDetectionSession(
-                    connections: host.detection,
-                    execution: AudioDetectionExecution(
-                        audio: platform.audio.io(.detection),
-                        beforeStart: { [weak lifecycle] in await lifecycle?.stopVoiceAndWait() })))
+                endpoint: Actions.AudioDetectionSession(connections: host.detection, execution: detectionExecution),
+                keywordEndpoint: Actions.AudioDetectionSession(
+                    connections: host.detection, execution: detectionExecution, keywordTest: true))
             let diagnostic = SpeechDiagnosticWorkflow(
                 state: ui.diagnostics.speech, player: platform.audio.io(.diagnostic),
                 provider: speech.synthesis, load: { try await speech.warmup(.synthesis) },

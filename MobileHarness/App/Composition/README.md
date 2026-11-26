@@ -58,7 +58,7 @@ Background URLSession completion can use the same model/storage scope before for
 
 ApplicationContainer projects each module's structured Failure, including ActionsFailure and GatewayFailure, into the existing diagnostic channel while preserving original errors. ModuleRegistration normalizes only pure cancellation after recording evidence; mixed cleanup errors remain failures. App supplies bootstrap failure before roles can present diagnostics. App binds the main Actions Shell scheduler to [RuntimeLog](../../UI/Components/RuntimeLog/README.md) with a newest-one snapshot buffer and joins that consumer when execution bindings stop.
 
-ForegroundPreparation is activated after the lifecycle foreground barrier and visible-home check. ModelKit reports actual load transitions; App updates interaction readiness and forwards facts to Agents for presentation. Ordinary checks, already-ready state and cloud configuration do not fabricate loading. See [Lifecycle](../Lifecycle/README.md) and [overall flows](../../README.md).
+ForegroundPreparation runs behind the foreground and visible-home barriers. ApplicationActionAssembly resolves named ModelKit handles from the confirmed selections and forwards real preparation activity to the home projection and Agents. See [Lifecycle](../Lifecycle/README.md) and [overall flows](../../README.md).
 
 ## Native State capability binding
 
@@ -108,7 +108,7 @@ AppComposition 持有一个 WriterContinuedProcessing 适配器，向每个根�
 
 ActionsDependencies receives a lazy WorkspaceRepository getter from the existing Storage database, alongside media/device getters. It is resolved after foundation readiness and creates no parallel database or JSON catalog.
 
-ApplicationActionAssembly透传AgentVoiceHost.playbackChanged到ActionsVoiceHost。Assistant的语音子能力接收真实播放事实并决定展示；App只连接接口，Actions不导入Agents，基础UI不接收业务接口。播放频谱仍直连UI的专用数据接口。
+ApplicationActionAssembly 将 AgentVoiceHost 的播放登记与播放变化回调透传到 ActionsVoiceHost。Assistant的语音子能力接收真实播放事实并决定展示；App只连接接口，Actions不导入Agents，基础UI不接收业务接口。播放频谱仍直连UI的专用数据接口。
 
 Composition passes the root Storage cache to Actions and adapts scoped previewSnapshot/resetPreviewSelection through neutral host ports. It does not prepare images or own selections. Agents registers actions.camera.preview against the same Camera owner used by UI capture.
 
@@ -124,9 +124,9 @@ ApplicationActionAssembly receives the existing selected-language reader from Se
 
 ApplicationActionAssembly forwards the Actions-owned speech-detection preference reader to AgentBusinessBindings unchanged. Agents snapshots the returned window count and probability when creating its VAD session; App neither stores nor interprets those settings.
 
-Home preparation appends the selected local Decision step to language, recognition, synthesis, voiceActivity and optional vision. Selection comes from Agents; loading/readiness belongs to ModelKit. Cloud/inherited Decision adds no local load. The same foreground worker serializes preparation and rechecks every step before reporting ready; shared Gemma resources already ready are not loaded again.
+ApplicationActionAssembly collects configured Assistant, Writer, Decision, speech and enabled vision resources, then deduplicates by resolved ID. Zipformer, Smart Turn and DeepFilterNet3 use this preparation path when selected. A cloud handle prepares the client configuration. The home projection carries the actual resource name for the loading Toast.
 
-Foreground model preparation adds an optional enhancement step: prepare/read artifact inventory, select deepfilternet3 only when installed, then join its normal managed load. This ignores the listening enablement switch; absent models are ready/no-op. The durable denoising preference passes from Actions bindings to Agents; the ModelKit speech enhancement port reaches SpeechPerception through the voice composition.
+Settings owners report affected roles and incoming model IDs before persisting. App closes home preparation, cancels dependent work through AgentContainer, and unloads affected resources through ModelKit. The home worker reads the committed settings before preparing a new generation. Active role admissions reopen after readiness. Effective locale changes enter the same barrier, coalesce to the newest locale, and cover recognition, synthesis and language-sensitive agent prompts. See [model lifecycle](../../ModelKit/README.md#managed-model-resources).
 
 语音宿主桥透传 playbackChanged(audioID, active, time) 的单调原生播放时刻，不在组合根推断播放开始或执行 ASR 冷却。
 
@@ -135,3 +135,11 @@ ModelContainer 自行构造模型文件与下载能力；ApplicationContainer �
 ServiceFactories.make 接收可选存储根，默认仍为 App Application Support。AppComposition 接收构造服务的闭包与语言偏好对象，首次启动及替换复用同一工厂，ModuleRegistration 图保持唯一；stop 加入正在进行的替换后关闭当前根。隔离 Simulator 验收使用这些接口覆盖实际生产装配，测试不提供另一份生命周期图。
 
 Composition injects module-owned external listener ports without introducing a shared foundation dependency: PlatformKit supplies media/native state, UI supplies requests/presentation facts, and ModelKit supplies artifact revisions. The responsible role or execution service owns the consumer task and cancellation/join. Gateway remains the internal Request/Reply, event and execution root; production handler catalogs are supplied by Agents assembly.
+
+ModelKit 的前台生命周期独立预热已安装的 Zipformer，并监听安装状态。可选预热不加入 Home
+就绪条件。App 将 Actions 的快速打断偏好读取端口绑定至 Agents。新采集读取该选项；
+默认在全双工回复中观察符合门限的命中。
+
+语音设置把按能力保存的模型 ID 与可选合成音色交给 ModelKit 应用；App 在切换期间复用现有语音
+维护边界。前台准备继续分别调用识别、合成和 VAD 的中立接口。已安装的可选降噪
+与关键词模型仍使用各自的预热入口。

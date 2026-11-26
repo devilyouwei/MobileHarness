@@ -78,3 +78,30 @@ Kokoro 曾有 CoreAI 英语与 FluidAudio Core ML 中英两个验收阶段，随
 ❌ 日语/法语/西语未接线。英文仍为词典与生词字母拼读；未接神经 G2P。没有完成中文读音准确率、完整真实 Agent 对话或 iPhone 安装/试听/持续热状态验收。
 
 ❌ 上游 FluidAudio #889 报告 iOS 27 上 BNNS/MPSGraph 进程崩溃。此版本包含输入缓冲尾页补齐，并选用 ANE + CPU noise/tail 路径；修复在目标 iPhone 上仍需长测确认。Mac 短测不能证明该风险已消除。
+
+## 2026-11-25 设置下载与音色绑定
+
+[制品配置](../../MobileHarness/ModelKit/Support/Config/model-catalog.json)固定
+`FluidInference/kokoro-82m-coreml` 的 `51c072023b254cd02368102ab88bcfbff6cad4cd`。
+生产下载器解析分页并创建 215 个文件的下载计划。首次验收在 300 秒测试等待上限到期
+时仍在下载，未提交安装。用独立临时制品根恢复该计划后，下载和安装通过。安装回执确认
+215 个文件、482,700,219 字节。制品覆盖 28 个英语音色和该普通话 Core ML 变体的全部
+103 个音色。
+
+- **Swift 工程测试**：9 项相关的无权重测试通过，覆盖音色分组、混读路由、偏好验证、
+  Gateway 绑定和模型移除后的回退。8 项 Python 工程检查单独执行通过。
+- **真实 Core ML**：Apple Silicon Mac 上，通过生产 `ModelContainer.speech.synthesis`
+  完成 `af_heart`、`bf_emma` 与 `zm_100` 三条请求。每条请求均产生 24 kHz PCM
+  并正常结束。同一英文文本的两个音色产生不同的 PCM。
+- **构建**：`./scripts/build-ios.sh` 的 5 个模拟器 scheme 和 App 资源、本地化校验通过。
+- **仓库总检查**：`./scripts/check.sh` 停在已有的边界检查问题。AgentContainer 缺少
+  检查器要求的 State Value codec，Xcode 工程中多个本地化 Agent/Skill 文件位于错误分组。
+  本次改动的 Swift 文件格式检查和 `git diff --check` 通过。
+- **设备验收**：未执行 iPhone 真机安装、设置交互或播放试听。三条 Mac 请求不覆盖逐音色
+  试听和真机长测。
+
+### 同日 iPhone 安装与启动
+
+使用 Xcode 27.2 的 `MobileHarness` scheme 构建并签名 Debug 真机包。签名校验通过，
+包内的模型目录包含 Kokoro 82M。通过 `devicectl` 安装到 iPhone 17 Pro，启动成功，
+并确认主 App 进程在运行。手机内的模型下载、设置交互和试听未执行。

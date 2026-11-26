@@ -102,5 +102,5 @@ extension UIActions {
 public enum ResourcePresentationError: Error, Sendable { case invalidGeneration, staleGeneration, unavailable }
 
 public enum ResourcePreferenceFailureReason: String, Sendable {
-    case invalidSource, recognitionRequired, synthesisRequired, execution
+    case invalidSource, recognitionRequired, synthesisRequired, keywordInterruptRequired, execution
 }

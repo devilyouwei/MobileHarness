@@ -9,6 +9,18 @@ public struct AudioDetectionSnapshot: Sendable, Equatable {
     public enum Fallback: String, CaseIterable, Sendable { case inputUnavailable, unsupported, startupFailed }
     public enum Signal: String, CaseIterable, Sendable { case waiting, receiving, noAudio }
     public enum Direction: String, CaseIterable, Sendable { case waiting, active, inactive, uncertain, unavailable }
+    public struct KeywordHit: Sendable, Equatable {
+        public let phrase: String
+        public let silentTail: Bool
+        public init(phrase: String, silentTail: Bool) {
+            self.phrase = phrase
+            self.silentTail = silentTail
+        }
+    }
+    public var keywordTest = false
+    public var keywordHit: KeywordHit?
+    public var keywordInputSamples = 0
+    public var keywordInputLevel = 0.0
     public var permissionGranted: Bool?
     public var input: Input = .unknown
     public var support: Support = .unknown
@@ -48,12 +60,16 @@ public final class AudioDetectionState {
                 "sampleAgeSeconds": seconds.map { .number($0) } ?? .unknown,
                 "signalFresh": seconds.map { .flag($0 <= 1) } ?? .unknown,
                 "directionFresh": directionFresh,
+                "keyword": observation.keywordHit.map { .text($0.phrase) } ?? .unknown,
+                "keywordSilentTail": observation.keywordHit.map { .flag($0.silentTail) } ?? .unknown,
+                "keywordInputSeconds": .number(Double(observation.keywordInputSamples) / 16000),
             ],
             runtime: [
                 "phase": .text(phase.rawValue), "support": .text(observation.support.rawValue),
                 "capture": .text(observation.capture.rawValue), "sampleRate": .count(observation.sampleRate),
                 "fallback": observation.fallback.map { .text($0.rawValue) } ?? .unknown,
                 "available": .flag(isPresentationAvailable),
+                "keywordTest": .flag(observation.keywordTest),
             ],
             meanings: [
                 "business.direction":
@@ -166,15 +182,14 @@ extension AudioDetectionPresenting {
         private var appCopy: AppLanguage { AppLanguage(preferredLanguage: appCopyLocale.identifier) }
         @Bindable var state: AudioDetectionState
         let requests: UIRequests<AudioDetectionInput, Void>
-        @Environment(\.scenePhase) private var scenePhase
         var body: some View {
             Section {
-                Button(state.isActive ? appCopy.text("Stop detection") : appCopy.text("Start detection")) {
-                    submit(state.isActive ? .stop : .start)
+                Button(isActive ? appCopy.text("Stop detection") : appCopy.text("Start detection")) {
+                    submit(isActive ? .stop : .start)
                 }
-                .disabled(state.phase == .stopping)
+                .disabled(state.phase == .stopping || (state.isActive && state.snapshot.keywordTest))
                 .accessibilityIdentifier("settings.recognition.detect")
-                if state.phase != .idle {
+                if state.phase != .idle && !state.snapshot.keywordTest {
                     LabeledContent(appCopy.text("Capture mode"), value: capture)
                         .accessibilityIdentifier("settings.recognition.capture")
                     if let fallback = state.snapshot.fallback {
@@ -199,9 +214,8 @@ extension AudioDetectionPresenting {
             } footer: {
                 Text(appCopy.text("Detection takes 10 seconds. Sound direction is approximate."))
             }
-            .onDisappear { submit(.stop) }
-            .onChange(of: scenePhase) { _, phase in if phase != .active { submit(.stop) } }
         }
+        private var isActive: Bool { state.isActive && !state.snapshot.keywordTest }
         private func submit(_ value: AudioDetectionInput) {
             Task {
                 do {
@@ -278,6 +292,77 @@ extension AudioDetectionPresenting {
             }
         }
     }
+
+    @MainActor struct KeywordDetectionControls: View {
+        @Environment(\.locale) private var locale
+        @Bindable var state: AudioDetectionState
+        let requests: UIRequests<AudioDetectionInput, Void>
+        let modelSelected: Bool
+
+        private var copy: AppLanguage { AppLanguage(preferredLanguage: locale.identifier) }
+        private var active: Bool { state.isActive && state.snapshot.keywordTest }
+
+        var body: some View {
+            Button(copy.text(active ? "Stop keyword test" : "Test keywords")) {
+                submit(active ? .stop : .startKeywordTest)
+            }
+            .disabled(state.phase == .stopping || (state.isActive && !active) || (!modelSelected && !active))
+            .accessibilityIdentifier("settings.speech.keywordSpotting.test")
+
+            Text(
+                copy.text(
+                    modelSelected || active
+                        ? "Say one keyword, then pause. The test listens for 10 seconds."
+                        : "Select a keyword model to test.")
+            )
+            .font(.caption).foregroundStyle(.secondary)
+
+            if state.snapshot.keywordTest {
+                if active {
+                    LabeledContent(copy.text("Microphone")) {
+                        ProgressView(value: state.snapshot.level).frame(width: 90)
+                            .accessibilityLabel(copy.text("Sound level"))
+                    }
+                    LabeledContent(
+                        copy.format("Sent to model: %.1f s", Double(state.snapshot.keywordInputSamples) / 16000)
+                    ) {
+                        ProgressView(value: state.snapshot.keywordInputLevel).frame(width: 90)
+                            .accessibilityLabel(copy.text("Model input level"))
+                    }
+                    if state.snapshot.keywordHit == nil {
+                        Text(copy.text(state.phase == .preparing ? "Preparing microphone…" : "Detecting"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if let hit = state.snapshot.keywordHit {
+                    LabeledContent(copy.text("Detected keyword"), value: hit.phrase)
+                        .accessibilityIdentifier("settings.speech.keywordSpotting.hit")
+                    Text(copy.text(hit.silentTail ? "Trailing silence passed" : "Trailing silence did not pass"))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if state.phase == .finished || (state.phase == .stopped && state.snapshot.capturedAt != nil) {
+                    Text(copy.text("No keyword detected")).foregroundStyle(.secondary)
+                } else if state.phase == .stopped {
+                    Text(copy.text("Stopped")).foregroundStyle(.secondary)
+                }
+                if let error = state.error { Text(copy.text(error)).font(.caption).foregroundStyle(.red) }
+            }
+        }
+
+        private func submit(_ input: AudioDetectionInput) {
+            Task {
+                do {
+                    if input == .stop {
+                        try await requests.submitControl(input)
+                    } else {
+                        try await requests.submit(input)
+                    }
+                } catch is CancellationError {
+                } catch {
+                    if state.error == nil { state.present(.error(error.localizedDescription)) }
+                }
+            }
+        }
+    }
 #endif
 
-public enum AudioDetectionInput: Sendable, Equatable { case start, stop }
+public enum AudioDetectionInput: Sendable, Equatable { case start, startKeywordTest, stop }

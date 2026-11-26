@@ -76,6 +76,7 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     private var activeLeases: [String: ActiveLease] = [:]
     private let concurrent: Bool
     private var unloading = false
+    private var cancellingLeases = false
     private var maintenance = false
     private var closed = false
     private var unloadFinished: CheckedContinuation<Void, Never>?
@@ -111,11 +112,23 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         }
     }
 
+    /// Leases an already resident model without starting or joining a load.
+    public func acquireIfReady() throws -> (id: String, model: Model)? {
+        try Task.checkCancellation()
+        _ = try admission.check()
+        guard !closed, !unloading, !maintenance, loading == nil, let model,
+            concurrent || activeLeases.isEmpty
+        else { return nil }
+        let id = UUID().uuidString
+        activeLeases[id] = ActiveLease(id: id)
+        return (id, model)
+    }
+
     /// Install after creating the session/worker; handles shutdown-before-install races.
     public func setCancellation(_ id: String, _ cancel: @escaping @Sendable () -> Void) {
         guard activeLeases[id] != nil else { return }
         activeLeases[id]?.cancel = cancel
-        if closed || (try? admission.check()) == nil { cancel() }
+        if closed || cancellingLeases || (try? admission.check()) == nil { cancel() }
     }
 
     public func release(_ id: String) {
@@ -184,16 +197,18 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
         _ = try await ensureLoaded(reportLoading: reportLoading)
     }
 
-    fileprivate func unload() async throws {
+    fileprivate func unload(cancelActive: Bool) async throws {
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !unloading else { throw CapabilityError.inputBusy }
         unloading = true
+        cancellingLeases = cancelActive
         defer {
+            cancellingLeases = false
             unloading = false
             unloadFinished?.resume()
             unloadFinished = nil
         }
-        await drain(cancel: false)
+        await drain(cancel: cancelActive)
     }
 
     fileprivate func suspend() async {
@@ -209,10 +224,12 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
 
     fileprivate func shutdown() async {
         closed = true
-        loading?.cancel()
-        for lease in activeLeases.values { lease.cancel?() }
         // An in-progress unload already owns the sole drain continuation.
-        if unloading { await withCheckedContinuation { unloadFinished = $0 } }
+        if unloading {
+            loading?.cancel()
+            for lease in activeLeases.values { lease.cancel?() }
+            await withCheckedContinuation { unloadFinished = $0 }
+        }
         unloading = true
         await drain(cancel: true)
         unloading = false
@@ -227,7 +244,10 @@ public actor ModelResource<Model: Sendable>: ModelResourceLifecycle {
     }
 
     private func drain(cancel: Bool) async {
-        if cancel { loading?.cancel() }
+        if cancel {
+            loading?.cancel()
+            for lease in activeLeases.values { lease.cancel?() }
+        }
         if let loading { _ = try? await loading.value }
         self.loading = nil
         loadID = nil
@@ -241,7 +261,7 @@ private protocol ModelResourceLifecycle: Sendable {
     var inferenceActive: Bool { get async }
     func load() async throws
     func load(reportLoading: @Sendable (Bool) async -> Void) async throws
-    func unload() async throws
+    func unload(cancelActive: Bool) async throws
     func shutdown() async
     func suspend() async
     func unloadIfIdle() async -> Bool
@@ -305,7 +325,9 @@ public final class ModelContext: Sendable {
     @_spi(ModelManagement) public func load(reportLoading: @Sendable (Bool) async -> Void) async throws {
         try await state.withLock { $0.resource }?.load(reportLoading: reportLoading)
     }
-    @_spi(ModelManagement) public func unload() async throws { try await state.withLock { $0.resource }?.unload() }
+    @_spi(ModelManagement) public func unload(cancelActive: Bool = false) async throws {
+        try await state.withLock { $0.resource }?.unload(cancelActive: cancelActive)
+    }
     @_spi(ModelManagement) public func unloadIfIdle() async -> Bool {
         await state.withLock { $0.resource }?.unloadIfIdle() ?? false
     }

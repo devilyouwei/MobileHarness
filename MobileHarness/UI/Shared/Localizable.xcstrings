@@ -2,6 +2,61 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "Voice language": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音语言"
+          }
+        }
+      }
+    },
+    "Mandarin Chinese": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "普通话"
+          }
+        }
+      }
+    },
+    "English": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "英语"
+          }
+        }
+      }
+    },
+    "Voice": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音色"
+          }
+        }
+      }
+    },
+    "Download the selected speech synthesis model first.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载所选的语音合成模型。"
+          }
+        }
+      }
+    },
     "Fallback": {
       "extractionState": "manual",
       "localizations": {
@@ -845,6 +900,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "自动"
+          }
+        }
+      }
+    },
+    "Automatic replies are paused because Action cleanup could not be confirmed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法确认 Action 已清理，自动回复已暂停。"
           }
         }
       }
@@ -2451,6 +2517,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "目的路径"
+          }
+        }
+      }
+    },
+    "Detected keyword": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命中的关键词"
           }
         }
       }
@@ -4193,6 +4270,17 @@
         }
       }
     },
+    "Loading %@…": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在加载 %@…"
+          }
+        }
+      }
+    },
     "Loading conversation…": {
       "extractionState": "extracted",
       "localizations": {
@@ -4336,6 +4424,17 @@
         }
       }
     },
+    "Lower values make keywords easier to detect. Applies the next time listening or testing starts.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阈值越低，越容易检测到关键词。下次开始聆听或测试时生效。"
+          }
+        }
+      }
+    },
     "MOSS Speech Synthesis": {
       "extractionState": "extracted",
       "localizations": {
@@ -4464,6 +4563,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "模型资源"
+          }
+        }
+      }
+    },
+    "Model input level": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型输入电平"
           }
         }
       }
@@ -4783,6 +4893,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "暂未发现设备"
+          }
+        }
+      }
+    },
+    "No keyword detected": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有检测到词表中的关键词"
           }
         }
       }
@@ -6613,6 +6734,17 @@
         }
       }
     },
+    "Say one keyword, then pause. The test listens for 10 seconds.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请说一个关键词（如「停下」或 stop），然后停顿。测试持续 10 秒。"
+          }
+        }
+      }
+    },
     "Scan for nearby devices": {
       "extractionState": "extracted",
       "localizations": {
@@ -6690,6 +6822,17 @@
         }
       }
     },
+    "Select a keyword model to test.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先选择已安装的关键词模型。"
+          }
+        }
+      }
+    },
     "Select a model": {
       "extractionState": "extracted",
       "localizations": {
@@ -6719,6 +6862,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "请选择已保存的 Provider 和模型"
+          }
+        }
+      }
+    },
+    "Sent to model: %.1f s": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已送入模型：%.1f 秒"
           }
         }
       }
@@ -7207,6 +7361,17 @@
         }
       }
     },
+    "Stop keyword test": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止关键词测试"
+          }
+        }
+      }
+    },
     "Stop listening and speaking": {
       "extractionState": "extracted",
       "localizations": {
@@ -7526,6 +7691,17 @@
         }
       }
     },
+    "Test keywords": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "测试关键词"
+          }
+        }
+      }
+    },
     "That question has closed. Send your request again.": {
       "extractionState": "extracted",
       "localizations": {
@@ -7698,6 +7874,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "首批改动已保存到草稿，正在继续处理。"
+          }
+        }
+      }
+    },
+    "The keyword model is not ready. Select an installed model and try again.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关键词模型未就绪。请选择已安装的模型后重试。"
           }
         }
       }
@@ -8406,6 +8593,28 @@
         }
       }
     },
+    "Trailing silence passed": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尾部静音门限通过"
+          }
+        }
+      }
+    },
+    "Trailing silence did not pass": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尾部静音门限未通过"
+          }
+        }
+      }
+    },
     "Try %@": {
       "extractionState": "extracted",
       "localizations": {
@@ -8974,6 +9183,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待补充 · %@"
+          }
+        }
+      }
+    },
+    "Waiting for microphone capture to resume after interruption.": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在等待打断后的麦克风采集恢复。"
           }
         }
       }
@@ -9746,6 +9966,322 @@
           "stringUnit": {
             "state": "translated",
             "value": "语音检测设置无效。"
+          }
+        }
+      }
+    },
+    "Speech": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音"
+          }
+        }
+      }
+    },
+    "Voice activity detection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice activity detection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音活动检测"
+          }
+        }
+      }
+    },
+    "Energy detection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energy detection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "能量检测"
+          }
+        }
+      }
+    },
+    "Keyword confidence threshold": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关键词置信度阈值"
+          }
+        }
+      }
+    },
+    "Keyword confidence threshold: %.2f": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关键词置信度阈值：%.2f"
+          }
+        }
+      }
+    },
+    "End-of-turn confirmation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End-of-turn confirmation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语句结束确认"
+          }
+        }
+      }
+    },
+    "Smart Turn v3.2": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart Turn v3.2"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Smart Turn v3.2"
+          }
+        }
+      }
+    },
+    "Speech will end based on voice activity detection.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech will end based on voice activity detection."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音将由语音活动检测判定结束。"
+          }
+        }
+      }
+    },
+    "Download Smart Turn before enabling end-of-turn confirmation.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download Smart Turn before enabling end-of-turn confirmation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 Smart Turn，再启用语句结束确认。"
+          }
+        }
+      }
+    },
+    "Keyword spotting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyword spotting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关键词检测"
+          }
+        }
+      }
+    },
+    "Apple speech recognition (en-US)": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 语音识别（英语）"
+          }
+        }
+      }
+    },
+    "Apple speech recognition (zh-CN)": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 语音识别（普通话）"
+          }
+        }
+      }
+    },
+    "Apple speech recognition": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple speech recognition"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 系统语音识别"
+          }
+        }
+      }
+    },
+    "Apple system voices": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple system voices"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple 系统语音"
+          }
+        }
+      }
+    },
+    "Custom model downloads": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom model downloads"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义模型下载"
+          }
+        }
+      }
+    },
+    "%@ (not installed)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (not installed)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@（未安装）"
+          }
+        }
+      }
+    },
+    "Zipformer Keyword Spotting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zipformer Keyword Spotting"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zipformer 关键词检测"
+          }
+        }
+      }
+    },
+    "Zipformer fast interrupt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zipformer fast interrupt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zipformer 快速打断"
+          }
+        }
+      }
+    },
+    "Applies the next time full-duplex listening starts. Decision handles speech when Zipformer is not ready or does not match.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applies the next time full-duplex listening starts. Decision handles speech when Zipformer is not ready or does not match."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次开始全双工聆听时生效。Zipformer 未就绪或未命中时，仍由 Decision 判断是否打断。"
+          }
+        }
+      }
+    },
+    "Download Zipformer before enabling fast interrupt.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download Zipformer before enabling fast interrupt."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先下载 Zipformer，再开启快速打断。"
+          }
+        }
+      }
+    },
+    "Fast interrupt will turn off. Decision will continue handling interruptions.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast interrupt will turn off. Decision will continue handling interruptions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速打断将关闭，Decision 仍会判断是否打断。"
           }
         }
       }

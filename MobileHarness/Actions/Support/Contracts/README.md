@@ -13,7 +13,7 @@ This existing target imports Foundation and Synchronization only, with no projec
 | FunctionInput / FunctionInvocation / ActionExecutionContext | Invocation identity, source/session/input and opaque correlation, reporting and optional Sendable attachment. Cognitive Task/decision strings are opaque correlation, never permission. |
 | ActionExecutionDescriptor / ActionCatalogSnapshot | Immutable descriptions, call protocols and execution/return policies; no handler or mutation API. |
 | PreparedAction / ActionsExecutionPort | Effect-free prepare, one-use revision-bound credential, resources/budget, execute and discard. Root instances retain actual invocations privately. |
-| ActionExecutionEngine / ActionSignalBinding / ScheduledAction / ExecutionResult / ActionSchedulingError | Neutral Agent → Action invocation and Action → Agent feedback boundary: Gateway forwards through the Shell contract and binds endpoint validation and the feedback exit once; the Actions Shell implements it. |
+| ActionExecutionEngine / ActionSignalBinding / ScheduledAction / ExecutionStart / ExecutionResult / ActionSchedulingError | Neutral Agent → Action invocation and Action → Agent feedback boundary: Gateway forwards through the Shell contract and binds endpoint validation and the feedback exit once; the Actions Shell implements it. |
 | ActionExecutionRecord / ActionExecutionSnapshot | Read-only scheduling observation with canonical path, bounded parameter previews and actual completion evidence. |
 | ActionCompletion / ActionReport / ActionFailure | Real completion/value/activity/report, per-leaf partial effects and independent failure. |
 | ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
@@ -40,7 +40,7 @@ ActionReport holds at most 256 entries. Paths are nonempty up to 128 bytes; deta
 
 A dependencyFailed leaf is notStarted because an earlier prerequisite failed; the earlier failure retains its original code and details. Successful stored child evidence does not replace a finite value receipt; failed/cancelled evidence takes precedence.
 
-Failure classification prefers actual producer/report failure over pure cancellation. Real failures with successes are partialFailure; real failure without success is failed; cancellation-only is cancelled. ExecutionFailurePreserving prevents resource/scheduling cancellation checks from replacing a real failed report. NativeCleanupFailure retains original errors without performing retry or cleanup.
+Failure classification prefers actual producer/report failure over pure cancellation. Real failures with successes are partialFailure; real failure without success is failed; cancellation-only is cancelled. ExecutionFailurePreserving prevents resource/scheduling cancellation checks from replacing a real failed report. NativeCleanupFailure retains original errors. Execution reports preserve unconfirmed cleanup, and owner-scoped cancel returns whether its selected work finished native cleanup.
 
 ActionRequestSlot admits only matching request/session once. Completion is rejected before admission, after closure or after a prior result. take consumes the result/failure and closes; close releases retained content. Role permission is checked before Gateway, independently of this attachment's business scope.
 

@@ -228,6 +228,7 @@ let testSources: [String: [String]] = [
         "Tests/Agents/Assistant/ListeningModeTests.swift",
         "Tests/Agents/SpeechPerception/SoundSourceTests.swift",
         "Tests/Agents/SpeechPerception/SpeechEnhancementWorkflowTests.swift",
+        "Tests/Agents/SpeechPerception/SpeechKeywordProbeTests.swift",
         "Tests/Agents/SpeechPerception/VoiceTests.swift",
         "Tests/Agents/Support/ContainerExecutionFixtures.swift",
         "Tests/Agents/Support/DirectInputSupport.swift",
@@ -303,6 +304,7 @@ let testSources: [String: [String]] = [
     "OpenAIChatTests": [
         "Tests/ModelKit/Language/OpenAI/OpenAIChatTests.swift"
     ],
+    "ZipformerTests": ["Tests/ModelKit/Speech/ZipformerTests.swift"],
     "SileroTests": [
         "Tests/ModelKit/Speech/Enhancement/DeepFilterTests.swift",
         "Tests/ModelKit/Speech/Enhancement/WindowedEnhancementTests.swift",
@@ -440,7 +442,7 @@ let package = Package(
                 "StorageChat", "StorageCache", "StorageTasks", "StorageMedia", "StorageDevices",
                 "StorageSQLite", "UI", "AppLifecycle",
                 "ModelKitAppleSpeech", "ModelKitRuntime", "ModelKitDefaults", "ModelKitHub",
-                "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano",
+                "ModelKitSilero", "ModelKitNemotron", "ModelKitMossNano", "ModelKitKokoro",
                 "PlatformKit",
             ]),
         .library(name: "StorageCore", targets: ["StorageCore"]),
@@ -674,7 +676,10 @@ let package = Package(
                 "Language/JEV/D3Decision.swift", "Language/JEV/VelaDecision.swift",
                 "Language/JEV/Vela31Decision.swift", "Language/JEV/LayaDecision.swift",
                 "Speech/Enhancement/README.md", "Speech/Enhancement/DeepFilterNet3",
+                "Speech/KWS/README.md", "Speech/KWS/ZipformerFilterbank.swift",
+                "Speech/KWS/ZipformerKeywordDecoder.swift", "Speech/KWS/ZipformerKeywordSpotter.swift",
                 "Speech/README.md", "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/VAD/README.md",
+                "Speech/VAD/SmartTurn.swift",
                 "Language/LLM/Apple", "Language/LLM/Gemma4", "Language/LLM/OpenAI", "Language/LLM/README.md",
                 "Support/Backends",
                 "Support/README.md", "Support/Speech",
@@ -701,8 +706,8 @@ let package = Package(
             name: "ModelKitDefaults",
             dependencies: [
                 "ModelKit", "ModelKitRuntime", "ModelKitHub", "ModelKitNemotron", "ModelKitSilero",
-                "ModelKitDeepFilterNet3",
-                "ModelKitMossNano", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
+                "ModelKitDeepFilterNet3", "ModelKitZipformer", "ModelKitSmartTurn",
+                "ModelKitMossNano", "ModelKitKokoro", "ModelKitYOLOPose", "ModelKitOpenAI", "ModelKitAppleSpeech",
                 "ModelKitEnergy", "ModelKitD3", "ModelKitAppleLLM",
             ] + localChatDependencies,
             path: "MobileHarness/ModelKit",
@@ -750,7 +755,7 @@ let package = Package(
                 "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/ASR/Apple/README.md",
                 "Speech/TTS/Apple/README.md", "Speech/ASR/SpeechRecognitionCapability.swift",
                 "Speech/TTS/SpeechSynthesisCapability.swift", "Speech/TTS/Kokoro", "Speech/TTS/MossNano",
-                "Speech/ASR/Nemotron", "Speech/VAD", "Speech/Enhancement",
+                "Speech/ASR/Nemotron", "Speech/VAD", "Speech/Enhancement", "Speech/KWS",
             ],
             sources: ["Speech/ASR/Apple", "Speech/TTS/Apple", "Support/Speech/Apple"]),
         .target(
@@ -759,9 +764,21 @@ let package = Package(
         organizedTestTarget(
             name: "YOLOPoseTests", dependencies: ["ModelKit", "ModelKitYOLOPose", "ModelKitCoreML", "ModelKitRuntime"]),
         .target(name: "ModelKitCoreML", path: "MobileHarness/ModelKit/Support/Backends/CoreML"),
+        organizedTestTarget(name: "ZipformerTests", dependencies: ["ModelKit", "ModelKitZipformer"]),
+        .target(
+            name: "ModelKitZipformer", dependencies: ["ModelKit", "ModelKitCoreML"],
+            path: "MobileHarness/ModelKit/Speech/KWS",
+            exclude: ["README.md", "KeywordSpottingCapability.swift"]),
         .target(
             name: "ModelKitDeepFilterNet3", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Speech/Enhancement/DeepFilterNet3", exclude: ["README.md"]),
+        .target(
+            name: "ModelKitSmartTurn", dependencies: ["ModelKit", "ModelKitCoreML"],
+            path: "MobileHarness/ModelKit/Speech/VAD",
+            exclude: [
+                "README.md", "VoiceActivityCapability.swift", "SpeechEndpointCapability.swift", "Energy", "Silero",
+            ],
+            sources: ["SmartTurn.swift"]),
         .target(
             name: "ModelKitSilero", dependencies: ["ModelKit", "ModelKitCoreML"],
             path: "MobileHarness/ModelKit/Speech/VAD/Silero", exclude: ["README.md"]),
@@ -817,7 +834,7 @@ let package = Package(
         organizedTestTarget(name: "Gemma4Tests", dependencies: ["StorageCore", "ModelKit", "ModelKitGemma4"]),
         organizedTestTarget(
             name: "ModelKitDefaultsTests",
-            dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults", "ModelKitOpenAI"]),
+            dependencies: ["ModelKit", "ModelKitRuntime", "ModelKitDefaults", "ModelKitHub", "ModelKitOpenAI"]),
         organizedTestTarget(name: "ModelKitTests", dependencies: ["ModelKit", "ModelKitAppleLLM"]),
         organizedTestTarget(name: "ModelKitRuntimeTests", dependencies: ["ModelKit", "ModelKitRuntime"]),
         organizedTestTarget(name: "ModelKitAppleSpeechTests", dependencies: ["ModelKit", "ModelKitAppleSpeech"]),

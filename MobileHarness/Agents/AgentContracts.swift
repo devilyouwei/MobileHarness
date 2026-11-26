@@ -88,11 +88,12 @@ public enum AgentContracts {
                         }),
                     CommunicationContract(
                         name: ReplyActivitySignal.contract, kind: .observation, channel: ReplyActivitySignal.channel,
-                        maximumBytes: 256,
+                        maximumBytes: ReplyActivitySignal.maximumBytes,
                         validateMessage: { message in
-                            guard message.content(as: ReplyActivitySignal.self) != nil else {
+                            guard let activity = message.content(as: ReplyActivitySignal.self) else {
                                 throw CommunicationError.invalidPayload
                             }
+                            try activity.validate()
                         }),
                     CommunicationContract(
                         name: ListeningModeSignal.contract, kind: .observation, channel: ListeningModeSignal.channel,
@@ -174,7 +175,7 @@ extension AgentContracts {
         ]
         for protocolID in configuration.communication.feedback {
             guard knownRoles.contains(configuration.agentID),
-                protocolID != "agent.round.result.v1" || configuration.agentID == .assistant
+                protocolID != ExecutionFeedback.contract || configuration.agentID == .assistant
             else {
                 throw AgentProtocolStartupError(
                     agentID: configuration.agentID, field: "signals.feedback", protocolID: protocolID,
@@ -226,7 +227,10 @@ extension AgentContracts {
     }
     private static var publicationImplementations: [AgentID: Set<String>] {
         [
-            .speechPerception: ["user.input.speech.v1", "perception.speech.activity.v1", "perception.audio.source.v1"],
+            .speechPerception: [
+                "user.input.speech.v1", SpeechActivity.contract, "perception.audio.source.v1",
+                AssistantInterrupt.contract,
+            ],
             .visionPerception: ["perception.vision.pose.v1"],
             .applicationControl: ["agent.interruption.v1", "agent.task.events.v1"],
             .assistant: ["agent.task.events.v1", "agent.listening.mode.v1", "agent.reply.activity.v1"],

@@ -10,7 +10,7 @@
 
 ## 职责与注入能力
 
-构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`／可选 `SpeechEnhancementCapability`、可选 `UIHomeContainer`、FunctionContracts `SpectrumPresenting`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
+构造注入 PlatformKit `AudioCaptureObserving`、ModelKit `SpeechRecognitionCapability`／`VoiceActivityCapability`／可选 `SpeechEndpointCapability`／`SpeechEnhancementCapability`、可选 `UIHomeContainer`、FunctionContracts `SpectrumPresenting`、低频测量回调和私有 Context。角色直接取得 PCM，负责声道／采样率／序号／连续性、VAD、ASR、声源和半双工政策；不直接开启麦克风或启动动画。
 
 UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/toggle/press 数据。UI 不调用角色；订阅本身不请求权限或开启设备。soundSourceOnly 模式不获得识别呈现权限。
 
@@ -21,7 +21,7 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | Isolated diagnostic role, result pump and neutral detection connection type specializations; no native capture ownership |
 | [SoundSourceEstimator.swift](SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
 | [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 边界、结束与恢复的纯策略；`SpeechOnsetPolicy` 由基础设置和播放事实得出单个窗口的起声概率、起声窗口数与维持概率 |
-| [SpeechPlaybackHistory.swift](SpeechPlaybackHistory.swift) | 播放事实快照与最多 32 区间的历史，由 Assistant 写入、感知角色按采集时刻读取 |
+| [共享播放快照](../Support/Communication/SpeechPlaybackHistory.swift) | 通过 Gateway 接收最多 32 段播放历史，按录音采集时刻本地查询 |
 | [AudioFrameFloat32.swift](AudioFrameFloat32.swift) | 本目录共享的 Float32 PCM 读写与帧电平（dBFS）扩展，不改变 ModelKit 契约 |
 | [SpeechListeningInputs.swift](SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
 | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
@@ -49,7 +49,7 @@ flowchart LR
  U -->|"主动订阅聆听控制数据"| A
  P["PlatformKit.audio：AudioCaptureObserving"]:::platform
  P -->|"直接 PCM"| A
- M["ModelKit.speech：VAD／ASR"]:::model
+ M["ModelKit.speech：VAD／语句结束确认／ASR"]:::model
  A <--> M
  X["Actions：频谱呈现／语音执行窄协议"]:::action
  A -->|"低频测量；无 PCM 转交"| X
@@ -74,7 +74,7 @@ flowchart LR
 
 角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
 
-SpeechPerception 在 user.input 主题发布 user.input.speech.v1（partial） 和 user.input.speech.v1（final）。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。另发布 perception.speech.activity.v1（采集、起声与 utterance 事实），并订阅 Assistant 的 agent.listening.mode.v1 与 agent.reply.activity.v1（回复活动，用于选择较短的静音端点）。声源诊断观察 sound.source。
+SpeechPerception 在 user.input 主题发布 user.input.speech.v1（partial） 和 user.input.speech.v1（final）。Assistant 订阅最终文本，片段可由诊断或显式订阅者观察。另发布 perception.speech.activity.v1（采集、起声与 utterance 事实），并订阅 Assistant 的 agent.listening.mode.v1 与 agent.reply.activity.v1（回复活动与原生播放快照，分别用于静音端点和动态起声门槛）。声源诊断观察 sound.source。
 
 ## 内部结构与执行链
 
@@ -84,7 +84,7 @@ flowchart TB
  direction LR
  U["UI.home.listeningRequests"]:::ui
  P["Platform.audio：只读 PCM／采集代"]:::platform
- M["ModelKit：VAD／ASR"]:::model
+ M["ModelKit：VAD／语句结束确认／ASR"]:::model
  end
  subgraph Role["SpeechPerception"]
  V["VoiceInteractionSession · 语音和检测生命周期"]:::agent
@@ -129,13 +129,21 @@ flowchart TB
 
 原生源单消费者，64 包有序 FIFO 加当前处理包；一个长期任务完成当前包后才取下一包，包括冷模型获取期间，不增加第二个原生积压 FIFO，不逐包创建处理 Task。保留 Float 存储及原生序号，8–192 kHz，mono 或 ACN/SN3D FOA；半双工门控不重新编号。每包至多 64,000 字节。通用 AgentInput 不接纳 PCM，不存在程序化媒体兼容入口或额外积压队列。
 
-选择 mono/W，每次转换至多 8192 samples；按设置经 48 kHz 降噪窗口或直接转换，最后状态化重采样为 16 kHz ModelKit.AudioFrame。ASR turn 最多 2048 事件、480,000 排队 mono samples；12 秒仅为内部段边界，没有整句时长截止。缓冲满显式失败，不扩大容量等待模型。采集代重绑重置格式、声源与 DSP，旧代 PCM 不可进入新会话。
+选择 mono/W，每次转换至多 8192 samples；按设置经 48 kHz 降噪窗口或直接转换，最后状态化重采样为 16 kHz ModelKit.AudioFrame。ASR turn 最多 2048 事件、480,000 排队 mono samples；12 秒为内部段边界。缓冲满显式失败，不扩大容量等待模型。采集代重绑重置格式、声源与 DSP，旧代 PCM 不可进入新会话。
+
+若一轮一直没有非空转写，`SpeechRecognitionTurn` 在成功送达识别器的 PCM 达到 32,768 样本（64 × 512、2.048 秒）时允许主动结束。SpeechPerception 结束同轮关键词探测，封口等待终稿最多 500 ms，随后取消并加入旧识别任务。非空终稿按正常路径发布，空轮发布语句结束事件。发生主动端点后重置 DSP、VAD 状态与识别轮，VAD 连续 160 ms 低于基础阈值才重新接纳起声。出现过非空转写的一轮使用常规 VAD 端点。
 
 ## 分段算法
 
 `VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.65, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
 
-`SpeechBoundaryPolicy` uses sample counts: configurable onset 1…16 windows of 512 samples (default 8 / 256 ms), pre-roll budget max(4096, onset windows × 512), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Consecutive silent VAD scores determine the endpoint. Active same-session reply work or playback uses 16 windows (512 ms); otherwise it uses 25 windows (800 ms). SpeechPerception reads the injected activity per model audio packet, and changes apply to accumulated silent windows at the next VAD score. Independent perception sessions use the idle threshold. Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
+`SpeechBoundaryPolicy` uses sample counts: configurable onset 1…16 windows of 512 samples (default 8 / 256 ms), pre-roll budget max(4096, onset windows × 512), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Consecutive silent VAD scores determine the endpoint. Active same-session reply work or playback uses 16 windows (512 ms); otherwise it uses 25 windows (800 ms). SpeechPerception caches reply activity from Gateway Signals and applies changes to accumulated silent windows at the next VAD score. Independent perception sessions use the idle threshold. Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
+
+For interruption continuation, the reply activity Signal includes an observation ID and a monotonic cutoff. SpeechPerception retains the latest 64 complete 512-sample VAD windows for the current native capture. A ready Signal carries the observation and capture IDs when all 64 windows follow the cutoff. This also covers windows scored while the request was in transport. Capture retirement clears the window history. The ready Signal follows the onset facts from the same window in the speech activity channel.
+
+### 语句结束确认
+
+VAD 达到静音端点时，同一 PCM 消费任务等待可选 `SpeechEndpointCapability`，每段连续停顿询问一次。分段器保留当前语句最近 128,000 个 16 kHz 单声道样本，包括该停顿。概率大于 0.5 时结束。低分保持说话状态与 ASR 轮次，语音恢复时把停顿一并交给原识别器，并允许再次确认。静音累计达 32,000 个样本即结束。关闭、未就绪或推理失败时按 VAD 原端点结束，失败写入语音端点日志。重置或取消时清空缓存。空转写主动结束、显式停采集和 ASR 内部分段仍按各自的契约执行。
 
 ## 输出契约
 
@@ -238,8 +246,25 @@ Each native input is processed inline; there is no second native FIFO. The windo
 
 ## 播放状态与连续接纳
 
-SpeechPlaybackHistory.swift拥有SpeechPlaybackSnapshot及最多32区间的SpeechPlaybackHistory。Assistant发布带原生schedule时刻的播放事实；播放及结束后200ms使用较严格起声门槛。历史淘汰保留known信息，不以历史缺失拒绝音频。没有起播保护窗口或ASR结束后的冷却窗口。
+Assistant 经 Gateway 发布最多 32 段同会话原生播放区间。SpeechPerception 持有最新 `agent.reply.activity.v1` 快照，按原始采集时间在本地选择门槛，播放期间及结束后 200 ms 使用较严格起声门槛。快照保留历史覆盖边界，缺失区间时语音继续处理。已处理的 PCM 无需因迟到的 Signal 重新送入 VAD。
 
 ASR完整语句结束后重置识别和预处理历史，允许下一片音频立即进入VAD。ASR收尾中的现有识别状态机、半双工播放暂停、会话与采集代隔离仍由原有生命周期控制。
 
 SpeechPerceptionAgent按至多32ms原始片段和512样本DSP输出处理音频。每个DSP切片获得采集代内严格递增的独立序号，frame.timestamp与原始audio.timestamp的偏移映射回capturedAt，用于播放期间起声阈值选择；不因起播或ASR完成时刻丢弃片段。没有额外PCM队列。
+
+## 流式关键词探测
+
+[SpeechKeywordProbe](SpeechKeywordProbe.swift) 从 VAD 首个起声候选接收 16 kHz PCM，
+保留最多 1,600 个预卷采样。每个候选最多排队 8 包，满时关闭本轮探测，ASR 继续。
+设置选择关键词模型且模型已就绪时，从候选窗口开始累积关键词缓存，关闭或模型未就绪则跳过。
+一轮最多使用一个符合 160 ms 尾部静音门限的首次命中。词表包含独立的 `stop` 和「停下」以及中英文长口令。
+只有 VAD 已确认、仍在同一采集代际和全双工状态、活动回复 ID
+匹配时才接受该事件。起声撤销、端点、模式切换、回复替换和采集关闭使候选失效。
+每次新采集读取已保存的快速打断偏好，读取失败时只记录已确认的命中。启用快停时，通过
+Gateway 发布携带精确回复及语句 ID 的 `AssistantInterrupt`，PCM 和转写各留在现有通道。
+
+设置中的关键词测试使用独立 `AudioDetectionAgentSession` 与一条已就绪的关键词会话。测试使用生产词表和当前降噪配置，将预处理后的 16 kHz 音频直接送入关键词会话。首次命中将短语和生产尾部静音判定作为诊断观测。测试的采集不进入 VAD、ASR、Assistant Signal 或停播链路。
+
+同一次设置测试内，连续 600 ms 低电平之后的下一次有声输入开启新关键词会话，带入至多 100 ms 预卷。成功交给模型的采样数与处理后电平通过有界频率投影至 UI。
+
+正式采集和关键词测试在开始时读取已保存的关键词置信度，并为该次采集固定词表和阈值。设置测试中的会话重开使用相同词表参数。

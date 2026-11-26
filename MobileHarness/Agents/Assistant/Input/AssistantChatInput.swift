@@ -149,50 +149,53 @@ extension AssistantChatWorker {
         if case .event = input.payload { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
         if try await acceptPendingFeedback(input) { return }
-        if case .roundResult(let result) = input.payload {
-            try validateFeedback(input)
-            guard result.roundID == roundID, roundReceipt == nil else { throw CommunicationError.unauthorized }
-            try await persistFeedback(input)
-            try validateFeedback(input)
-            guard result.roundID == roundID, roundReceipt == nil else { throw CommunicationError.scopeClosed }
-            roundReceipt = result
+        if case .executionFeedback(let feedback) = input.payload,
+            try await acceptExecutionLifecycle(feedback, input: input)
+        {
             return
         }
-        if case .actionResult(let result) = input.payload {
+        if case .executionFeedback(.actionFinished(let result)) = input.payload {
             guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
                 result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID
             else { throw CommunicationError.unauthorized }
             if let id = result.callID {
-                try validateFeedback(input)
-                guard result.roundID == roundID,
-                    let index = roundCalls.firstIndex(where: { $0.id == id && !$0.tool }),
-                    roundCalls[index].path == result.path.description
-                else { throw CommunicationError.unauthorized }
-                try await persistFeedback(input)
-                try validateFeedback(input)
-                guard result.roundID == roundID, roundCalls.indices.contains(index), roundCalls[index].id == id else {
-                    throw CommunicationError.scopeClosed
+                guard let receiptRound = result.roundID, ownsExecutionRound(receiptRound, input: input) else {
+                    throw CommunicationError.unauthorized
                 }
-                let value = try Self.completionText(result.completion)
-                try acceptResult(
-                    .init(
-                        callID: id, value: value, isError: result.status != .succeeded,
-                        failureCode: result.failure?.rawValue, completion: result.completion ?? .completed,
-                        roundID: result.roundID),
-                    at: index)
-                roundCalls[index].actionResult = result
+                if receiptRound == roundID, activeInput != nil {
+                    guard let index = roundCalls.firstIndex(where: { $0.id == id && !$0.tool }),
+                        roundCalls[index].path == result.path.description
+                    else { throw CommunicationError.unauthorized }
+                    try await persistFeedback(input)
+                    if try await acceptPendingFeedback(input, persisted: true) { return }
+                    if receiptRound == roundID, roundCalls.indices.contains(index), roundCalls[index].id == id {
+                        let value = try Self.completionText(result.completion)
+                        try acceptResult(
+                            .init(
+                                callID: id, value: value, isError: result.status != .succeeded,
+                                failureCode: result.failure?.rawValue, completion: result.completion ?? .completed,
+                                roundID: receiptRound),
+                            at: index)
+                        roundCalls[index].actionResult = result
+                    }
+                } else {
+                    // Cleanup can outlive the generation. Retain the terminal as execution evidence.
+                    try await persistFeedback(input)
+                }
+            } else {
+                try await persistFeedback(input)
             }
-            if result.callID == nil { try await persistFeedback(input) }
             resultInbox.accept(result)
             return
         }
         if case .toolResult(let result) = input.payload,
+            let activeInput, let receiptRound = roundID,
             let index = roundCalls.firstIndex(where: { $0.id == result.callID && $0.tool })
         {
             try validateFeedback(input)
-            guard result.roundID == nil || result.roundID == roundID else { throw CommunicationError.unauthorized }
+            guard result.roundID == nil || result.roundID == receiptRound else { throw CommunicationError.unauthorized }
             try await persistFeedback(input)
-            guard let activeInput else { throw CommunicationError.unauthorized }
+            if try await acceptPendingFeedback(input, persisted: true) { return }
             do {
                 try await conversations.recordToolOutcome(
                     result.callID, for: activeInput.id,
@@ -203,17 +206,18 @@ extension AssistantChatWorker {
                 feedbackFailure = "Native outcome persistence failed"
                 throw error
             }
-            try validateFeedback(input)
-            guard roundCalls.indices.contains(index), roundCalls[index].id == result.callID else {
-                throw CommunicationError.scopeClosed
+            if try await acceptPendingFeedback(input, persisted: true, toolOutcomeRecorded: true) { return }
+            if roundID == receiptRound, roundCalls.indices.contains(index), roundCalls[index].id == result.callID {
+                try acceptResult(result, at: index)
             }
-            try acceptResult(result, at: index)
             return
         }
-        if case .toolResult = input.payload {
-            // A native result must match an in-flight model call. Runtime display completions
-            // belong to their internal caller and can never become another Assistant input.
-            throw CommunicationError.unauthorized
+        if case .toolResult(let value) = input.payload {
+            guard let id = value.roundID, ownsExecutionRound(id, input: input),
+                id != roundID || activeInput == nil
+            else { throw CommunicationError.unauthorized }
+            try await persistFeedback(input)
+            return
         }
         // Host control bypasses ordinary admission, including when the queue is full or paused.
         if case .observation(let message) = input.payload, let control = try State.sessionControl(message) {
@@ -236,7 +240,11 @@ extension AssistantChatWorker {
                 guard !hostCancellationInProgress else { throw HarnessError.invalidTransition }
                 hostCancellationInProgress = true
                 hostCancellationSession = input.sessionID
-                cancelledAdmissions.formUnion(admittingInputs.filter { $0.value == input.sessionID }.map(\.key))
+                cancelledAdmissions.formUnion(
+                    admittingInputs.keys.filter {
+                        admittingInputs[$0] == input.sessionID
+                            && (!preservingInterruptionSpeechAdmissions || !admittingSpeechFinals.contains($0))
+                    })
                 defer {
                     hostCancellationInProgress = false
                     hostCancellationSession = nil
@@ -273,7 +281,11 @@ extension AssistantChatWorker {
                 for key in pendingRounds.keys where pendingRounds[key]?.input.sessionID == input.sessionID {
                     pendingRounds[key]?.cancelled = true
                 }
-                if let cancelledActive { await speechOutput?.cancel(input: cancelledActive) }
+                let cancelledSpeech = oldIDs.union(activeInterruption.map { [$0.replyInputID] } ?? [])
+                for id in cancelledSpeech {
+                    await speechOutput?.cancel(
+                        input: AgentInput(id: id, sessionID: input.sessionID, payload: .text("")))
+                }
                 for id in oldIDs where continuationRounds[id] != nil {
                     continuationRounds[id] = nil
                     if let retired = queue.inputs.first(where: { $0.id == id }) {
@@ -375,7 +387,11 @@ extension AssistantChatWorker {
                 inputInteractions[input.id] = views
             }
         }
-        guard hostCancellationSession != input.sessionID else { throw HarnessError.invalidTransition }
+        let trackedSpeechFinal = isTrackedSpeechFinal(input)
+        guard
+            hostCancellationSession != input.sessionID
+                || (preservingInterruptionSpeechAdmissions && trackedSpeechFinal)
+        else { throw HarnessError.invalidTransition }
         let ordinary = queue.inputs.filter { pending in
             !fullDuplex
                 || (continuationRounds[pending.id] == nil
@@ -429,9 +445,11 @@ extension AssistantChatWorker {
         }
         admitting += 1
         admittingInputs[input.id] = input.sessionID
+        if trackedSpeechFinal { admittingSpeechFinals.insert(input.id) }
         defer {
             admitting -= 1
             admittingInputs[input.id] = nil
+            admittingSpeechFinals.remove(input.id)
             cancelledAdmissions.remove(input.id)
             if settlementAdmissions.contains(input.id) { drain() }
         }
@@ -475,7 +493,10 @@ extension AssistantChatWorker {
             inputInteractions[input.id] = nil
             throw HarnessError.notRunning
         }
-        guard !cancelledAdmissions.contains(input.id), hostCancellationSession != input.sessionID else {
+        guard !cancelledAdmissions.contains(input.id),
+            hostCancellationSession != input.sessionID
+                || (preservingInterruptionSpeechAdmissions && trackedSpeechFinal)
+        else {
             inputInteractions[input.id] = nil
             try await contextRepository.update { context in
                 if context.work[input.id]?.state.terminal == false {
@@ -488,7 +509,17 @@ extension AssistantChatWorker {
         let occupied = replyAtArrival || playbackAtArrival == true
         let turn = occupied ? turnAtArrival.flatMap { $0.sessionID == input.sessionID ? $0 : nil } : nil
         // Idle arrivals never need an interrupt signal, even if admission starts a new reply.
-        let snapshot = (occupied ? userText : nil).map { text in
+        let keywordInterrupted: Bool
+        if input.sessionID == speechSessionID, let turn = input.turn,
+            case .transcript(_, final: true)? = input.payload.perception,
+            let index = keywordInterruptedTurns.firstIndex(of: turn.id)
+        {
+            keywordInterruptedTurns.remove(at: index)
+            keywordInterrupted = true
+        } else {
+            keywordInterrupted = false
+        }
+        let snapshot = (occupied && !keywordInterrupted ? userText : nil).map { text in
             InputDecisionSnapshot(
                 input: input, text: text,
                 currentAssistantReply: turn?.assistant ?? "", receivedAt: arrivedAt)
@@ -502,6 +533,9 @@ extension AssistantChatWorker {
                 try await decisionQueue.submit(
                     .init(
                         snapshot: snapshot, target: turn?.id,
+                        allowsStandaloneSpokenStop: input.sessionID == speechSessionID && fullDuplex
+                            && listening?.mode == .full && input.metadata.origin == .agent
+                            && input.metadata.source == AgentID.speechPerception.rawValue,
                         interrupt: { [weak self] signal, session in
                             guard let self else { throw CommunicationError.unavailableTarget }
                             return try await self.requestInterrupt(signal, sessionID: session, source: "decision")
@@ -665,10 +699,11 @@ extension AssistantChatWorker {
         }
     }
     func drain() {
-        guard worker == nil, lifecycle == .running, !hostCancellationInProgress, !executionCancellationBarrier
-        else { return }
-        let waitingForSettlement = !pendingRounds.isEmpty
-        let settlements = Set(pendingRounds.values.filter(\.queued).map { $0.input.id })
+        guard worker == nil, lifecycle == .running, !hostCancellationInProgress else { return }
+        let waitingForSettlement = executionCancellationBarrier || !pendingRounds.isEmpty
+        let settlements = Set(
+            pendingRounds.values.filter { $0.queued && (!executionCancellationBarrier || $0.cancelled) }
+                .map { $0.input.id })
         guard !waitingForSettlement || !settlements.isEmpty else { return }
         if !settlementAdmissions.isEmpty {
             settlementAdmissions.formIntersection(Set(admittingInputs.keys))
@@ -730,7 +765,7 @@ extension AssistantChatWorker {
                 default: break
                 }
             // Unsupported input is rejected by the descriptor; receipts are handled before this switch.
-            case .image, .audio, .actionResult, .roundResult, .activityEvent, .event: break
+            case .image, .audio, .actionResult, .executionFeedback, .activityEvent, .event: break
             case .toolResult(let result):
                 activeInput = input
                 beginDecisionTurn(input)

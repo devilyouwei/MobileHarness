@@ -5,7 +5,7 @@ import Foundation
 /// No high-level SDK manager: it owns global G2P caches and downloads on demand.
 /// This backend admits only completely provisioned local resources before calling the SDK store.
 public actor LocalKokoroEngine {
-    public enum Language: Sendable { case english, mandarin }
+    public enum Language: Hashable, Sendable { case english, mandarin }
     public enum Failure: Error {
         case missingResource(String)
         case incompatibleResource(String)
@@ -15,6 +15,8 @@ public actor LocalKokoroEngine {
     private let english: KokoroAneModelStore
     private let mandarin: KokoroAneModelStore
     private let chineseFrontend: LocalMandarinFrontend
+    private let repository: URL
+    private var voicePacks: [Language: (id: String, pack: KokoroAneVoicePack)] = [:]
 
     public static func validateResources(at root: URL) throws {
         let base = root.appendingPathComponent("kokoro-82m-coreml")
@@ -61,8 +63,8 @@ public actor LocalKokoroEngine {
 
     public init(root: URL) async throws {
         try Self.validateResources(at: root)
-        let base = root.appendingPathComponent("kokoro-82m-coreml/ANE-zh")
-        chineseFrontend = try LocalMandarinFrontend(base: base)
+        repository = root.appendingPathComponent("kokoro-82m-coreml")
+        chineseFrontend = try LocalMandarinFrontend(base: repository.appendingPathComponent("ANE-zh"))
         english = KokoroAneModelStore(directory: root, computeUnits: .aneTailCpu, variant: .english)
         mandarin = KokoroAneModelStore(directory: root, computeUnits: .aneTailCpu, variant: .mandarin)
         // Both stores are owned by the enclosing ModelResource; no process-global loaded models.
@@ -76,6 +78,11 @@ public actor LocalKokoroEngine {
     }
 
     public func synthesize(phonemes: String, language: Language) async throws -> [Float] {
+        let voice = language == .english ? KokoroVoiceCatalog.defaultEnglish : KokoroVoiceCatalog.defaultMandarin
+        return try await synthesize(phonemes: phonemes, language: language, voice: voice)
+    }
+
+    func synthesize(phonemes: String, language: Language, voice: String) async throws -> [Float] {
         try Task.checkCancellation()
         let store = language == .english ? english : mandarin
         let vocab = try await store.vocabulary()
@@ -84,12 +91,28 @@ public actor LocalKokoroEngine {
             throw Failure.invalidPhonemes
         }
         let ids = try vocab.encode(phonemes)
-        let voice = language == .english ? "af_heart" : "zf_001"
-        let pack = try await store.voicePack(voice)
+        let pack = try voicePack(voice, language: language)
         let styles = pack.slice(for: KokoroAneVocab.phonemeLength(phonemes))
         let result = try await KokoroAneSynthesizer.synthesize(
             inputIds: ids, styleS: styles.styleS, styleTimbre: styles.styleTimbre, store: store)
         try Task.checkCancellation()
         return result.samples
+    }
+
+    private func voicePack(_ voice: String, language: Language) throws -> KokoroAneVoicePack {
+        if let cached = voicePacks[language], cached.id == voice { return cached.pack }
+        let pack: KokoroAneVoicePack
+        switch language {
+        case .mandarin:
+            pack = try KokoroAneVoicePack.load(from: repository.appendingPathComponent("ANE-zh/voices/\(voice).bin"))
+        case .english where voice == KokoroVoiceCatalog.defaultEnglish:
+            pack = try KokoroAneVoicePack.load(from: repository.appendingPathComponent("ANE/\(voice).bin"))
+        case .english:
+            let file = repository.appendingPathComponent("voices/\(voice).json")
+            pack = try KokoroAneVoicePack.load(fromJSON: Data(contentsOf: file))
+        }
+        // Retain only the most recently used pack per language.
+        voicePacks[language] = (voice, pack)
+        return pack
     }
 }

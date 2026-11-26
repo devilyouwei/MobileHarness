@@ -110,7 +110,8 @@ private func until(_ condition: @Sendable () async -> Bool) async throws {
     }
     for model in [first, second] {
         try #require(model.requests.count == 2)
-        #expect(model.requests[0].text.contains("current_assistant_reply"))
+        #expect(model.requests[0].text == "You are saying “My answer is…” when the user says to you “Hold on.”.")
+        #expect(model.requests[0].instructions == "Does the user intend to interrupt you by saying this?")
         #expect(model.requests[1].text == "Go ahead.")
         #expect(model.requests[1].instructions.contains("inviting you to talk again"))
     }

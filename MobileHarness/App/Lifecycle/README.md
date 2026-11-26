@@ -39,3 +39,5 @@ Scene失活在running时只同步invalidate未声明continuesInBackground的服�
 步骤串行执行，全部完成后统一复查；后续步骤使先前能力不再就绪时明确失败，不循环重载。活跃交互只检查，终态请求刷新。内部 notReady 保留原始验证错误并调用 onValidationFailure；具体能力错误由能力拥有者报告。只在失败状态允许显式重试，无手动 cancel／cancelled 状态。
 
 Step.prepare 接收实际加载事实回调：当前代际的 true 投影 preparing，false 立即投影 checking，prepare 返回后再复查。普通检查和进入 prepare 本身不表示发生加载。
+
+配置保存围栏阻止准备 worker 开启新一轮。围栏打开后只执行最新一轮检查。各步骤失败后仍尝试其他资源，保留首个失败用于当前状态；成功路径完成后复查全部资源。

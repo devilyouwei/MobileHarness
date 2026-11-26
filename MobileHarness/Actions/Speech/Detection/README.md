@@ -24,3 +24,7 @@
 AudioDetectionSession is Actions-owned native orchestration. DetectionConnections carries generic observation/input ports; Agents supplies cognitive callbacks through App binding. AudioDetectionReadiness and AudioDetectionError are neutral contracts. SpeechPerception retains model/consent/observation policy, without owning native session execution. ActionsContainer retains diagnostic/native stop cleanup.
 
 媒体服务 reset 事件使检测以运行故障结束，不归为路由变化，不自动重启；底层原生错误仍由 PCM/Platform 诊断保留。
+
+## 关键词测试
+
+ApplicationControl 复用 `Speech.Detection.run`，由请求私有的就绪附件选择音频检测或关键词测试。两者共用麦克风执行和清理，关键词测试选择普通采集。Actions 将识别角色返回的短语和尾部静音结果投影给 UI。

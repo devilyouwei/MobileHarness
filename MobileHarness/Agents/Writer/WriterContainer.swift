@@ -92,6 +92,8 @@ public struct WriterBackgroundExecution: Sendable {
         }
     }
     func setSceneActive(_ active: Bool) async { await agent?.setSceneActive(active) }
+    func beginModelChange() async { await agent?.beginModelChange() }
+    func endModelChange() async { await agent?.endModelChange() }
     func setForeground(_ active: Bool) async throws {
         if active { try await agent?.resume() } else { try await agent?.pause() }
     }

@@ -28,13 +28,13 @@ import UI
             throw error
         }
     }
-    public func run(_ prepared: AudioDetectionPrepared) async throws {
+    public func run(_ prepared: AudioDetectionPrepared, preferSpatial: Bool = true) async throws {
         let scope = prepared.scope
         var failure: (any Error)?
         do {
             try await withTaskCancellationHandler {
                 try Task.checkCancellation()
-                try await scope.audio.startCapture(preferSpatial: true)
+                try await scope.audio.startCapture(preferSpatial: preferSpatial)
                 try Task.checkCancellation()
                 scope.apply(scope.audio.captureContext)
                 scope.watchAudioChanges()
@@ -189,6 +189,11 @@ private func diagnosticError(_ error: any Error) -> any Error {
             snapshot.azimuthDegrees = azimuth.map { $0 * 180 / .pi }
             snapshot.elevationDegrees = elevation.map { $0 * 180 / .pi }
             snapshot.directionExpiresAt = expiresAt
+        case .keyword(let phrase, let silentTail):
+            snapshot.keywordHit = .init(phrase: phrase, silentTail: silentTail)
+        case .keywordAudio(let samples, let rms):
+            snapshot.keywordInputSamples = samples
+            snapshot.keywordInputLevel = min(1, max(0, (20 * log10(max(Double(rms), 0.000001)) + 60) / 60))
         }
         update(snapshot)
     }

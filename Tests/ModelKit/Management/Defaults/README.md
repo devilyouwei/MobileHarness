@@ -23,7 +23,7 @@ Default local Gemma and cloud capabilities both advertise tools. Configuration i
 - [ChatExecutionTests.swift](ChatExecutionTests.swift)
 - [D3NativeTests.swift](D3NativeTests.swift)
 - [DefaultsTests.swift](DefaultsTests.swift)
-- [SpeechSelectionTests.swift](SpeechSelectionTests.swift)
+- [SpeechSelectionTests.swift](SpeechSelectionTests.swift)，包括 Smart Turn 固定制品和独立选择检查。
 
 适配器与 tokenizer 一致性由 [DecisionAdapterNativeTests.swift](DecisionAdapterNativeTests.swift) 验证；D3 的业务 case 评估归 [experiments/decision](../../../../experiments/decision/README.md)，原生制品与超长输入验收保留在本目录。
 
@@ -39,6 +39,13 @@ DecisionAdapterNativeTests 每模型最多3条参考请求；tokenizer 夹具验
 
 ## 测试分层与输入有效性
 
-DefaultsTests、ChatExecutionTests、SpeechSelectionTests 验证真实默认根/子能力、FIFO 及 SpeechSelection/ModelManager 的注册与选择协作，属于 Integration Tests；不加载真实权重。平台受限的普通回归使用 @available 报告跳过；显式开启的 D3/Apple 模型 smoke 在平台不支持时抛 unavailable。
+DefaultsTests、ChatExecutionTests、SpeechSelectionTests 验证真实默认根/子能力、FIFO 及 SpeechSelection/ModelManager 的注册与选择协作，属于 Integration Tests。默认使用工程替身。平台受限的普通回归使用 @available 报告跳过；显式开启的 D3/Apple 模型 smoke 在平台不支持时抛 unavailable。
+
+用 `HARNESS_TEST_SMART_TURN_DOWNLOAD=1 swift test --filter downloadedSmartTurnPrewarmsAndRunsThroughTheProductionEndpointPort` 在 Mac 上验证固定制品下载、安装、前台预热和一次真实 Core ML 预测。输入为合成波形，临时制品沿生产存储结构写入系统临时目录并在结束时清理。
+
+`HARNESS_TEST_KOKORO_DOWNLOAD=1 swift test --filter downloadedKokoroVoicesAreUsedByTheProductionSynthesisPort`
+在临时制品根使用生产下载器安装 Kokoro，经过 ModelContainer 的合成端口执行三条请求，
+覆盖英语默认音色、英式音色切换和非默认普通话音色。
+可用 `HARNESS_TEST_KOKORO_DOWNLOAD_ROOT` 指定独立的制品根以复用续传记录。
 
 [DecisionAdapterNativeTests.swift](DecisionAdapterNativeTests.swift) 包含两层：decisionParityRequiresSelectedReferenceCases / tokenizerParityRequiresReferenceRows 是 Unit Tests，仅使用内存夹具；两个 native parity 用例是显式启用的 Integration Tests。原生加载前拒绝未知模型、空参考集、所选模型缺失、非法输出种类及空 tokenizer rows；每模型最多三个请求不变。

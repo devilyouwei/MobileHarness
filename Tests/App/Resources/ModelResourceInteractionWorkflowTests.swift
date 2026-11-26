@@ -104,6 +104,24 @@ import Testing
     func remove(_ id: String) { removals += 1 }
 }
 
+@MainActor @Test func speechSelectionSavesOneCapabilityAndKeepsConfirmedSelectionOnFailure() async {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    operations.storedSource.speechModels = ["voiceActivity": "energy-vad", "keywordSpotting": "zipformer-kws"]
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+
+    await workflow.selectSpeechModel("silero", for: .voiceActivity)
+    #expect(state.source.speechModels == ["voiceActivity": "silero", "keywordSpotting": "zipformer-kws"])
+    #expect(operations.storedSource.speechModels == state.source.speechModels)
+
+    operations.failSave = true
+    await workflow.selectSpeechModel("off", for: .keywordSpotting)
+    #expect(state.source.speechModels == operations.storedSource.speechModels)
+    #expect(state.source.speechModels?["keywordSpotting"] == "zipformer-kws")
+    #expect(state.error != nil)
+}
+
 @MainActor @Test(.timeLimit(.minutes(1))) func immediateAdmissionBlocksDuplicateDownloadAndOrdersCancellation() async {
     let state = ModelResourcesState()
     let operations = ResourceOperationsFixture(state: state)
@@ -218,8 +236,11 @@ import Testing
     let restored = try JSONDecoder().decode(ModelResourceSourceDraft.self, from: data)
     #expect(restored.useCustomRecognition && !restored.useCustomSynthesis)
     #expect(!String(decoding: data, as: UTF8.self).contains("preferDownloadedSpeech"))
-    #expect(ModelResourceGroup.recognition.modelIDs == ["nemotron", "silero", "deepfilternet3"])
-    #expect(ModelResourceGroup.synthesis.modelIDs == ["moss-tts-nano"])
+    #expect(
+        ModelResourceGroup.recognition.modelIDs == [
+            "nemotron", "silero", "deepfilternet3", "zipformer-kws", "smart-turn",
+        ])
+    #expect(ModelResourceGroup.synthesis.modelIDs == ["moss-tts-nano", "kokoro-82m"])
     #expect(ModelResourceGroup.vision.modelIDs == ["yolo26n-pose"])
 }
 
@@ -540,10 +561,16 @@ func speechDetectionSlidersPersistWithoutSavingUnfinishedSourceAndRetainOnFailur
     #expect(operations.storedSource.vadOnsetWindows == 12)
     #expect(state.source.endpoint == "unfinished")
     #expect(state.source.vadThreshold == 0.75)
+    await workflow.setKeywordThreshold(0.20)
+    #expect(operations.storedSource.keywordThreshold == 0.20)
+    #expect(operations.storedSource.vadThreshold == 0.75)
+    #expect(state.source.endpoint == "unfinished")
     operations.failSave = true
     await workflow.setSpeechDetection(windows: 16, threshold: 0.95)
+    await workflow.setKeywordThreshold(0.35)
     #expect(state.source.vadOnsetWindows == 12)
     #expect(state.source.vadThreshold == 0.75)
+    #expect(state.source.keywordThreshold == 0.20)
     #expect(state.error != nil)
     #expect(!state.saving)
     await workflow.stopAndWait()
@@ -564,5 +591,24 @@ func speechDetectionSlidersPersistWithoutSavingUnfinishedSourceAndRetainOnFailur
     await workflow.setSpeechEnhancement(enabled: false)
     #expect(state.source.useSpeechEnhancement && state.error != nil && !state.saving)
     #expect(ModelResourceGroup.recognition.modelIDs.contains("deepfilternet3"))
+    await workflow.stopAndWait()
+}
+
+@Test @MainActor func keywordInterruptToggleKeepsOtherPreferencesAndRestoresOnError() async {
+    let state = ModelResourcesState()
+    let operations = ResourceOperationsFixture(state: state)
+    let workflow = ModelResourceInteractionWorkflow(state: state, operations: operations)
+    await workflow.restore()
+    await workflow.setSpeechEnhancement(enabled: true)
+    state.present(.sourceEndpoint("unfinished"))
+    await workflow.setKeywordInterrupt(enabled: true)
+    #expect(state.source.useKeywordInterrupt && operations.storedSource.useKeywordInterrupt)
+    #expect(operations.storedSource.useSpeechEnhancement)
+    #expect(operations.storedSource.endpoint == "https://huggingface.co")
+    #expect(state.source.endpoint == "unfinished")
+    operations.failSave = true
+    await workflow.setKeywordInterrupt(enabled: false)
+    #expect(state.source.useKeywordInterrupt && !state.saving && state.error != nil)
+    #expect(ModelResourceGroup.recognition.modelIDs.contains("zipformer-kws"))
     await workflow.stopAndWait()
 }

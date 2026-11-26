@@ -137,7 +137,7 @@ public struct SignalEvidence: Codable, Sendable {
         case .observation(let message): content = try message.encodedContent()
         case .toolResult(let result): content = try JSONEncoder().encode(result)
         case .actionResult(let result): content = try JSONEncoder().encode(result)
-        case .roundResult(let result): content = try JSONEncoder().encode(result)
+        case .executionFeedback(let result): content = try JSONEncoder().encode(result)
         default: content = nil
         }
     }

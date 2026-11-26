@@ -451,23 +451,26 @@ import StorageFiles
                     try await speech.configure(synthesis: synthesis, store: store)
                 },
                 stopSpeech: { [interaction] in await interaction.speech?.endSession() },
+                preparePlayback: { [interaction] id in
+                    guard let speech = interaction.speech else { throw AgentContainerError.unavailable }
+                    try await speech.preparePlayback(audioID: id)
+                },
                 playbackChanged: { [interaction] id, active, time in
                     await interaction.speech?.playbackChanged(audioID: id, active: active, at: time)
                     await interaction.agent.refreshReplyActivity()
                 },
                 makePerception: {
                     [
-                        interactionSessionID, uiHome, contextScope, assistant = interaction.agent,
-                        speechOutput = interaction.speech,
-                        detection = business.speechDetection, enhancementEnabled = business.speechEnhancementEnabled
+                        interactionSessionID, uiHome, contextScope,
+                        detection = business.speechDetection, enhancementEnabled = business.speechEnhancementEnabled,
+                        keywordDetection = business.keywordDetection
                     ] in
                     try SpeechPerceptionAgent(
                         recognition: $0, vad: $1, enhancement: $5, speechEnhancementEnabled: enhancementEnabled,
+                        keywordSpotting: $6, endpointConfirmation: $7,
+                        keywordDetection: keywordDetection,
                         sessionID: $2, interactionSessionID: interactionSessionID,
                         residentListening: true, uiHome: uiHome, microphoneInput: $3, microphoneSpectrum: $4,
-                        speechPlayback: {
-                            await speechOutput?.playbackSnapshot(sessionID: interactionSessionID) ?? .init()
-                        },
                         speechDetection: detection,
                         context: try Self.context(
                             .speechPerception, SpeechPerceptionContextState(), scope: contextScope))

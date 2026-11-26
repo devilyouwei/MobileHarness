@@ -286,8 +286,26 @@ public actor WriterAgent: Agent {
         startInbox()
     }
 
+    private var modelChanging = false
+
+    func beginModelChange() async {
+        modelChanging = true
+        await inboxWorker?.value
+        let active = workers
+        for id in active.keys {
+            guard let input = inputs[id], let scope = input.taskScope else { continue }
+            await cancelExecution(scope, original: input)
+        }
+        for worker in active.values { await worker.value }
+    }
+
+    func endModelChange() {
+        modelChanging = false
+        startInbox()
+    }
+
     private func startInbox() {
-        guard lifecycle == .running, inboxWorker == nil, !inbox.isEmpty else { return }
+        guard lifecycle == .running, !modelChanging, inboxWorker == nil, !inbox.isEmpty else { return }
         inboxWorker = Task { await drainInbox() }
     }
 
@@ -296,7 +314,7 @@ public actor WriterAgent: Agent {
             inboxWorker = nil
             startInbox()
         }
-        while lifecycle == .running, !Task.isCancelled, let (content, input) = inbox.first {
+        while lifecycle == .running, !modelChanging, !Task.isCancelled, let (content, input) = inbox.first {
             do {
                 try await processMessage(content, input: input)
             } catch is CancellationError where lifecycle != .running || Task.isCancelled {

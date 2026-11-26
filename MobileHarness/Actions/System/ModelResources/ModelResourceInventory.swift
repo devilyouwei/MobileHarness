@@ -6,14 +6,15 @@ public enum ResourceModelGroup: String, Codable, Sendable, CaseIterable {
     public var requiredIDs: Set<String> {
         switch self {
         case .recognition: ["nemotron"]
-        case .synthesis: ["moss-tts-nano"]
+        case .synthesis: ["moss-tts-nano", "kokoro-82m"]
         case .language: []
         case .vision: ["yolo26n-pose"]
         case .decision: []
         }
     }
     public func isInstalled(in ids: Set<String>) -> Bool {
-        !requiredIDs.isEmpty && requiredIDs.isSubset(of: ids)
+        if self == .synthesis { return !requiredIDs.isDisjoint(with: ids) }
+        return !requiredIDs.isEmpty && requiredIDs.isSubset(of: ids)
     }
 }
 public struct ModelResourceFact: Codable, Sendable, Equatable {
@@ -72,17 +73,30 @@ public struct LocalModelFact: Codable, Sendable, Equatable {
     }
 }
 
+public struct SpeechModelFact: Codable, Sendable, Equatable {
+    public let capability: String
+    public let id: String
+    public let title: String
+    public let artifactID: String?
+    public let voicesByLanguage: [String: [String]]?
+}
+
 public enum ResourceInventoryError: Error, Sendable { case invalidSnapshot, capacityExceeded }
 public struct ModelResourceInventory: Codable, Sendable, Equatable {
     public static let maximumBytes = 65_536
     public let version: Int
     public let items: [ModelResourceFact]
     public let languageModels: [LocalModelFact]?
+    public let speechOptions: [SpeechModelFact]?
     public let installedGroups: Set<ResourceModelGroup>
-    public init(items: [ModelResourceFact], languageModels: [LocalModelFact]? = nil) {
+    public init(
+        items: [ModelResourceFact], languageModels: [LocalModelFact]? = nil,
+        speechOptions: [SpeechModelFact]? = nil
+    ) {
         version = 1
         self.items = items
         self.languageModels = languageModels
+        self.speechOptions = speechOptions
         let ids = Set(items.filter { $0.phase == .installed }.map(\.id))
         var groups = Set(
             ResourceModelGroup.allCases.filter { $0 != .language && $0 != .decision && $0.isInstalled(in: ids) })
@@ -94,7 +108,7 @@ public struct ModelResourceInventory: Codable, Sendable, Equatable {
         installedGroups = groups
     }
     public func validate() throws {
-        guard items.count <= 64, (languageModels?.count ?? 0) <= 32 else {
+        guard items.count <= 64, (languageModels?.count ?? 0) <= 32, (speechOptions?.count ?? 0) <= 32 else {
             throw ResourceInventoryError.capacityExceeded
         }
         guard version == 1, Set(items.map(\.id)).count == items.count else {
@@ -124,7 +138,9 @@ public struct ModelResourceInventory: Codable, Sendable, Equatable {
         try Task.checkCancellation()
         let items = try await capability.snapshotResources()
         try Task.checkCancellation()
-        let value = try await Self(items: items, languageModels: capability.localLanguageModels())
+        let value = try await Self(
+            items: items, languageModels: capability.localLanguageModels(),
+            speechOptions: capability.speechModelOptions())
         try value.validate()
         return value
     }
@@ -132,8 +148,10 @@ public struct ModelResourceInventory: Codable, Sendable, Equatable {
 public protocol ModelResourceInventoryCapability: Sendable {
     func snapshotResources() async throws -> [ModelResourceFact]
     func localLanguageModels() async throws -> [LocalModelFact]
+    func speechModelOptions() async throws -> [SpeechModelFact]
 }
 
 extension ModelResourceInventoryCapability {
     public func localLanguageModels() async throws -> [LocalModelFact] { [] }
+    public func speechModelOptions() async throws -> [SpeechModelFact] { [] }
 }

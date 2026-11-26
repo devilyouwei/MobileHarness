@@ -44,6 +44,7 @@ extension ApplicationControlAgent {
                     try await consumeUI(source, sessionID: sessionID) { agent, value, context in
                         switch value {
                         case .start: try await agent.startDetection(context: context)
+                        case .startKeywordTest: try await agent.startDetection(context: context, keywordTest: true)
                         case .stop: await agent.stopDetection()
                         }
                     })
@@ -133,11 +134,11 @@ extension ApplicationControlAgent {
         detection?.cancel()
         _ = await detection?.result
     }
-    private func startDetection(context: ProcessingContext) async throws {
+    private func startDetection(context: ProcessingContext, keywordTest: Bool = false) async throws {
         guard detection == nil else { throw AudioDetectionError.busy }
         let consumer = try uiExecution.begin(context.requestID)
         defer { uiExecution.finish(context.requestID) }
-        let ready = AudioDetectionReadiness()
+        let ready = AudioDetectionReadiness(keywordTest: keywordTest)
         let call = try InternalTool(path: "Speech.Detection.run").call([:])
         let envelope = OutputEnvelope(
             source: descriptor.id, context: context, output: .toolCall(call), executionAttachment: ready)
@@ -263,7 +264,9 @@ extension ApplicationControlAgent {
                 endpoint: draft.endpoint, allowsCellular: draft.allowsCellular,
                 recognition: draft.useCustomRecognition, synthesis: draft.useCustomSynthesis,
                 decision: draft.useLocalDecision, vadOnsetWindows: draft.vadOnsetWindows,
-                vadThreshold: draft.vadThreshold, enhancement: draft.useSpeechEnhancement)
+                vadThreshold: draft.vadThreshold, enhancement: draft.useSpeechEnhancement,
+                keywordInterrupt: draft.useKeywordInterrupt, speechModels: draft.speechModels,
+                synthesisVoice: draft.synthesisVoice, keywordThreshold: draft.keywordThreshold)
         case .download(let id, let draft):
             intent = .download(id: id, endpoint: draft.endpoint, allowsCellular: draft.allowsCellular)
         case .cancel(let id): intent = .cancel(id)

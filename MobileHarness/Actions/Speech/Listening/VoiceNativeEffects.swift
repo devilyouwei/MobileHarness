@@ -77,7 +77,6 @@
             currentSession: @escaping @MainActor () -> Bool,
             activeChanged: @escaping @MainActor (Bool, ContinuousClock.Instant) async -> Void
         ) async throws {
-            try validate()
             let displayToken = state.token
             var started = false
             var startPublication: Task<Void, Never>?
@@ -103,9 +102,11 @@
                     self.spectrum(AudioSpectrum.silence, false)
                 }
                 await startPublication?.value
-                if started { await activeChanged(false, finishedAt) }
+                await activeChanged(false, finishedAt)
             }
             do {
+                try Task.checkCancellation()
+                try validate()
                 try await audio.playStream(
                     onStarted: {
                         guard !started else { return }

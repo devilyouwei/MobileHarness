@@ -21,11 +21,12 @@
 
 ## 资源快照与偏好
 
-ModelResourceInventory 是 version=1 的 Codable 值。read 从 capability 获得原始事实，并以 installed 项推导 installedGroups：recognition=nemotron、synthesis=moss-tts-nano、language=gemma4-e2b、vision=yolo26n-pose。Silero 不在这些必需集合中。
+ModelResourceInventory 是 version=1 的 Codable 值。read 从 capability 获得原始事实，并以 installed 项推导 installedGroups：recognition=nemotron、synthesis=MOSS 或 Kokoro 已安装、language=gemma4-e2b、vision=yolo26n-pose。Silero 不在这些必需集合中。
 
 快照最多 64 个唯一 ID、编码最多 65536 字节；ID/name/revision/license/failure 分别限 64/256/512/512/1024 UTF-8 字节，字节计数非负。active 对应 queued/downloading/verifying/deleting，progress 对总量做有界计算。decode 校验版本、条目和大小；installedGroups 的一致性推导发生于构造读取路径，validate 不重新计算已解码集合。
 
-ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentStore，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
+ModelResourcePreferencesService 是 actor，惰性获取注入的 DocumentStore，通过 changing 标志拒绝重叠 restore/save。restore 校验存储值并依据已安装资源关闭不可用自定义语音选项。Zipformer 快速打断默认关闭，
+只允许在已安装时启用，移除模型后清除偏好；只有联网/语音开关变化时才回写，单独 endpoint 规范化不触发写入。save 先校验源与已安装前提，再以预期 revision 保存。偏好结果编码上限 2048 字节；文档存储容量由注入 store 配置。
 
 偏好解码支持 preferDownloadedSpeech 字段映射到两个独立开关；新编码只写当前字段。持久化不负责模型绑定，已提交偏好不会因另一项绑定失败自动撤销。
 
@@ -53,6 +54,18 @@ Resource preferences also persist vadOnsetWindows (1…16) and vadThreshold (0.0
 
 `useSpeechEnhancement` is independent of the custom-ASR switch and defaults false when absent in stored records. Enabling requires an installed `deepfilternet3` artifact; restore disables and persists it after removal. The workflow preserves confirmed state on failed saves and does not save unfinished endpoint edits when toggling denoising. Existing bounded resource commands handle download/progress/cancel/delete; removal quiesces the voice owner before artifact deletion. The read-only enablement closure crosses App composition into Agents; Actions never processes PCM.
 
+`speechModels.endpointConfirmation` 默认关闭，选用 Smart Turn 需要已安装制品。恢复偏好时，已移除的制品回到关闭。Gateway 参数解析按 ModelKit 语音模型目录的能力数量限制映射项，并校验 JSON 和每个标识的字节数。端点推理与音频生命周期由 SpeechPerception 管理。
+
 Actions 只拥有用户意图、UI 投影和模型选择／下载源／语音参数偏好。偏好文档位于 Storage settings 命名空间；模型目录、制品存储、传输恢复与后台交接均由 [ModelKit Management](../../../ModelKit/Support/Management/README.md) 拥有。
 
 Chat 和 Decision 的下载分组由已注册模型与制品的关联确定。下载不自动切换选择。
+
+语音资源清单从 ModelKit 投影选项的 capability、model ID、名称和 artifact ID。
+偏好按能力保存模型 ID，旧语音布尔值在恢复时迁移，已有制品在选择前仍需校验状态。
+Kokoro 的分语言音色由同一清单投影。可选 `synthesisVoice` 字段经过 ModelKit 音色校验，
+通过现有偏好事务随模型映射绑定。旧记录缺少该字段时使用提供者默认音色。
+下载和移除使用现有资源事务，只有移除当前模型才将该能力回退到默认。
+
+关键词置信度作为 `keywordThreshold` 走同一偏好事务，范围 0.10…0.60，步进 0.05，旧记录读取为 0.25。采集读取接口返回快停开关和已保存的阈值。
+
+保存语音偏好时，服务比较已确认的能力选择、VAD 阈值与起声窗口、关键词阈值和合成音色。它在写入前把受影响的角色和新增模型交给宿主维护入口，写入结束后释放保存围栏。单独修改下载源不触发模型维护。首页配置读取保留已选模型，实际制品状态由 ModelKit 校验。

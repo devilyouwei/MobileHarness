@@ -76,15 +76,18 @@
         public let cancelReply: @MainActor () async throws -> Void
         public let adaptFailure: @Sendable (any Error) -> any Error
         public let detection: AudioDetectionConnections
+        public let preparePlayback: @Sendable (String) async throws -> Void
         public let playbackChanged: @Sendable (String, Bool, ContinuousClock.Instant) async -> Void
         public init(
             sessionID: String, cancelReply: @escaping @MainActor () async throws -> Void,
             detection: AudioDetectionConnections, adaptFailure: @escaping @Sendable (any Error) -> any Error,
+            preparePlayback: @escaping @Sendable (String) async throws -> Void = { _ in },
             playbackChanged: @escaping @Sendable (String, Bool, ContinuousClock.Instant) async -> Void = { _, _, _ in }
         ) {
             self.sessionID = sessionID
             self.cancelReply = cancelReply
             self.detection = detection
+            self.preparePlayback = preparePlayback
             self.playbackChanged = playbackChanged
             self.adaptFailure = adaptFailure
         }
@@ -114,6 +117,8 @@
         public let artifactStreaming: (any ArtifactStreaming)?
         public let writerArtifacts: (any WriterArtifactsControlling)?
         public let writerModel: (@Sendable () async throws -> ChatModel)?
+        public let homeModelSelections:
+            @MainActor () async throws -> (writer: ManagedModelResource?, decision: ManagedModelResource?)
         public let inputQueueStatus: @MainActor @Sendable (Int, Int) -> Void
         public let decisionStatus: @MainActor @Sendable (String) -> Void
         public let decisionConfiguration:
@@ -131,6 +136,7 @@
         public let observeTranscript: @MainActor @Sendable (String, String) throws -> Void
         public let output: @Sendable (ActionOutputObservation) async -> Void
         public let speechEnhancementEnabled: @Sendable () async throws -> Bool
+        public let keywordDetection: @Sendable () async throws -> (enabled: Bool, threshold: Double)
         public let speechDetection: @Sendable () async throws -> (windows: Int, threshold: Double)
         public let decodeResources: @Sendable (String) throws -> ModelResourceViewSnapshot
         public let makeVoice: @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
@@ -140,6 +146,8 @@
             artifactStreaming: (any ArtifactStreaming)? = nil,
             writerArtifacts: (any WriterArtifactsControlling)? = nil,
             writerModel: (@Sendable () async throws -> ChatModel)? = nil,
+            homeModelSelections:
+                @escaping @MainActor () async throws -> (ManagedModelResource?, ManagedModelResource?) = { (nil, nil) },
             decisionConfiguration: (
                 @Sendable () async throws -> (String?, (@Sendable () async throws -> ChatModel)?)
             )? =
@@ -158,6 +166,9 @@
             observeTranscript: @escaping @MainActor @Sendable (String, String) throws -> Void,
             output: @escaping @Sendable (ActionOutputObservation) async -> Void,
             speechEnhancementEnabled: @escaping @Sendable () async throws -> Bool = { false },
+            keywordDetection: @escaping @Sendable () async throws -> (enabled: Bool, threshold: Double) = {
+                (false, 0.25)
+            },
             speechDetection: @escaping @Sendable () async throws -> (windows: Int, threshold: Double) = { (8, 0.65) },
             decodeResources: @escaping @Sendable (String) throws -> ModelResourceViewSnapshot,
             makeVoice: @escaping @MainActor (ActionsVoiceHost) throws -> ActionsVoiceExecution
@@ -166,6 +177,7 @@
             self.artifactStreaming = artifactStreaming
             self.writerArtifacts = writerArtifacts
             self.writerModel = writerModel
+            self.homeModelSelections = homeModelSelections
             self.decisionConfiguration = decisionConfiguration
             self.decisionStatus = decisionStatus
             self.inputQueueStatus = inputQueueStatus
@@ -181,6 +193,7 @@
             self.observeTranscript = observeTranscript
             self.output = output
             self.speechEnhancementEnabled = speechEnhancementEnabled
+            self.keywordDetection = keywordDetection
             self.speechDetection = speechDetection
             self.decodeResources = decodeResources
             self.makeVoice = makeVoice

@@ -10,13 +10,15 @@ This guide covers device setup, model configuration, download sources, and inter
 
 ## Model Configuration
 
-Open **Settings → AI Models** in the app to manage **Speech Recognition**, **Speech Synthesis**, **Agent Brains**, and **Vision Recognition** resources:
+Open **Settings → AI Models** to manage **Speech**, **Vision**, and **Agents**.
 
 - **Local text conversation:** Download a compatible **Gemma 4 E2B** artifact. The current local Gemma iOS graph supports only hardware identifiers `iPhone18,1` and `iPhone18,2`; other devices require an explicitly configured cloud chat provider. See [Gemma compatibility](../MobileHarness/ModelKit/Language/LLM/Gemma4/README.md#local-gemma-engine).
 - **Cloud chat:** Explicitly configure a provider implementing the **Responses API** (a provider offering only Chat Completions is insufficient). Photo understanding requires an image-capable cloud model; local Gemma does not support images or native Tools. Cloud chat replaces chat only.
-- **Speech Recognition & Synthesis:** Custom recognition/synthesis default off; Apple ASR/TTS can run without Nemotron/MOSS weights. Silero/Energy VAD selection is independent of that switch.
-- **Decision (Full-duplex):** Configure a local D3 or cloud Decision model under **Agent Brains → Decision** to classify interruptions while the Assistant is thinking or speaking.
-- **Vision Recognition:** Install YOLO for pose inference.
+- **Speech:** The menus select voice activity detection, end-of-turn confirmation, noise suppression, keyword spotting, speech recognition, and speech synthesis. Energy detection and Apple speech are the defaults. End-of-turn confirmation, noise suppression, and keyword spotting start off. Download Silero, Smart Turn, DeepFilterNet3, Zipformer, Nemotron, MOSS TTS Nano, or Kokoro 82M in the matching section before selecting it. After choosing Kokoro, switch between English and Mandarin Chinese in Voice language and pick a Voice from that language’s list.
+- **Decision (Full-duplex):** Configure a local or cloud Decision model under **Agents → Decision** to classify interruptions and quiet-mode wake requests.
+- **End-of-turn confirmation:** Download and select Smart Turn v3.2 in Speech. It checks whether you have finished speaking when voice activity detection finds a pause. If it predicts you are still speaking, recognition keeps the current turn open for up to about two seconds of continuous silence.
+- **Keyword test:** In **Speech**, select an installed keyword model and tap **Test keywords**. Say one keyword and pause. The test shows the phrase the model detected and whether the trailing-silence check passed.
+- **Vision:** Install YOLO for pose inference.
 
 ### Model Downloads and Development Provisioning
 

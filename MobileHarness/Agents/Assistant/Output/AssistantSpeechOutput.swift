@@ -43,6 +43,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
     private var activeScope: InputScope?
     private var processed = 0
     private var playing: String?
+    private var nativePlayback: [String: InputScope] = [:]
     private var playbackHistory = SpeechPlaybackHistory()
     private let island = AgentIslandPublication()
 
@@ -62,26 +63,34 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
             installed: binding != nil, queued: pending.count,
             processed: processed, presentationFailure: await island.lastFailure)
     }
+    func preparePlayback(audioID: String) throws {
+        guard let job = handles[audioID], !closed, binding?.id == job.binding.id else {
+            throw CancellationError()
+        }
+        let scope = InputScope(job.input)
+        guard cancellingInputs[scope] == nil, nativePlayback[audioID] == nil else { throw CancellationError() }
+        guard nativePlayback.count < 32 else { throw HarnessError.queueFull }
+        nativePlayback[audioID] = scope
+    }
     func playbackChanged(audioID: String, active: Bool, at time: ContinuousClock.Instant = .now) async {
-        guard !closed, binding != nil else { return }
+        guard !closed, binding != nil, let scope = nativePlayback[audioID] else { return }
         if active {
             playing = audioID
-            if let job = handles[audioID] {
-                playbackHistory.started(id: audioID, sessionID: job.input.sessionID, at: time)
-            }
+            playbackHistory.started(id: audioID, sessionID: scope.session, at: time)
         } else {
             playbackHistory.ended(id: audioID, at: time)
             if playing == audioID { playing = nil }
+            nativePlayback[audioID] = nil
         }
         await refreshIsland()
     }
-    func playbackSnapshot(sessionID: String) -> SpeechPlaybackSnapshot {
+    func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot {
         playbackHistory.read(sessionID: sessionID)
     }
     func isPlaying(sessionID: String) -> Bool? {
         guard !closed, binding != nil else { return nil }
         guard let playing else { return false }
-        return handles[playing].map { $0.input.sessionID == sessionID }
+        return nativePlayback[playing]?.session == sessionID
     }
     private func refreshIsland() async {
         let content: IslandContent?
@@ -257,6 +266,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         if let ending { return await ending.value }
         let previous = binding
         binding = nil
+        nativePlayback.removeAll()
         let pending = admissions.values.map(\.task)
         for task in pending { task.cancel() }
         queue.removeAll()
@@ -290,6 +300,7 @@ private enum AssistantSpeechFailureContext { @TaskLocal static var audioID: Stri
 /// A role-owned text-to-audio boundary. Admission reserves a handle, not audible completion.
 public protocol AssistantSpeechProducing: Sendable {
     func isPlaying(sessionID: String) async -> Bool?
+    func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot
     func prepare(text: String, input: AgentInput) async throws -> String
     func cancel(audioID: String, input: AgentInput) async throws
     func cancel(input: AgentInput) async
@@ -298,4 +309,5 @@ public protocol AssistantSpeechProducing: Sendable {
 
 extension AssistantSpeechProducing {
     public func isPlaying(sessionID: String) async -> Bool? { nil }
+    public func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot { .init() }
 }

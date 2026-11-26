@@ -2,8 +2,10 @@ import Foundation
 
 public enum AudioDetectionError: LocalizedError, Sendable {
     case captureEnded, perceptionFailed, microphoneDenied, invalidFormat, overflow, busy, routeChanged, interrupted
+    case keywordModelNotReady
     public var errorDescription: String? {
         switch self {
+        case .keywordModelNotReady: "The keyword model is not ready. Select an installed model and try again."
         case .captureEnded: "No audio was received. Restart detection."
         case .perceptionFailed: "Direction detection stopped. Restart detection."
         case .microphoneDenied: "Allow microphone access in System Settings."

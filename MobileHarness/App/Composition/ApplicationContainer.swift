@@ -146,7 +146,8 @@ public final class ApplicationContainer: ManagedContainer, @unchecked Sendable {
                 ModelContainer(
                     onFailure: self.containerFailures().sink(
                         module: "model",
-                        details: Self.failureDetails), recognitionLocale: self.recognitionLocale)
+                        details: Self.failureDetails), recognitionLocale: self.recognitionLocale,
+                    preparesInstalledSpeechDetectors: false)
             }
         }.cached
     }

@@ -15,6 +15,7 @@ public struct ActionReport: Equatable, Sendable {
             public static let invalidArguments = Self(rawValue: "invalidArguments")
             public static let unavailable = Self(rawValue: "unavailable")
             public static let handlerFailed = Self(rawValue: "handlerFailed")
+            public static let cleanupUnconfirmed = Self(rawValue: "cleanupUnconfirmed")
             public static let dependencyFailed = Self(rawValue: "dependencyFailed")
             public static let cancelled = Self(rawValue: "cancelled")
             public static let resultCapacityExceeded = Self(rawValue: "resultCapacityExceeded")
@@ -56,6 +57,7 @@ public struct ActionReport: Equatable, Sendable {
         String(((error as? any LocalizedError)?.errorDescription ?? String(describing: error)).prefix(512))
     }
     public static func code(for error: any Error) -> Entry.Code {
+        if error is NativeCleanupFailure { return .cleanupUnconfirmed }
         if error is CancellationError { return .cancelled }
         if let producer = error as? any ActionReportFailureProviding { return producer.actionReportCode }
         if let producer = error as? any ActionExecutionFailureProviding {
@@ -87,6 +89,9 @@ public struct ActionReport: Equatable, Sendable {
             ?? (reported?.isCancelled == true ? .cancelled : nil)
             ?? Self.code(for: error)
         return withExecutionFailure(code, description: reported?.failureDescription ?? Self.description(for: error))
+    }
+    public var cleanupConfirmed: Bool {
+        executionFailure != .cleanupUnconfirmed && !entries.contains { $0.code == .cleanupUnconfirmed }
     }
     public var hasFailures: Bool {
         (executionFailure != nil && executionFailure != .cancelled)

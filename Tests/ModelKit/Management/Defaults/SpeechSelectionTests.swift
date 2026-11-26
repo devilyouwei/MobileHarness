@@ -1,5 +1,6 @@
 import Foundation
 import ModelKit
+import ModelKitHub
 @_spi(ModelAssembly) import ModelKitRuntime
 import Synchronization
 import Testing
@@ -53,37 +54,21 @@ private actor SelectionStorage: ModelArtifactStorage {
     let storage = SelectionStorage()
     let catalog = try ModelArtifactCatalog.decode(
         Data(
-            #"{"schemaVersion":2,"packages":[{"id":"speech","name":"Fixture","capability":"synthesis","directory":"Speech","source":{"kind":"huggingface","repoId":"owner/repo","revision":"main","allowPatterns":["config.json"]},"minimumOS":1,"requiresPhysicalDevice":false,"license":"MIT","estimatedBytes":3,"requiredFiles":["config.json"]}]}"#
+            #"{"schemaVersion":2,"packages":[{"id":"moss-tts-nano","name":"Fixture","capability":"synthesis","directory":"Speech","source":{"kind":"huggingface","repoId":"owner/repo","revision":"main","allowPatterns":["config.json"]},"minimumOS":1,"requiresPhysicalDevice":false,"license":"MIT","estimatedBytes":3,"requiredFiles":["config.json"]}]}"#
                 .utf8))
     try await manager.configureArtifacts(catalog: catalog, storage: storage)
-    let local = ModelID("local")
-    let unavailable = ModelID("unavailable")
-    let system = ModelID("system")
-    for (id, availability) in [
-        (local, CapabilityAvailability.available), (unavailable, .unavailable(reason: "Fixture")),
-    ] {
-        try await manager.register(
-            ModelRegistration(id: id, capabilities: [.synthesis]) { _ in
-                ProvidedCapabilities(synthesis: SelectionProvider(availability: availability))
-            })
-    }
+    let local = ModelID("moss-tts-nano")
+    let system = ModelID("apple-synthesis")
+    try await manager.register(
+        ModelRegistration(id: local, capabilities: [.synthesis]) { _ in
+            ProvidedCapabilities(synthesis: SelectionProvider(availability: .available))
+        })
     let selection = SpeechSelection()
-    await selection.configure(recognition: true, synthesis: true)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "speech", local: local, system: system, capability: .synthesis) == local)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "speech", local: unavailable, system: system, capability: .synthesis) == system)
-    await selection.configure(recognition: true, synthesis: false)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "speech", local: local, system: system, capability: .synthesis) == system)
-    await selection.configure(recognition: false, synthesis: true)
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .synthesis) == system)
+    try await selection.configure(models: ["synthesis": local.rawValue])
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .synthesis) == local)
     await storage.setPresent(false)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "speech", local: local, system: system, capability: .synthesis) == system)
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .synthesis) == system)
     await manager.shutdown()
 }
 
@@ -104,60 +89,146 @@ private actor SelectionStorage: ModelArtifactStorage {
     let catalog = try ModelArtifactCatalog.decode(
         JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "packages": packages]))
     try await manager.configureArtifacts(catalog: catalog, storage: storage)
-    let local = ModelID("fixture")
-    let system = ModelID("system")
-    try await manager.register(
-        ModelRegistration(id: local, capabilities: [.recognition, .synthesis, .voiceActivity]) { _ in
-            let provider = SelectionProvider(availability: .available)
-            return ProvidedCapabilities(recognition: provider, synthesis: provider, voiceActivity: provider)
-        })
-    let selection = SpeechSelection()
-    await selection.configure(recognition: true, synthesis: false)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "nemotron", local: local, system: system, capability: .recognition) == local)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "moss-tts-nano", local: local, system: system, capability: .synthesis) == system
-    )
-    let unavailable = ModelID("fixture-unavailable-vad")
-    try await manager.register(
-        ModelRegistration(id: unavailable, capabilities: [.voiceActivity]) { _ in
-            ProvidedCapabilities(voiceActivity: SelectionProvider(availability: .unavailable(reason: "Fixture")))
-        })
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "silero", local: unavailable, system: system, capability: .voiceActivity)
-            == system)
-    // Both ASR choices may use installed Silero; the recognition switch does not control VAD.
-    for enabled in [false, true] {
-        await selection.configure(recognition: enabled, synthesis: false)
-        #expect(
-            try await selection.resolve(
-                manager: manager, artifact: "silero", local: local, system: system, capability: .voiceActivity) == local
-        )
-        #expect(
-            try await selection.resolve(
-                manager: manager, artifact: "nemotron", local: local, system: system, capability: .recognition)
-                == (enabled ? local : system))
+    let options: [(String, ProvidedCapability)] = [
+        ("nemotron-local", .recognition), ("silero", .voiceActivity), ("moss-tts-nano", .synthesis),
+    ]
+    for (id, capability) in options {
+        try await manager.register(
+            ModelRegistration(id: ModelID(id), capabilities: [capability]) { _ in
+                let provider = SelectionProvider(availability: .available)
+                switch capability {
+                case .recognition: return ProvidedCapabilities(recognition: provider)
+                case .voiceActivity: return ProvidedCapabilities(voiceActivity: provider)
+                default: return ProvidedCapabilities(synthesis: provider)
+                }
+            })
     }
+    let selection = SpeechSelection()
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .voiceActivity) == ModelID("energy-vad"))
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .enhancement) == nil)
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .keywordSpotting) == nil)
+    await #expect(throws: CapabilityError.self) {
+        try await selection.configure(models: ["voiceActivity": "nemotron-local"])
+    }
+    try await selection.configure(models: ["recognition": "nemotron-local", "voiceActivity": "silero"])
+    #expect(try await selection.resolveRecognition(manager: manager) == ModelID("nemotron-local"))
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .voiceActivity) == ModelID("silero"))
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .synthesis) == ModelID("apple-synthesis"))
     await storage.setMissing("silero")
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "nemotron", local: local, system: system, capability: .recognition) == local)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "silero", local: local, system: system, capability: .voiceActivity) == system)
-    await storage.setMissing("nemotron")
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "silero", local: local, system: system, capability: .voiceActivity) == local)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "nemotron", local: local, system: system, capability: .recognition) == system)
-    await selection.configure(recognition: false, synthesis: true)
-    #expect(
-        try await selection.resolve(
-            manager: manager, artifact: "moss-tts-nano", local: local, system: system, capability: .synthesis) == local)
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .voiceActivity) == ModelID("energy-vad"))
+    #expect(try await selection.resolveRecognition(manager: manager) == ModelID("nemotron-local"))
     await manager.shutdown()
+}
+
+@Test(
+    .enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_KOKORO_DOWNLOAD"] == "1"), .timeLimit(.minutes(10)))
+@MainActor func downloadedKokoroVoicesAreUsedByTheProductionSynthesisPort() async throws {
+    let retainedRoot = ProcessInfo.processInfo.environment["HARNESS_TEST_KOKORO_DOWNLOAD_ROOT"]
+    let root =
+        retainedRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { if retainedRoot == nil { try? FileManager.default.removeItem(at: root) } }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let model = ModelContainer(resources: storage.installedRoot) {
+        ModelArtifactConfiguration(
+            catalog: try .bundled(), storage: storage, downloader: HuggingFaceArtifactDownloader())
+    }
+    let id = "kokoro-82m"
+    try await model.start()
+    try await model.setForeground(true)
+    try await model.artifacts.downloadArtifact(id, source: ModelDownloadSource())
+    let deadline = ContinuousClock.now + .seconds(480)
+    while true {
+        let artifact = try #require(try await model.artifacts.artifactSnapshots().first { $0.artifact.id == id })
+        if artifact.phase == .installed { break }
+        try #require(artifact.phase != .failed, Comment(rawValue: artifact.failure ?? "Download failed"))
+        try #require(ContinuousClock.now < deadline, "Timed out installing Kokoro")
+        try await Task.sleep(for: .seconds(1))
+    }
+
+    func synthesize(_ text: String, voice: String) async throws -> Data {
+        try await model.speech.configureSpeechModels(["synthesis": id], synthesisVoice: voice)
+        let session = try await model.speech.synthesis.synthesize(
+            SpeechSynthesisRequest(text: text, locale: "auto"))
+        var pcm = Data()
+        var finished = false
+        for try await event in session.events {
+            switch event {
+            case .audio(let frame):
+                #expect(frame.format.sampleRate == 24_000)
+                pcm.append(frame.data)
+            case .finished: finished = true
+            }
+        }
+        #expect(finished)
+        try #require(!pcm.isEmpty)
+        return pcm
+    }
+
+    let text = "The weather is lovely today."
+    let defaultVoice = try await synthesize(text, voice: "af_heart")
+    let britishVoice = try await synthesize(text, voice: "bf_emma")
+    #expect(defaultVoice != britishVoice)
+    _ = try await synthesize("你好，今天天气很好。", voice: "zm_100")
+    try await model.stop()
+}
+
+@Test func smartTurnHasAnIndependentSelectionAndPinnedArtifact() async throws {
+    let catalog = try ModelArtifactCatalog.bundled()
+    let artifact = try #require(catalog.packages.first { $0.id == "smart-turn" })
+    #expect(artifact.capability == ProvidedCapability.endpointConfirmation.rawValue)
+    #expect(artifact.source.repoId == "aufklarer/Smart-Turn-v3.2-CoreML")
+    #expect(artifact.revision == "75f069717f500947195fa1945c46ddb472559cff")
+    #expect(artifact.requiredFiles.contains("smart_turn.mlmodelc/weights/weight.bin"))
+    let manager = try ModelManager()
+    let storage = SelectionStorage()
+    try await manager.configureArtifacts(catalog: catalog, storage: storage)
+    let selection = SpeechSelection()
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .endpointConfirmation) == nil)
+    try await selection.configure(models: ["endpointConfirmation": "smart-turn"])
+    #expect(
+        try await selection.resolvedChoice(manager: manager, capability: .endpointConfirmation)?.rawValue
+            == "smart-turn")
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .voiceActivity)?.rawValue == "energy-vad")
+    await storage.setMissing("smart-turn")
+    #expect(try await selection.resolvedChoice(manager: manager, capability: .endpointConfirmation) == nil)
+    await manager.shutdown()
+}
+
+@Test(
+    .enabled(if: ProcessInfo.processInfo.environment["HARNESS_TEST_SMART_TURN_DOWNLOAD"] == "1"),
+    .timeLimit(.minutes(3)))
+@MainActor func downloadedSmartTurnPrewarmsAndRunsThroughTheProductionEndpointPort() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let storage = try ModelArtifactDiskStorage(root: root)
+    let model = ModelContainer(resources: storage.installedRoot) {
+        ModelArtifactConfiguration(
+            catalog: try .bundled(), storage: storage, downloader: HuggingFaceArtifactDownloader())
+    }
+    let id = "smart-turn"
+    try await model.start()
+    try await model.setForeground(true)
+    do {
+        let endpoint = try #require(model.speech.endpointConfirmation)
+        let samples = (0..<16000).map { Float(sin(Double($0) * 0.08) * 0.01) }
+        try await model.speech.configureSpeechModels(["endpointConfirmation": id])
+        #expect(try await endpoint.completionProbability(for: samples) == nil)
+        try await model.artifacts.downloadArtifact(id, source: ModelDownloadSource())
+        let deadline = ContinuousClock.now + .seconds(140)
+        while await endpoint.availability != .available {
+            let artifact = try #require(try await model.artifacts.artifactSnapshots().first { $0.artifact.id == id })
+            try #require(artifact.phase != .failed, Comment(rawValue: artifact.failure ?? "Download failed"))
+            try #require(ContinuousClock.now < deadline, "Timed out preparing Smart Turn")
+            try await Task.sleep(for: .milliseconds(200))
+        }
+        let probability = try #require(try await endpoint.completionProbability(for: samples))
+        #expect((0...1).contains(probability))
+        try await model.speech.configureSpeechModels(["endpointConfirmation": "off"])
+        #expect(try await endpoint.completionProbability(for: samples) == nil)
+    } catch {
+        try await model.stop()
+        throw error
+    }
+    try await model.stop()
 }

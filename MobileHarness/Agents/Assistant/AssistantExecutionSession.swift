@@ -72,9 +72,9 @@ public actor AssistantExecutionSession {
                 try Task.checkCancellation()
                 try await manager.start(.assistant)
                 let consumer = try await output.consumer(for: agent)
-                await agent.bindInputInterruption { [weak self] session in
+                await agent.bindInputInterruption { [weak self] session, id in
                     guard let self else { throw CommunicationError.unavailableTarget }
-                    try await self.performInterruption(sessionID: session)
+                    try await self.performInterruption(sessionID: session, id: id)
                 }
                 await island.bind { operation, parameters, session in
                     let result = try await consumer.executeInternal(
@@ -176,12 +176,12 @@ public actor AssistantExecutionSession {
         _ = try await agent.requestInterrupt(AssistantInterrupt(), sessionID: sessionID)
     }
 
-    private func performInterruption(sessionID: String) async throws {
+    private func performInterruption(sessionID: String, id: String) async throws {
         guard started, !closed else { throw CommunicationError.unavailableTarget }
-        async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID)
-        async let model: Void = sendControl(.interruptSession, sessionID: sessionID)
-        _ = try await (model, calls)
-        try await agent.settleInterruptedExecution(sessionID: sessionID)
+        async let calls: Void = output.cancelCalls(for: agent, sessionID: sessionID, interruptionID: id)
+        try await sendControl(.interruptSession, sessionID: sessionID)
+        try await agent.interruptionGenerationJoined(id)
+        try await calls
     }
 
     /// Receives the existing role-owned Skill snapshot; task logs are not a presentation authority.

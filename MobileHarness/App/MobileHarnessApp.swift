@@ -21,7 +21,6 @@
                         set: { composition.languageSettings.select($0) })
                 )
                 .environment(\.locale, composition.languageSettings.language.locale)
-                .onChange(of: composition.languageSettings.language) { _, _ in composition.features.updateLanguage() }
                 .id(composition.scopeID)
                 .task { await composition.start() }
                 .onChange(of: phase, initial: true) { _, phase in

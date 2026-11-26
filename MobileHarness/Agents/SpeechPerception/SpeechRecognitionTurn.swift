@@ -4,6 +4,7 @@ import StorageCore
 
 /// Live, VAD-committed PCM -> capability events. Preview never submits an Agent input.
 actor SpeechRecognitionTurn {
+    private static let noTextSampleLimit = 64 * 512
     private let recognition: any SpeechRecognitionCapability
     private let sessionID: String
     private let preview: @Sendable (String) async throws -> Void
@@ -11,11 +12,20 @@ actor SpeechRecognitionTurn {
     private var queuedSamples = 0
     private var worker: Task<Void, Error>?
     private var reader: Task<String, Error>?
+    private var finalization: Task<String, Error>?
     private var session: SpeechRecognitionSession?
     private var completed = ""
     private var failure: (any Error)?
     private var sealed = false
     private var cancelled = false
+    private var sentSamplesWithoutText = 0
+    private var hasRecognizedText = false
+    private var finalizedText = ""
+    private var deadlineTranscript: String?
+
+    var reachedNoTextEndpoint: Bool {
+        !hasRecognizedText && sentSamplesWithoutText >= Self.noTextSampleLimit
+    }
 
     init(
         recognition: any SpeechRecognitionCapability, sessionID: String,
@@ -62,14 +72,26 @@ actor SpeechRecognitionTurn {
         session = stream
         let prefix = completed
         let preview = preview
-        reader = Task {
+        reader = Task { [weak self] in
             var transcript = TranscriptAccumulator(prefix: prefix)
             for try await event in stream.output.events {
                 try Task.checkCancellation()
-                if let visible = try transcript.accept(event) { try await preview(visible) }
+                if let visible = try transcript.accept(event) {
+                    await self?.recordTranscript(
+                        visible, final: event.isFinal ? Self.join(prefix, transcript.finalText) : nil)
+                    try await preview(visible)
+                }
             }
             return transcript.finalText
         }
+    }
+
+    private func recordTranscript(_ text: String, final: String?) {
+        guard !cancelled else { return }
+        if !hasRecognizedText, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            hasRecognizedText = true
+        }
+        if let final { finalizedText = final }
     }
 
     private func endSegment() async throws {
@@ -94,7 +116,13 @@ actor SpeechRecognitionTurn {
                     queuedSamples -= frames.reduce(0) { $0 + $1.sampleCount }
                     if !frames.isEmpty {
                         try await open()
-                        for frame in frames { try await session?.send(frame) }
+                        guard let session else { throw CapabilityError.sessionClosed }
+                        for frame in frames {
+                            try await session.send(frame)
+                            if !hasRecognizedText, sentSamplesWithoutText < Self.noTextSampleLimit {
+                                sentSamplesWithoutText += frame.sampleCount
+                            }
+                        }
                     }
                 case .end: try await endSegment()
                 }
@@ -110,21 +138,43 @@ actor SpeechRecognitionTurn {
         }
     }
 
-    func finish() async throws -> String {
+    func finish(noTextGrace: Duration? = nil) async throws -> String {
         guard !sealed, !cancelled else { throw CapabilityError.sessionClosed }
         sealed = true
-        return try await withTaskCancellationHandler {
-            try await finishAccepted()
+        let finalization = Task { try await finishAccepted() }
+        self.finalization = finalization
+        let deadline = noTextGrace.map { grace in
+            Task { [weak self] in
+                do { try await Task.sleep(for: grace) } catch { return }
+                await self?.expireFinish()
+            }
+        }
+        let result = await withTaskCancellationHandler {
+            await finalization.result
         } onCancel: {
             Task { await self.cancel() }
         }
+        if deadlineTranscript == nil { deadline?.cancel() }
+        await deadline?.value
+        self.finalization = nil
+        try Task.checkCancellation()
+        if let deadlineTranscript { return deadlineTranscript }
+        return try result.get()
     }
+
+    private func expireFinish() async {
+        guard !Task.isCancelled, !cancelled else { return }
+        deadlineTranscript = finalizedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        await cancel()
+    }
+
     private func finishAccepted() async throws -> String {
         if let worker { try await worker.value }
         try Task.checkCancellation()
         if let failure { throw failure }
         guard !cancelled else { throw CancellationError() }
         try await endSegment()
+        guard !cancelled else { throw CancellationError() }
         return completed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     func cancel() async {
@@ -134,9 +184,11 @@ actor SpeechRecognitionTurn {
         queuedSamples = 0
         worker?.cancel()
         reader?.cancel()
+        finalization?.cancel()
         await session?.cancel()
         if let worker { _ = await worker.result }
         if let reader { _ = await reader.result }
+        if let finalization { _ = await finalization.result }
         worker = nil
         reader = nil
         session = nil

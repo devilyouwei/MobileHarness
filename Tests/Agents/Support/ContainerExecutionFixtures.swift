@@ -64,7 +64,8 @@ extension ChannelScheduler {
         maximumChannels: Int = 16, diagnosticCapacity: Int = 256, resources: ResourceCoordinator? = nil,
         resultCapacity: Int = 512, resultDeliveryTimeout: Duration = .seconds(60), admission: ActionsAdmission? = nil,
         deliverResult: @escaping @Sendable (ActionResult) async -> ActionResultDelivery = { _ in .closed },
-        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil
+        onExecutionSnapshot: (@Sendable (ActionExecutionSnapshot) -> Void)? = nil,
+        deliverStart: @escaping @Sendable (ExecutionStart) async -> ActionResultDelivery = { _ in .accepted }
     ) {
         self.init(
             executor: fixtureExecutionPort(actions: registry.bindings), capacityPerChannel: capacityPerChannel,
@@ -72,7 +73,7 @@ extension ChannelScheduler {
             diagnosticCapacity: diagnosticCapacity, resources: resources, resultCapacity: resultCapacity,
             resultDeliveryTimeout: resultDeliveryTimeout,
             admission: admission, deliverResult: { await deliverResult($0.agentValue) },
-            onExecutionSnapshot: onExecutionSnapshot)
+            onExecutionSnapshot: onExecutionSnapshot, deliverStart: deliverStart)
     }
 }
 
@@ -109,7 +110,7 @@ private struct FixtureExecutionEngine: ActionExecutionEngine {
     }
     func cancel(inputID: String, source: String) async { await scheduler.cancel(inputID: inputID, source: source) }
     func cancel(sessionID: String) async { await scheduler.cancel(sessionID: sessionID) }
-    func cancel(endpoint: String, incarnation: String, sessionID: String?) async {
+    func cancel(endpoint: String, incarnation: String, sessionID: String?) async -> Bool {
         await scheduler.cancel(endpoint: endpoint, incarnation: incarnation, sessionID: sessionID)
     }
     func execute(_ input: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {

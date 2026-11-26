@@ -70,7 +70,7 @@ Assistant 的 `state.set` 控制声明提供 `wakeCondition`，仅供进入 quie
 | 字段 | 作用与校验 |
 | --- | --- |
 | `requests` | 本角色启用的版本化请求协议；启动必须匹配唯一代码处理器及协议要求的完整操作集合。 |
-| `feedback` | 本角色消费的可信运行时反馈，如 `action.result.v1` 和 `agent.round.result.v1`。 |
+| `feedback` | 本角色消费的可信运行时反馈，如 `action.result.v1` 和 `action.execution.feedback.v1`。 |
 | `publications` | `{channel, protocol}` 声明本角色可发布的协议；启动校验实际生产代码及订阅配对，允许无订阅者。频道不携带协议版本，不由协议名推导。 |
 | `subscriptions` | `{channel, protocol, sources, events?}`；来源为实际运行时 Agent ID，events 可筛选同一协议的变体。 |
 

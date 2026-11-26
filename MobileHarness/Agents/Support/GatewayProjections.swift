@@ -80,7 +80,7 @@ extension ActionExecutionEngine {
     public func cancel(inputID: String, source: AgentID) async {
         await cancel(inputID: inputID, source: source.rawValue)
     }
-    public func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async {
+    @discardableResult public func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async -> Bool {
         await cancel(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
     }
     public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {

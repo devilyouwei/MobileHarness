@@ -23,7 +23,7 @@ public struct GatewayExecution: ActionExecutionEngine {
     }
     public func cancel(inputID: String, source: String) async { await engine.cancel(inputID: inputID, source: source) }
     public func cancel(sessionID: String) async { await engine.cancel(sessionID: sessionID) }
-    public func cancel(endpoint: String, incarnation: String, sessionID: String?) async {
+    @discardableResult public func cancel(endpoint: String, incarnation: String, sessionID: String?) async -> Bool {
         await engine.cancel(endpoint: endpoint, incarnation: incarnation, sessionID: sessionID)
     }
     public func execute(_ input: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {
@@ -70,7 +70,9 @@ public struct DetachedActionExecution: ActionExecutionEngine {
     public func finish(inputID: String, source: String) async throws {}
     public func cancel(inputID: String, source: String) async {}
     public func cancel(sessionID: String) async {}
-    public func cancel(endpoint: String, incarnation: String, sessionID: String?) async {}
+    @discardableResult public func cancel(endpoint: String, incarnation: String, sessionID: String?) async -> Bool {
+        true
+    }
     public func execute(_ input: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {
         throw ActionExecutionError.missingHandler(input.call.actionPath)
     }

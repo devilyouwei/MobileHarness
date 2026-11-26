@@ -239,6 +239,15 @@ public actor ModelManager {
         return ModelState(resourceState: await entry.context.status)
     }
 
+    public func requireInstalledArtifact(for id: ModelID) async throws {
+        guard let artifacts, let artifactID = try entry(id).registration.artifactID else { return }
+        guard
+            try await artifacts.snapshots().contains(where: {
+                $0.artifact.id == artifactID && $0.phase == .installed
+            })
+        else { throw ModelArtifactError.missingArtifact }
+    }
+
     /// Defaults to ready-to-use resources. Deferred acquisition is for lazy App composition.
     public func get<Value: Sendable>(
         _ id: ModelID, as key: CapabilityKey<Value>, load: Bool = true
@@ -309,14 +318,21 @@ public actor ModelManager {
         guard !closed, !entry.unloading else { throw CapabilityError.sessionClosed }
     }
 
-    public func unload(_ id: ModelID) async throws {
+    public func unload(_ id: ModelID, cancelActive: Bool = false) async throws {
         let entry = try entry(id)
         // Reserve before any await so get/load cannot cross the transition.
         guard !entry.unloading else { throw CapabilityError.inputBusy }
         entry.unloading = true
         defer { entry.unloading = false }
-        if let task = entry.construction?.task { _ = try await task.value }
-        try await entry.context.unload()
+        if let task = entry.construction?.task {
+            if cancelActive {
+                task.cancel()
+                _ = await task.result
+            } else {
+                _ = try await task.value
+            }
+        }
+        try await entry.context.unload(cancelActive: cancelActive)
     }
 
     /// Nonterminal pause: join admitted inference without evicting loaded weights.
@@ -423,6 +439,11 @@ extension CapabilityKey where Value == any SpeechRecognitionCapability {
 extension CapabilityKey where Value == any SpeechSynthesisCapability {
     public static var synthesis: Self { Self(kind: .synthesis, select: { $0.synthesis }) }
 }
+extension CapabilityKey where Value == any SpeechEndpointCapability {
+    public static var endpointConfirmation: Self {
+        Self(kind: .endpointConfirmation, select: { $0.endpointConfirmation })
+    }
+}
 extension CapabilityKey where Value == any VoiceActivityCapability {
     public static var voiceActivity: Self { Self(kind: .voiceActivity, select: { $0.voiceActivity }) }
 }
@@ -436,4 +457,8 @@ extension CapabilityKey where Value == any PoseCapability {
 
 extension CapabilityKey where Value == any SpeechEnhancementCapability {
     public static var enhancement: Self { Self(kind: .enhancement, select: { $0.enhancement }) }
+}
+
+extension CapabilityKey where Value == any KeywordSpottingCapability {
+    public static var keywordSpotting: Self { Self(kind: .keywordSpotting, select: { $0.keywordSpotting }) }
 }

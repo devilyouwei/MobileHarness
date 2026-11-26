@@ -338,7 +338,13 @@ extension AssistantChatWorker {
             roundID = decisionID
             roundReceipt = nil
             roundCoordinator = AgentRoundCoordinator(id: decisionID, taskID: input.id)
-            guard let requestID = roundID else { throw CommunicationError.invalidPayload }
+            let requestID = decisionID
+            guard executionRoundSources.count < 128 else { throw HarnessError.queueFull }
+            executionRoundSources[decisionID] = input.context
+            guard emit(.roundStarted(decisionID), for: input) else {
+                executionRoundSources[decisionID] = nil
+                throw HarnessError.queueFull
+            }
             generationFinishReason = nil
             let decisionContext = try await contextRepository.snapshot()
             requestSkillIDs = decisionContext.state.skillState?.loaded ?? []

@@ -51,7 +51,7 @@ flowchart TB
 
 GatewayExecution checks the root admission fence before enqueue, schedule, direct execution and lease acquisition or renewal, then forwards to the Shell. Finish, cancel, release and snapshot calls stay available while draining so cleanup can complete. The Shell validates endpoint identity through the bound `signals.validateExecution` check, which fences stale incarnations. ActionCall, ToolCall, preparation, Channel/wait ordering, resource permits and result retry are specified in the [Shell design](../Actions/Support/Shell/README.md). Gateway never interprets a function, resource or result.
 
-The feedback exit delivers an ExecutionResult to the Agents adapter registered at configuration. Accepted means receiving admission, retry indicates temporary pressure and closed indicates a stale or absent scope; redelivery and its limit belong to the Shell. Agents owns the semantic decision before submission and the cognitive projection after delivery. The complete [registration-to-completion ownership matrix](../README.md#action-lifecycle-responsibilities) distinguishes the boundaries.
+The feedback exit delivers `ExecutionStart` and `ExecutionResult` to the registered Agents adapter. Accepted means receiving admission, retry indicates temporary pressure, and closed indicates a stale or absent scope. The Shell owns ordering, redelivery and its bound. Agents projects Assistant’s Action, round and interruption-scope events through `action.execution.feedback.v1` and authenticates their owner, session and causal identity. See the [ownership matrix](../README.md#action-lifecycle-responsibilities).
 
 ## Lifetime and capacity
 

@@ -261,13 +261,20 @@ private func preparedSpeech(
 private actor BlockedRecognition: SpeechRecognitionCapability {
     var availability: CapabilityAvailability { .available }
     let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    private let finalBeforeStall: String?
+    init(finalBeforeStall: String? = nil) { self.finalBeforeStall = finalBeforeStall }
+
     func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
         let pair = InferenceSession<TranscriptionEvent>.make(
             context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         started.continuation.yield(())
         return SpeechRecognitionSession(
             output: pair.session, format: request.format, sendAudio: { _ in },
-            finishInput: {
+            finishInput: { [finalBeforeStall] in
+                if let finalBeforeStall {
+                    try pair.emitter.yield(
+                        TranscriptionEvent(segmentID: "final", revision: 0, text: finalBeforeStall, isFinal: true))
+                }
                 try await Task.sleep(for: .seconds(60))
                 pair.emitter.finish()
             })
@@ -294,6 +301,17 @@ private actor BlockedRecognition: SpeechRecognitionCapability {
     await #expect(throws: CapabilityError.self) { try await next.finish() }
 }
 
+@Test(.timeLimit(.minutes(1)), arguments: [nil, "停下"] as [String?])
+func noTranscriptEndpointCancelsAStalledRecognizer(final: String?) async throws {
+    let recognition = BlockedRecognition(finalBeforeStall: final)
+    let turn = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID().uuidString) { _ in }
+    try await turn.enqueue([.audio([sampleFrame()])])
+    var started = recognition.started.stream.makeAsyncIterator()
+    _ = await started.next()
+    #expect(try await turn.finish(noTextGrace: .seconds(1)) == (final ?? ""))
+    await #expect(throws: CapabilityError.sessionClosed) { try await turn.enqueue([.end(.silence)]) }
+}
+
 private struct LiveRecognitionFixture: SpeechRecognitionCapability {
     var availability: CapabilityAvailability { .available }
     func transcribe(_ request: SpeechRecognitionRequest) throws -> SpeechRecognitionSession {
@@ -301,9 +319,17 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
         let pair = InferenceSession<TranscriptionEvent>.make(
             context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         let id = UUID().uuidString
+        let emittedPreview = Mutex(false)
         return SpeechRecognitionSession(
             output: pair.session, format: request.format,
             sendAudio: { _ in
+                guard
+                    emittedPreview.withLock({ emitted in
+                        guard !emitted else { return false }
+                        emitted = true
+                        return true
+                    })
+                else { return }
                 try pair.emitter.yield(
                     TranscriptionEvent(segmentID: id, revision: 2, text: "你好", isFinal: false))
                 try pair.emitter.yield(
@@ -360,6 +386,26 @@ private struct LiveRecognitionFixture: SpeechRecognitionCapability {
     let next = SpeechRecognitionTurn(recognition: recognition, sessionID: UUID().uuidString) { _ in }
     try await next.enqueue([.audio([sampleFrame()]), .end(.silence)])
     #expect(try await next.finish() == "你好世界")
+    previews.continuation.finish()
+}
+
+@Test(.timeLimit(.minutes(1))) func noTranscriptEndpointStaysOffAfterTextArrives() async throws {
+    let previews = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(2))
+    let turn = SpeechRecognitionTurn(recognition: LiveRecognitionFixture(), sessionID: UUID().uuidString) {
+        previews.continuation.yield($0)
+    }
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    let frames = try (0..<64).map { sequence in
+        try ModelKit.AudioFrame(
+            floatSamples: Array(repeating: 0.1, count: 512), format: format,
+            sequence: UInt64(sequence), timestamp: Double(sequence) * 0.032)
+    }
+    try await turn.enqueue([.audio(frames)])
+    var preview = previews.stream.makeAsyncIterator()
+    #expect(await preview.next() == "你好")
+    #expect(await !turn.reachedNoTextEndpoint)
+    #expect(try await turn.finish() == "你好世界")
+    #expect(await !turn.reachedNoTextEndpoint)
     previews.continuation.finish()
 }
 
@@ -863,6 +909,118 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop(profile: String) async t
     await segmenter.cancel()
 }
 
+private actor SpeechEndpointProbe: SpeechEndpointCapability {
+    let availability: CapabilityAvailability = .available
+    private let outcomes: [Result<Float?, CapabilityError>]
+    private(set) var inputs: [[Float]] = []
+
+    init(_ outcomes: [Result<Float?, CapabilityError>]) { self.outcomes = outcomes }
+
+    func completionProbability(for samples: [Float]) throws -> Float? {
+        inputs.append(samples)
+        return try outcomes[min(inputs.count - 1, outcomes.count - 1)].get()
+    }
+}
+
+private actor EndpointPCMVoiceActivity: VoiceActivitySession {
+    private var position: Int64 = 0
+
+    func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
+        let start = position
+        position += Int64(frame.sampleCount)
+        return [
+            try VoiceActivityScore(
+                startSample: start, sampleCount: frame.sampleCount,
+                probability: frame.floatSamples.first == 0 ? 0 : 1)
+        ]
+    }
+    func finish() -> [VoiceActivityScore] { [] }
+    func reset() { position = 0 }
+    func cancel() {}
+}
+
+private func submitEndpointWindow(
+    _ segmenter: VoiceActivitySegmenter, _ index: Int, sample: Float
+) async throws -> VoiceSegmentation {
+    let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
+    let frame = try ModelKit.AudioFrame(
+        floatSamples: Array(repeating: sample, count: 512), format: format,
+        sequence: UInt64(index), timestamp: Double(index) * 0.032)
+    return try await segmenter.process(frame, onsetWindows: 1)
+}
+
+private func endedAtSilence(_ result: VoiceSegmentation) -> Bool {
+    result.streamEvents.contains {
+        if case .end(.silence) = $0 { return true }
+        return false
+    }
+}
+
+@Test func smartTurnPreservesOneTurnThroughAnUnfinishedPause() async throws {
+    let endpoint = SpeechEndpointProbe([.success(0.5), .success(0.8)])
+    let segmenter = VoiceActivitySegmenter(session: EndpointPCMVoiceActivity(), endpointConfirmation: endpoint)
+    _ = try await submitEndpointWindow(segmenter, 0, sample: 0.1)
+    for index in 1...30 {
+        let pause = try await submitEndpointWindow(segmenter, index, sample: 0)
+        #expect(pause.isSpeaking && !endedAtSilence(pause))
+    }
+    #expect(await endpoint.inputs.map(\.count) == [26 * 512])
+    let resumed = try await submitEndpointWindow(segmenter, 31, sample: 0.2)
+    guard case .audio(let frames)? = resumed.streamEvents.first else {
+        Issue.record("Resuming speech did not release held audio")
+        return
+    }
+    #expect(frames.map(\.sampleCount).reduce(0, +) == 31 * 512)
+    for index in 32..<56 { _ = try await submitEndpointWindow(segmenter, index, sample: 0) }
+    let completed = try await submitEndpointWindow(segmenter, 56, sample: 0)
+    #expect(endedAtSilence(completed) && !completed.isSpeaking)
+    let inputs = await endpoint.inputs
+    #expect(inputs.count == 2)
+    #expect(inputs.last?.first == 0.1)
+    #expect(inputs.last?.contains(0.2) == true)
+    await segmenter.cancel()
+}
+
+@Test func smartTurnBoundsAnUnfinishedSilenceWithoutRepeatedInference() async throws {
+    let endpoint = SpeechEndpointProbe([.success(0.1)])
+    let segmenter = VoiceActivitySegmenter(session: EndpointPCMVoiceActivity(), endpointConfirmation: endpoint)
+    _ = try await submitEndpointWindow(segmenter, 0, sample: 0.1)
+    for index in 1...62 {
+        #expect(try await submitEndpointWindow(segmenter, index, sample: 0).isSpeaking)
+    }
+    let completed = try await submitEndpointWindow(segmenter, 63, sample: 0)
+    #expect(endedAtSilence(completed) && !completed.isSpeaking)
+    #expect(await endpoint.inputs.count == 1)
+    await segmenter.cancel()
+}
+
+@Test(arguments: [false, true])
+func smartTurnUsesVADEndpointIfPredictionIsUnavailableOrFails(failure: Bool) async throws {
+    let outcome: Result<Float?, CapabilityError> = failure ? .failure(.sessionClosed) : .success(nil)
+    let endpoint = SpeechEndpointProbe([outcome])
+    let segmenter = VoiceActivitySegmenter(session: EndpointPCMVoiceActivity(), endpointConfirmation: endpoint)
+    _ = try await submitEndpointWindow(segmenter, 0, sample: 0.1)
+    for index in 1..<25 { _ = try await submitEndpointWindow(segmenter, index, sample: 0) }
+    let completed = try await submitEndpointWindow(segmenter, 25, sample: 0)
+    #expect(endedAtSilence(completed) && !completed.isSpeaking)
+    #expect(await endpoint.inputs.count == 1)
+    await segmenter.cancel()
+}
+
+@Test func smartTurnUsesOnlyTheLatestEightSeconds() async throws {
+    let endpoint = SpeechEndpointProbe([.success(0.8)])
+    let segmenter = VoiceActivitySegmenter(session: EndpointPCMVoiceActivity(), endpointConfirmation: endpoint)
+    _ = try await submitEndpointWindow(segmenter, 0, sample: 0.1)
+    for index in 1...249 { _ = try await submitEndpointWindow(segmenter, index, sample: 0.2) }
+    for index in 250...274 { _ = try await submitEndpointWindow(segmenter, index, sample: 0) }
+    let inputs = await endpoint.inputs
+    #expect(inputs.count == 1)
+    #expect(inputs.first?.count == 128_000)
+    #expect(inputs.first?.first == 0.2)
+    #expect(inputs.first?.last == 0)
+    await segmenter.cancel()
+}
+
 @Test(arguments: [false, true])
 func speechBoundaryUsesCurrentEndpointDuringSilence(initiallyShort: Bool) throws {
     var policy = SpeechBoundaryPolicy()
@@ -1244,20 +1402,32 @@ private actor ColdVoiceRecognition: SpeechRecognitionCapability {
     nonisolated let availability: CapabilityAvailability = .available
     nonisolated let gate = ColdVoiceGate()
     private(set) var received = Data()
+    private let emitsPreview: Bool
+    init(emitsPreview: Bool = false) { self.emitsPreview = emitsPreview }
+
     func transcribe(_ request: SpeechRecognitionRequest) async throws -> SpeechRecognitionSession {
         try await gate.wait()
         let pair = InferenceSession<TranscriptionEvent>.make(
             context: request.context, limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
         return SpeechRecognitionSession(
             output: pair.session, format: request.format,
-            sendAudio: { [self] frame in await append(frame.data) },
+            sendAudio: { [self, emitsPreview] frame in
+                if await append(frame.data), emitsPreview {
+                    try pair.emitter.yield(
+                        TranscriptionEvent(segmentID: "cold", revision: 0, text: "cold", isFinal: false))
+                }
+            },
             finishInput: {
                 try pair.emitter.yield(
-                    TranscriptionEvent(segmentID: "cold", revision: 0, text: "cold-start", isFinal: true))
+                    TranscriptionEvent(segmentID: "cold", revision: 1, text: "cold-start", isFinal: true))
                 pair.emitter.finish()
             })
     }
-    private func append(_ data: Data) { received.append(data) }
+    private func append(_ data: Data) -> Bool {
+        let isFirst = received.isEmpty
+        received.append(data)
+        return isFirst
+    }
 }
 
 private actor ColdVoiceActivity: VoiceActivityCapability, VoiceActivitySession {
@@ -1295,9 +1465,63 @@ private actor ColdVoiceActivity: VoiceActivityCapability, VoiceActivitySession {
     func cancel() {}
 }
 
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func noTranscriptEndpointEndsTheUtteranceAndRearmsAfterQuiet(includeFinal: Bool) async throws {
+    let vad = ColdVoiceActivity()
+    vad.gate.open()
+    let session = UUID().uuidString
+    let context = try AgentContextRepository(
+        agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState())
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "停下", includeFinal: includeFinal), vad: vad,
+        sessionID: session, interactionSessionID: session, speechDetection: { (3, 0.5) }, context: context)
+    let finalTexts = Mutex([String]())
+    let ended = Mutex(0)
+    try await speech.start()
+    let pump = Task {
+        for await envelope in speech.outputs {
+            guard case .communication(let action) = envelope.output else { continue }
+            if case .transcript(let text, true)? = action.message.perception { finalTexts.withLock { $0.append(text) } }
+            if action.message.content(as: SpeechActivity.self)?.kind == .utteranceEnded { ended.withLock { $0 += 1 } }
+        }
+    }
+    defer { pump.cancel() }
+    var sequence: UInt64 = 0
+    func send(_ value: Float) async throws {
+        let samples = [Float](repeating: value, count: 512)
+        let audio = try syntheticAudioInput(
+            samples: samples.withUnsafeBytes { Data($0) }, sampleRate: 16000,
+            sequence: sequence, timestamp: Double(sequence) * 0.032)
+        sequence += 1
+        try await processMicrophoneFixture(
+            .init(id: UUID().uuidString, sessionID: session, payload: .audio(audio)), using: speech)
+    }
+    for _ in 0..<63 { try await send(0.1) }
+    #expect(try await context.snapshot().state.phase == "speaking")
+    for _ in 0..<20 {
+        try await send(0.1)
+        if try await context.snapshot().state.phase == "listening" { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(try await context.snapshot().state.phase == "listening")
+    for _ in 0..<100 {
+        if finalTexts.withLock({ !$0.isEmpty }) || ended.withLock({ $0 > 0 }) { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(finalTexts.withLock { $0 } == (includeFinal ? ["停下"] : []))
+    #expect(ended.withLock { $0 } == (includeFinal ? 0 : 1))
+    for _ in 0..<16 { try await send(0.1) }
+    #expect(try await context.snapshot().state.utteranceCount == 1)
+    for _ in 0..<5 { try await send(0) }
+    for _ in 0..<5 { try await send(0.1) }
+    #expect(try await context.snapshot().state.utteranceCount == 2)
+    await speech.stop()
+    await pump.value
+}
+
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func coldVADAndASRPreserveRecordedPrefixAndJoinLiveAudioInOrder() async throws {
-    let recognition = ColdVoiceRecognition()
+    let recognition = ColdVoiceRecognition(emitsPreview: true)
     let vad = ColdVoiceActivity()
     let root = UUID().uuidString
     let epoch = UUID().uuidString
@@ -1371,7 +1595,10 @@ func cancellingColdRecognitionClearsBufferedPrefixBeforeNextTurn() async throws 
     try await turn.enqueue([.audio([sampleFrame()])])
     var entered = recognition.gate.entered.stream.makeAsyncIterator()
     await entered.next()
-    try await turn.enqueue([.audio(Array(repeating: sampleFrame(), count: 64))])
+    let window = try ModelKit.AudioFrame(
+        floatSamples: Array(repeating: 0, count: 512), format: sampleFrame().format, sequence: 1, timestamp: 0.032)
+    try await turn.enqueue([.audio(Array(repeating: window, count: 64))])
+    #expect(await !turn.reachedNoTextEndpoint)
     await turn.cancel()
     recognition.gate.open()
     #expect(await recognition.received.isEmpty)
@@ -1489,27 +1716,34 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     try await perception.resume()
     try await wait { state.activities.contains { $0.owner.hasPrefix("speechPerception:") } }
     let resumed = try #require(state.activities.first { $0.owner.hasPrefix("speechPerception:") })
-    await synthesis.playbackChanged(audioID: "first", active: true)
+    let first = try await synthesis.prepare(
+        text: "第一段播报", input: .init(id: UUID().uuidString, sessionID: session, payload: .text("speak")))
+    try await synthesis.preparePlayback(audioID: first)
+    await synthesis.playbackChanged(audioID: first, active: true)
     try await wait { state.headerActivity?.owner.hasPrefix("assistant:") == true }
     #expect(state.headerActivity?.content.secondary == .spectrum)
-    _ = try await synthesis.prepare(
+    let second = try await synthesis.prepare(
         text: "生产完成不能撤下仍在播放的活动",
         input: .init(id: UUID().uuidString, sessionID: session, payload: .text("speak")))
     let productionDeadline = ContinuousClock.now + .seconds(4)
-    while await synthesis.snapshot().processed == 0, ContinuousClock.now < productionDeadline { await Task.yield() }
-    #expect(await synthesis.snapshot().processed == 1)
+    while await synthesis.snapshot().processed < 2, ContinuousClock.now < productionDeadline { await Task.yield() }
+    #expect(await synthesis.snapshot().processed == 2)
     #expect(state.headerActivity?.owner.hasPrefix("assistant:") == true)
     #expect(state.activities.contains { $0.id == resumed.id && $0.content.secondary == resumed.content.secondary })
-    await synthesis.playbackChanged(audioID: "second", active: true)
-    await synthesis.playbackChanged(audioID: "first", active: false)
+    try await synthesis.preparePlayback(audioID: second)
+    await synthesis.playbackChanged(audioID: second, active: true)
+    await synthesis.playbackChanged(audioID: first, active: false)
     #expect(state.headerActivity?.owner.hasPrefix("assistant:") == true)
-    await synthesis.playbackChanged(audioID: "second", active: false)
+    await synthesis.playbackChanged(audioID: second, active: false)
     try await wait { state.headerActivity?.owner.hasPrefix("speechPerception:") == true }
     #expect(await perception.acquirePlaybackAdmission())
     try await wait { state.activities.isEmpty }
     try await perception.resumeListening()
     try await wait { state.headerActivity?.owner.hasPrefix("speechPerception:") == true }
-    await synthesis.playbackChanged(audioID: "third", active: true)
+    let third = try await synthesis.prepare(
+        text: "第三段播报", input: .init(id: UUID().uuidString, sessionID: session, payload: .text("speak")))
+    try await synthesis.preparePlayback(audioID: third)
+    await synthesis.playbackChanged(audioID: third, active: true)
     try await wait { state.headerActivity?.owner.hasPrefix("assistant:") == true }
     await perception.stop()
     #expect(!state.activities.contains { $0.owner.hasPrefix("speechPerception:") })
@@ -1554,7 +1788,7 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(retained >= windows * 512)
 }
 
-@Test func speechPlaybackFactsRetainTailAndSessionIdentityWithoutProtectionWindow() {
+@Test func speechPlaybackFactsRetainTailAndSessionIdentityWithoutProtectionWindow() throws {
     let time = ContinuousClock.now
     var history = SpeechPlaybackHistory()
     history.started(id: "a", sessionID: "voice", at: time)
@@ -1573,6 +1807,13 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     let snapshot = history.read(sessionID: "voice")
     #expect(snapshot.periods.count == 32)
     #expect(!snapshot.state(at: time).known)
+    let signal = ReplyActivitySignal(active: true, playback: snapshot)
+    let payload = try JSONEncoder().encode(signal)
+    #expect(try AgentContracts.communication.validatedSize(signal.message()) <= ReplyActivitySignal.maximumBytes)
+    let decoded = try JSONDecoder().decode(ReplyActivitySignal.self, from: payload)
+    #expect(decoded.playback == snapshot)
+    let olderPayload = Data(#"{"active":true}"#.utf8)
+    #expect(try JSONDecoder().decode(ReplyActivitySignal.self, from: olderPayload).playback == nil)
 }
 
 @Test func speechPlaybackOnsetIsStricterWithoutCuttingConfirmedSpeech() throws {
@@ -1623,6 +1864,7 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     let (speech, store, _, invocation) = try await preparedSpeech(text: "reply", input: input, probe: VoiceProbe())
     let id = try #require(invocation.call.parameters["audioID"])
     let time = ContinuousClock.now
+    try await speech.preparePlayback(audioID: id)
     await speech.playbackChanged(audioID: id, active: true, at: time)
     #expect(await speech.playbackSnapshot(sessionID: session).state(at: time).playing)
     #expect(await !speech.playbackSnapshot(sessionID: "other").state(at: time).playing)
@@ -1636,6 +1878,20 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(await speech.playbackSnapshot(sessionID: session).periods.isEmpty)
     await speech.stop()
     await store.shutdown()
+}
+
+@Test func cancellingPreparedSpeechRevokesPlaybackBeforeFirstPCM() async throws {
+    let input = AgentInput(id: "old-reply", sessionID: "speech", payload: .text("reply"))
+    let (speech, store, _, invocation) = try await preparedSpeech(text: "reply", input: input, probe: VoiceProbe())
+    let id = try #require(invocation.call.parameters["audioID"])
+    try await speech.preparePlayback(audioID: id)
+    await speech.cancel(input: input)
+    let owner = AudioCache.Owner(source: "assistant", session: input.sessionID, input: input.id)
+    #expect((try? await store.validate(id, owner: owner)) == nil)
+    await #expect(throws: CancellationError.self) { try await speech.preparePlayback(audioID: id) }
+    await speech.playbackChanged(audioID: id, active: false)
+    #expect(await speech.playbackSnapshot(sessionID: input.sessionID).periods.isEmpty)
+    await speech.stop()
 }
 
 /// Feeds one spoken utterance (speech, then silence) so the endpoint finishes it.
@@ -1704,7 +1960,8 @@ private func listeningModeInput(
     let contracts = try AgentContracts.communication
     for kind in SpeechActivity.Kind.allCases {
         let activity = SpeechActivity(
-            kind, generation: "g", utterance: "u", fullDuplex: true)
+            kind, generation: "g", utterance: "u", fullDuplex: true,
+            continuation: kind == .continuationReady ? SpeechContinuationProbe(id: UUID()) : nil)
         #expect(try contracts.validatedSize(activity.message()) > 0)
     }
     #expect(try contracts.validatedSize(ListeningModeSignal(.quiet).message()) > 0)

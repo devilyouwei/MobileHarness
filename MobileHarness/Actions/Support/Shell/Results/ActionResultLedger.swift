@@ -6,14 +6,28 @@ struct ActionResultLedger {
     enum DeliveryState: String, Sendable { case reserved, pending, accepted, closed, expired }
     struct Record: Sendable {
         let executionID: String
+        let roundID: String?
         let result: ExecutionResult?
         let state: DeliveryState
+    }
+    enum Delivery: Sendable {
+        case started(ExecutionStart)
+        case finished(ExecutionResult)
+
+        var executionID: String {
+            switch self {
+            case .started(let value): value.executionID
+            case .finished(let value): value.executionID
+            }
+        }
     }
     private struct Entry {
         let invocation: ScheduledAction
         let order: UInt64
         let snapshot: ActionInvocationSnapshot
         var result: ExecutionResult?
+        var startedAt: ContinuousClock.Instant?
+        var startFailure: DeliveryState?
         var completedAt: ContinuousClock.Instant?
         var attempts = 0
         var nextAttempt: ContinuousClock.Instant = .now
@@ -52,6 +66,13 @@ struct ActionResultLedger {
             invocation: invocation, order: order, snapshot: try ActionInvocationSnapshot(invocation.call))
     }
 
+    mutating func started(_ invocation: ScheduledAction) {
+        guard invocation.envelope.roundID != nil, invocation.envelope.callID != nil,
+            invocation.feedback == .terminal
+        else { return }
+        entries[invocation.executionID]?.startedAt = .now
+    }
+
     mutating func complete(
         _ invocation: ScheduledAction, status: ExecutionResult.Status, effect: ExecutionResult.Effect,
         completion: ActionCompletion? = nil, failure: ExecutionResult.Failure? = nil
@@ -70,17 +91,38 @@ struct ActionResultLedger {
         entries[invocation.executionID] = entry
     }
 
-    mutating func ready() -> ExecutionResult? {
-        return entries.values.filter { $0.result != nil && $0.nextAttempt <= .now }
-            .min(by: { $0.order < $1.order })?.result
+    func ready() -> Delivery? {
+        guard
+            let entry = entries.values.filter({ ($0.startedAt != nil || $0.result != nil) && $0.nextAttempt <= .now })
+                .min(by: { $0.order < $1.order })
+        else { return nil }
+        if entry.startedAt != nil, let owner = entry.invocation.owner {
+            return .started(
+                .init(
+                    executionID: entry.invocation.executionID, owner: owner, envelope: entry.invocation.envelope))
+        }
+        return entry.result.map(Delivery.finished)
     }
 
-    var hasPending: Bool { entries.values.contains { $0.result != nil } }
+    var hasPending: Bool { entries.values.contains { $0.startedAt != nil || $0.result != nil } }
 
-    mutating func delivered(_ id: String, outcome: ActionResultDelivery) {
+    mutating func delivered(_ delivery: Delivery, outcome: ActionResultDelivery) {
+        let id = delivery.executionID
         guard var entry = entries[id] else { return }
+        if case .started = delivery, let startedAt = entry.startedAt {
+            if outcome == .retry, startedAt.duration(to: .now) < deliveryTimeout {
+                deferRetry(&entry)
+            } else {
+                if outcome != .accepted { entry.startFailure = outcome == .closed ? .closed : .expired }
+                entry.startedAt = nil
+                entry.attempts = 0
+                entry.nextAttempt = .now
+            }
+            entries[id] = entry
+            return
+        }
         switch outcome {
-        case .accepted: finish(id, state: .accepted)
+        case .accepted: finish(id, state: entry.startFailure ?? .accepted)
         case .closed: finish(id, state: .closed)
         case .retry:
             // Retry covers temporary receiver pressure only; an unresolved result must end as a visible failure.
@@ -89,10 +131,14 @@ struct ActionResultLedger {
                 finish(id, state: .expired)
                 return
             }
-            entry.attempts = min(entry.attempts + 1, 10)
-            entry.nextAttempt = .now.advanced(by: .milliseconds(100 * entry.attempts))
+            deferRetry(&entry)
             entries[id] = entry
         }
+    }
+
+    private func deferRetry(_ entry: inout Entry) {
+        entry.attempts = min(entry.attempts + 1, 10)
+        entry.nextAttempt = .now.advanced(by: .milliseconds(100 * entry.attempts))
     }
 
     mutating func close(sessionID: String? = nil) {
@@ -105,7 +151,7 @@ struct ActionResultLedger {
         history
             + entries.values.sorted { $0.order < $1.order }.map {
                 Record(
-                    executionID: $0.invocation.executionID, result: $0.result,
+                    executionID: $0.invocation.executionID, roundID: $0.invocation.envelope.roundID, result: $0.result,
                     state: $0.result == nil ? .reserved : .pending)
             }
     }
@@ -116,7 +162,9 @@ struct ActionResultLedger {
             history.removeFirst()
             evictedHistory &+= 1
         }
-        history.append(Record(executionID: id, result: entry.result, state: state))
+        history.append(
+            Record(
+                executionID: id, roundID: entry.invocation.envelope.roundID, result: entry.result, state: state))
         while history.reduce(0, { $0 + ($1.result?.invocation?.retainedBytes ?? 0) }) > 32 * 1024 * 1024 {
             history.removeFirst()
             evictedHistory &+= 1

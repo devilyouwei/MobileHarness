@@ -2,6 +2,114 @@
 
 本文件是按日期追加的跨模块验证日志。每节中的版本、数字、失败与未执行范围只对应该轮，不作为当前设计；专项模型和硬件样本在 [验证索引](README.md) 所列报告中拥有正文。相同运行的摘要与专项报告不能算作两次独立验收。
 
+## 播放快照通过 Gateway Signal 传递
+
+- 13 项串行 Swift 定向测试、共 31 个用例通过。实际 Gateway 覆盖回复仍活跃时发布原生停播更新、按 PCM 采集时刻保留 200 ms 尾部、尾部后恢复基础门槛。覆盖 32 个区间的序列化、旧载荷兼容及既有打断等待和 ASR 收尾。
+- 五个 iOS 模拟器 scheme 构建通过，主 App 的 Agent/Skill、Live Activity 和中英文资源校验通过。
+- Swift 严格格式、工程文件 plist 格式及补丁检查通过。`./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode Agent/Skill 中文资源归类检查处退出。
+- 工程回归使用合成 PCM 与受控播放时间。本轮未安装真机或实测声学效果。
+
+## 打断时保留在途起声
+
+- 修复前，Zipformer 和 Decision 的四个在途候选用例均复现窗口到期后提前放行。修复后六项串行 Swift 定向测试、共 25 个用例通过，覆盖候选先到并在窗口后确认或清除、同轮快停续说终稿完整入队、停播计时及采集中止。
+- 五个 iOS 模拟器 scheme 构建通过，主 App 的 Agent/Skill、Live Activity 和中英文资源校验通过。
+- 修改文件的 Swift 严格格式检查和 `git diff --check` 通过。`./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode Agent/Skill 中文资源归类检查处退出。
+- 测试使用受控的打断、识别及播放事实。2026-11-26，签名版 `0.1.0 (2026112602)` 在 iPhone 17 Pro 上从 `2026112601` 原位更新。签名、打包资源、安装回执和设备应用清单校验通过。真实语音验收待实测。
+
+## 旧回复停止后起算续说窗口
+
+- 22 项串行 Swift 执行层测试、48 项同次筛选的展示相关测试和 3 项追加的会话记录与语音 Gateway 测试通过。Zipformer 和 Decision 的夹具都覆盖仅剩播报、停播回执晚于信号接纳 1.28 秒的情况，并验证回执后仍完整等待 1.28 秒。既有回归覆盖慢 Action 清理、在途终稿和采集中止。另验证首块 PCM 提交前已登记的播放必须收到对应音频 ID 的停止回执。
+- `./scripts/build-ios.sh` 的五个模拟器 scheme 构建通过，主 App 的 Agent/Skill、Live Activity 和中英文资源验证通过。
+- 2026-11-26，签名版 `0.1.0 (2026112601)` 在 iPhone 17 Pro 上从 `2026112511` 原位更新。签名、打包资源、安装回执和设备应用清单校验通过。此版在停播后按单调时钟等待 1.28 秒。真实模型推理和真机口语未验证。
+- `./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode Agent/Skill 中文资源归类检查处退出。修改文件的 Swift 严格格式检查和 `git diff --check` 通过。
+
+## 打断信号接纳时起算续说窗口
+
+- 四项串行 Swift 定向测试、共 18 个用例通过。新增用例模拟停播清理跨过 1.28 秒，在途 ASR 结算后直接放行，无需从清理完成重新计时。既有 Zipformer、Decision 和运行时中断回归通过。
+- 五个模拟器 scheme 构建通过，主 App 打包资源校验通过。
+- 签名版 `0.1.0 (2026112511)` 在 iPhone 17 Pro 上从 `2026112510` 原位更新。签名、打包资源、安装回执和设备应用清单已核对，真机口语体验待验证。
+- `./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode 中文资源归类检查处退出。
+
+## 统一 Zipformer 与 Decision 的续说等待
+
+- 四项串行 Swift 定向测试、共 17 个用例通过。Decision 替身从实际请求入口返回 true，确认清理期间的续说起声会被跟踪，短续说终稿不会提前释放 1.28 秒窗口，窗口已满的在途 ASR 会继续等待终稿。
+- 五个模拟器 scheme 构建通过，主 App 打包资源校验通过。
+- `./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode 中文资源归类检查处退出。真机行为留待验证。
+
+## Zipformer 快停后的续说等待
+
+- 四项定向 Swift 测试通过，包含 16 个用例。覆盖口令终稿后的完整探测窗、窗内再次起声、续说终稿入队、停播清理期间到达的口令终稿和既有打断路径。
+- 五个模拟器 scheme 和主 App 打包资源校验通过。
+- `./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode 中文资源归类检查处退出。真机口语链路留待实测。
+
+## 2026-11-25 — 首页加载与配置切换
+
+- 48 项定向 Swift 串行回归通过，覆盖模型资源 ID 和本地化识别变体、取消并卸载后的重载、阈值与音色的影响范围、首页配置围栏以及制品缺失后继续准备其他模型。
+- 五个模拟器 scheme 构建通过，最终变更后重建模拟器主 App。Agent/Skill、Live Activity、英中文资源检查通过，打包中文 Toast 文案确认为「正在加载 %@…」。
+- `./scripts/check.sh` 仍在既有 AgentContainer State Value codec 与 Xcode Agent/Skill 中文资源归类检查处退出。真机、真实模型加载和 Toast 交互留待验证。
+
+## 2026-11-25 — 打断 Decision 提问精简
+
+- 102 项串行 Swift 回归通过，覆盖中英打断提示词正文、空回复、原生和 Chat Decision 接入、迟到结果的目标隔离、quiet 唤醒及语音设置保存。扩展回归并行运行时，进入 quiet 的等待用例曾超时，串行复跑通过。
+- 更新后的提示词随模拟器主 App 构建通过，Agent/Skill、Live Activity 和中英文本地化资源检查通过。
+- 签名版 `0.1.0 (2026112510)` 包含简化提示词及语音菜单修复，已在 iPhone 17 Pro 原位更新。签名、双语打包资源、安装回执及独立应用清单校验通过。同版再次原位安装后，安装回执与设备应用清单再次核对通过。模型判断准确率和真机口语体验留待验证。
+
+## 2026-11-25 — 语音模型菜单保存修复
+
+- 从真实设置请求恢复六项语音能力，再修改其中一项并保存。修复前 ApplicationControl 拒绝完整映射并返回 `invalidPayload`。修复后保存成功，ModelKit 绑定获得完整映射，其余语音设置仍正确。
+- 50 项定向 Swift 测试通过，覆盖语音模型选择、资源工作流、偏好及恢复。语音资源分组断言包含 Smart Turn 和 Kokoro。
+- 五个模拟器 scheme 构建通过。
+- 签名版 `0.1.0 (2026112509)` 已从 `2026112508` 原位更新到 iPhone 17 Pro。安装回执与独立设备应用清单确认版本，真机上的手动下拉操作留待实测。
+- `./scripts/check.sh` 仍在既有 AgentContainer State Value codec 和 Xcode Agent/Skill 中文资源归类检查处退出。
+
+## 2026-11-25 — Smart Turn 语句结束确认
+
+- 21 项定向 Swift 测试通过，包括六项语音偏好经 Gateway 保存和恢复、半句停顿后保留同一识别轮、连续静音上限、最近 8 秒输入、模型失效回退及空转写、Zipformer 回归。包含下述单条真实模型冒烟测试。
+- Mac 上通过生产模型管理链路下载并安装固定 revision `75f069717f500947195fa1945c46ddb472559cff`，确认前台自动预热，用合成 PCM 获得有效 Core ML 概率。该冒烟测试验证制品和接口，真机麦克风、自然停顿准确率与延时分布尚未测量。
+- 五个模拟器 scheme 构建通过。资源 Gateway 修正后重新构建模拟器主 App，确认打包目录包含固定 revision 的模型记录及「语句结束确认」中文文案。Agent/Skill、Live Activity 和中英文本地化资源校验通过。
+- 签名版 `0.1.0 (2026112508)` 通过真机构建、签名及打包资源检查，在 iPhone 17 Pro 上从 `2026112507` 原位更新。安装回执和独立应用清单确认新版本。真机上的 Smart Turn 下载、设置交互和口语检测留待实测。
+- `./scripts/check.sh` 在已有的 AgentContainer State Value codec 和 Xcode Agent/Skill 中文资源归类检查处退出，Swift 定向验证独立运行。
+
+## 2026-11-25 — 关键词置信度滑块
+
+- 23 项 Swift 定向测试通过。覆盖偏好经 Gateway 保存和恢复、旧记录默认 0.25、设置保存失败恢复、正式关键词会话接收已配置阈值，以及相同 0.22 候选在 0.20 与 0.25 下的判定。真实制品用例在默认回归中跳过。
+- 五个模拟器目标构建及主 App 资源验证通过，已检查包内中文滑块文案。`./scripts/check.sh` 仍在既有 State Value codec 和 Xcode 本地化资源归类检查处退出。
+- 签名版 `0.1.0 (2026112507)` 通过真机构建、签名和打包资源检查，在 iPhone 17 Pro 上从 `2026112506` 原位更新。安装回执和独立应用清单确认新版本。滑块交互与真实命中率尚未在 iPhone 上复测。
+
+## 2026-11-25 — 关键词测试的输入与重开会话排查
+
+- iPhone 17 Pro 的 `ZipformerKWS` 清单、词表和三份模型图及权重逐字节等于固定发布版 `46d5bc5be5acf590afdb8349d89bb2533f01ce48`。用户确认原始麦克风电平随说话变化，关闭 DeepFilterNet3 后仍无命中。
+- Mac 上对同一合成“停下”和 `stop` 使用完整的六条词表，发布版 Python 宿主与 Swift 宿主均命中，未复现独立短词在用户真机上的漏检。用合成的前句、停顿和 `stop` 拼接，Swift 的单次会话漏掉后一个口令，参考宿主可命中。以 600 ms 静音判定选取新起声和 100 ms 预卷后，Swift 对同一口令命中。这个对照未包含用户的实际 PCM。
+- 19 项定向 Swift 测试通过，Core ML 测试按上述夹具单独启用。签名版 `0.1.0 (2026112506)` 原位更新，签名、资源、本地化和设备版本核对通过。新页面显示到达模型的音频时长与电平。真人发音和 iPhone 麦克风链路待复测。
+- `./scripts/check.sh` 在已有 Agent 状态编解码与 Xcode 本地化归类问题处退出。
+
+## 2026-11-25 — 设置中的关键词测试
+
+- 15 项 Swift 定向测试通过。验证原始命中在尾部静音门限通过和未通过时均显示，停止后不会再收新命中，普通音频检测不会收到迟到的关键词结果。既有关键词快停和空转写端点回归通过。
+- 五个模拟器 scheme 构建和 App 资源检查通过。`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归类问题处退出。
+- 真机签名版 `0.1.0 (2026112505)` 原位安装到 iPhone 17 Pro。签名、资源、打包后的关键词测试中文文案、安装回执及设备 App 清单校验通过。真人发音、室内杂音和页面内交互留待真机复测。
+
+## 2026-11-25 — 空转写的语音端点
+
+- 23 项 Swift 定向测试通过。包括持续有声的 VAD 输入在 ASR 无文字时主动结束、连续杂音期间保持关闭以及静音后重新起声。正常预览、冷启动 PCM、长语句分段、Zipformer 打断和 quiet 收尾回归通过。
+- 有限收尾的替身测试验证空终稿丢弃、已确认终稿保留和识别会话取消。模拟器构建脚本的五个 scheme 均通过。最终主 App 复编通过，Agent/Skill、Live Activity 和中英文本地化资源校验通过。`./scripts/check.sh` 仍在既有 State Value codec 与 Xcode 本地化资源归类检查处退出。
+- 本轮使用合成 PCM 和受控的识别、VAD 替身。真实背景杂音、Apple ASR、Nemotron 和 iPhone 真机尚未复测。
+- 签名版 `0.1.0 (2026112504)` 通过真机构建、签名和打包资源检查，在配对的 iPhone 17 Pro 原位更新。安装回执与独立设备应用清单确认版本。证据为 `/tmp/mh-no-transcript-device-2026112504.log`、`/tmp/mh-no-transcript-device-install-2026112504.json` 和 `/tmp/mh-no-transcript-device-after-2026112504.json`。
+
+## 2026-11-25 — 独立停播口令与 Zipformer 真机预热
+
+- 在 `2026112502` 的 iPhone 17 Pro 上确认 Zipformer 制品已安装且已选中。近期语音记录中有 ASR 转写进入本地 D3 Decision 并得到否定判定，无法把该条结果逐字对齐到报告的原始音频。设备快照仅用于检查，原始数据未保留。
+- 39 项 Swift 定向测试通过。覆盖关键词前后缀边界、尾部静音、已确认语句和回复目标，以及 Decision 给出否定结论后的独立口令补判。真实模型用例在默认回归中跳过，随后在 Mac 上显式运行。固定发布的 Core ML 制品识别单条合成 `stop` 和「停下」，单条合成 `Please do not stop` 未命中。这里的工程冒烟测试未测统计召回率或真实麦克风延时。
+- 签名版 `0.1.0 (2026112503)` 原位更新到同一设备，签名、打包资源、安装回执与独立 App 清单校验通过。Instruments 的真机启动日志捕获 `SpeechKeyword` 就绪事件。真机播报中用人声触发、回声和实际停播仍需复测。
+- `./scripts/check.sh` 仍在既有的 State Value codec 和 Xcode 本地化资源归类检查处退出，Swift 定向验证独立运行。
+
+## 2026-11-25 — 语音模型设置合并
+
+- 81 项 Swift 定向回归通过。覆盖模型 ID 经资源 Gateway 保存和绑定、旧配置解析、VAD 默认值、缺模型回退、不同能力的选择隔离和保存失败恢复。模型和安装状态使用测试夹具。
+- Xcode 的五个 iOS Simulator scheme 构建通过。最终主 App 再次构建通过，Agent/Skill、Live Activity 和中英文本地化资源校验通过。
+- 修改文件通过严格 Swift 格式与 `git diff --check`。`./scripts/check.sh` 在既有的 State Value codec 与 15 个 Xcode 本地化资源归类问题处退出，Swift 定向回归独立运行。本轮未执行原生界面点按、真实模型推理和 iPhone 真机验收。
+- 签名版 `0.1.0 (2026112502)` 通过真机构建、签名和打包资源校验，在配对的 iPhone 17 Pro 原位更新。安装回执与独立应用清单确认由 `2026112501` 更新到 `2026112502`。证据保存在 `/tmp/mh-speech-settings-device-2026112502.log`、`/tmp/mh-speech-settings-device-install-2026112502.json` 和 `/tmp/mh-speech-settings-device-after-2026112502.json`。
+
 ## 2026-11-25 — 打断与 quiet 唤醒共用 Decision
 
 - 14 项 quiet 相关 Swift 测试、11 项 interrupt 与 Decision 调度回归通过。覆盖共用本地模型选择、切换选择、云端路由、失败与超时、字面匹配、最新句替换与退出后恢复对话。测试使用模型替身。

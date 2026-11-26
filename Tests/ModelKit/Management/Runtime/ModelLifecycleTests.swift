@@ -109,6 +109,21 @@ private func registeredManager(_ counter: LoadCounter) async throws -> ModelMana
     await #expect(throws: CapabilityError.sessionClosed) { _ = try await manager.get(ModelID("model"), as: .chat) }
 }
 
+@Test(.timeLimit(.minutes(1))) func cancellingUnloadInterruptsActiveInferenceAndAllowsReload() async throws {
+    let counter = LoadCounter()
+    let manager = try await registeredManager(counter)
+    let id = ModelID("model")
+    let chat = try await manager.get(id, as: .chat)
+    let active = try await chat.chat(ChatRequest(messages: [.init(role: .user, content: "hold")]))
+    try await manager.unload(id, cancelActive: true)
+    await #expect(throws: CancellationError.self) { for try await _ in active.events {} }
+    #expect(try await manager.status(id) == .unloaded)
+    try await manager.warmup(id)
+    #expect(try await manager.status(id) == .ready)
+    #expect(await counter.loads == 2)
+    await manager.shutdown()
+}
+
 @Test(.timeLimit(.minutes(1))) func failedLoadRetriesWithoutReconstructingProvider() async throws {
     let counter = LoadCounter()
     let manager = try ModelManager()

@@ -36,7 +36,7 @@ public struct MemorySignalPreprocessor: SignalPreprocessor {
     public func classify(_ input: AgentInput, state: MemoryContextState) throws -> SignalDisposition {
         guard !input.metadata.expired else { throw CommunicationError.expired }
         switch input.payload {
-        case .actionResult, .toolResult, .roundResult: return .feedback
+        case .actionResult, .toolResult, .executionFeedback: return .feedback
         case .text: return .enqueue(priority: 0)
         case .observation: return .enqueue(priority: 0)
         default: throw CommunicationError.invalidPayload

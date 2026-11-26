@@ -1,7 +1,36 @@
+import FluidAudio
 import Foundation
 import ModelKit
 
-/// The provisioned frontends are US English and Mandarin. `auto` splits mixed scripts in order.
+public enum KokoroVoiceCatalog {
+    public static let modelID = "kokoro-82m"
+    public static let defaultEnglish = "af_heart"
+    public static let defaultMandarin = "zf_001"
+    public static let voicesByLanguage: [String: [String]] = [
+        "en": [defaultEnglish]
+            + KokoroAneVariant.english.knownVoices.filter {
+                ($0.hasPrefix("a") || $0.hasPrefix("b")) && $0 != defaultEnglish
+            },
+        "zh": [defaultMandarin] + KokoroAneVariant.mandarin.knownVoices.filter { $0 != defaultMandarin },
+    ]
+
+    public static func contains(_ voice: String) -> Bool {
+        voicesByLanguage.values.contains { $0.contains(voice) }
+    }
+
+    static func language(of voice: String) -> KokoroInput.Language? {
+        if voicesByLanguage["en"]?.contains(voice) == true { return .english }
+        if voicesByLanguage["zh"]?.contains(voice) == true { return .mandarin }
+        return nil
+    }
+
+    static func voice(for language: KokoroInput.Language, preferred: String?) -> String {
+        if let preferred, Self.language(of: preferred) == language { return preferred }
+        return language == .english ? defaultEnglish : defaultMandarin
+    }
+}
+
+/// The provisioned frontends are English and Mandarin. `auto` splits mixed scripts in order.
 enum KokoroInput {
     enum Language: Sendable, Equatable { case english, mandarin }
     struct Segment: Sendable, Equatable {
@@ -9,10 +38,10 @@ enum KokoroInput {
         let language: Language
     }
 
-    static func segments(text: String, locale: String) throws -> [Segment] {
+    static func segments(text: String, locale: String, preferredLanguage: Language? = nil) throws -> [Segment] {
         let locale = locale.lowercased().replacingOccurrences(of: "_", with: "-")
-        guard ["auto", "en", "en-us", "zh", "zh-cn", "zh-hans", "zh-tw", "zh-hant"].contains(locale) else {
-            throw CapabilityError.invalidRequest("Kokoro currently supports Mandarin and US English only")
+        guard ["auto", "en", "en-us", "en-gb", "zh", "zh-cn", "zh-hans", "zh-tw", "zh-hant"].contains(locale) else {
+            throw CapabilityError.invalidRequest("Kokoro currently supports Mandarin and English only")
         }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf8.count <= 2048 else {
             throw CapabilityError.invalidRequest("Kokoro text must contain 1...2048 UTF-8 bytes")
@@ -21,7 +50,12 @@ enum KokoroInput {
         if locale.hasPrefix("en"), hasHanzi {
             throw CapabilityError.invalidRequest("English locale cannot synthesize Hanzi; use auto or zh-CN")
         }
-        let neutral: Language = locale.hasPrefix("zh") || hasHanzi ? .mandarin : .english
+        let neutral: Language
+        if locale.hasPrefix("zh") || hasHanzi {
+            neutral = .mandarin
+        } else {
+            neutral = locale == "auto" ? preferredLanguage ?? .english : .english
+        }
         var language = neutral
         var pending = ""
         var result: [Segment] = []

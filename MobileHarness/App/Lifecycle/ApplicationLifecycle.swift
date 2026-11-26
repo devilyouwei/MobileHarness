@@ -271,7 +271,7 @@ public final class ForegroundPreparation {
         }
     }
     public private(set) var state: State = .inactive
-    private var steps: (@MainActor () -> [Step])?
+    private var steps: (@MainActor () async throws -> [Step])?
     private var onValidationFailure: (@MainActor (String, ValidationError) -> Void)?
     private var canPrepare: (@MainActor () -> Bool)?
     private var project: (@MainActor (State) -> Void)?
@@ -279,9 +279,10 @@ public final class ForegroundPreparation {
     private var active = false
     private var closed = false
     private var pending = false
+    private var configurationChanging = false
     private var revision: UInt64 = 0
     public init(
-        steps: @escaping @MainActor () -> [Step], canPrepare: @escaping @MainActor () -> Bool,
+        steps: @escaping @MainActor () async throws -> [Step], canPrepare: @escaping @MainActor () -> Bool,
         project: @escaping @MainActor (State) -> Void,
         onValidationFailure: @escaping @MainActor (String, ValidationError) -> Void = { _, _ in }
     ) {
@@ -313,8 +314,16 @@ public final class ForegroundPreparation {
         publish(.checking)
         startIfIdle()
     }
+    public func beginConfigurationChange() {
+        configurationChanging = true
+        refresh()
+    }
+    public func endConfigurationChange() {
+        configurationChanging = false
+        startIfIdle()
+    }
     private func startIfIdle() {
-        guard active, !closed, pending, worker == nil else { return }
+        guard active, !closed, !configurationChanging, pending, worker == nil else { return }
         pending = false
         let selected = revision
         worker = Task { [weak self] in
@@ -325,26 +334,37 @@ public final class ForegroundPreparation {
     private func run(_ selected: UInt64) async {
         var component = "configuration"
         do {
-            let selectedSteps = steps?() ?? []
+            let selectedSteps = try await steps?() ?? []
+            var firstFailure: (String, any Error)?
             for step in selectedSteps {
                 component = step.id
                 try check(selected)
-                let ready = try await step.isReady()
-                try check(selected)
-                if ready { continue }
-                guard canPrepare?() == true else {
-                    publish(.deferred)
-                    return
+                do {
+                    let ready = try await step.isReady()
+                    try check(selected)
+                    if ready { continue }
+                    guard canPrepare?() == true else {
+                        publish(.deferred)
+                        return
+                    }
+                    let componentID = step.id
+                    try await step.prepare { [weak self] loading in
+                        guard let self, self.active, !self.closed, selected == self.revision else { return }
+                        self.publish(loading ? .preparing(componentID) : .checking)
+                    }
+                    try check(selected)
+                    publish(.checking)
+                    guard try await step.isReady() else { throw ValidationError.notReady }
+                    try check(selected)
+                } catch {
+                    try check(selected)
+                    publish(.checking)
+                    if firstFailure == nil { firstFailure = (step.id, error) }
                 }
-                let componentID = step.id
-                try await step.prepare { [weak self] loading in
-                    guard let self, self.active, !self.closed, selected == self.revision else { return }
-                    self.publish(loading ? .preparing(componentID) : .checking)
-                }
-                try check(selected)
-                publish(.checking)
-                guard try await step.isReady() else { throw ValidationError.notReady }
-                try check(selected)
+            }
+            if let (id, error) = firstFailure {
+                component = id
+                throw error
             }
             for step in selectedSteps {
                 component = step.id

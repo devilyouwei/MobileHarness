@@ -1,5 +1,16 @@
 import Foundation
 
+public struct ExecutionStart: Sendable {
+    public let executionID: String
+    public let owner: ExecutionOwner
+    public let envelope: ExecutionEnvelope
+    public init(executionID: String, owner: ExecutionOwner, envelope: ExecutionEnvelope) {
+        self.executionID = executionID
+        self.owner = owner
+        self.envelope = envelope
+    }
+}
+
 /// Action → Agent terminal fact (internal Signal feedback), redelivered by the result ledger without re-executing.
 public struct ExecutionResult: Sendable {
     public enum Status: String, Sendable { case succeeded, partialFailure, failed, cancelled }

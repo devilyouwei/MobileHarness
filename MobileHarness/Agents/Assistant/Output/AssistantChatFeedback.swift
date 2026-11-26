@@ -68,11 +68,13 @@ extension AssistantChatWorker {
             throw error
         }
     }
-    func acceptPendingFeedback(_ input: AgentInput) async throws -> Bool {
+    func acceptPendingFeedback(_ input: AgentInput, persisted: Bool = false, toolOutcomeRecorded: Bool = false)
+        async throws -> Bool
+    {
         let key: String?
         switch input.payload {
-        case .roundResult(let value): key = value.roundID
-        case .actionResult(let value): key = value.roundID
+        case .executionFeedback(.roundFinished(let value)): key = value.id
+        case .executionFeedback(.actionFinished(let value)): key = value.roundID
         case .toolResult(let value):
             key =
                 value.roundID ?? pendingRounds.first(where: { $0.value.calls.contains { $0.id == value.callID } })?.key
@@ -85,26 +87,33 @@ extension AssistantChatWorker {
         else {
             throw CommunicationError.unauthorized
         }
-        try await persistFeedback(input)
+        if !persisted { try await persistFeedback(input) }
         guard var current = pendingRounds[key] else { return true }
         switch input.payload {
-        case .roundResult(let value):
-            guard current.receipt == nil else { throw CommunicationError.unauthorized }
+        case .executionFeedback(.roundFinished(let value)):
+            guard current.receipt == nil else { return true }
+            if current.cancelled {
+                try await settleCancelledCalls(&current, roundID: key)
+                guard pendingRounds[key] != nil else { return true }
+            }
             current.receipt = value
+            retireExecutionFeedback(key)
         case .toolResult(let value):
             guard let index = current.calls.firstIndex(where: { $0.tool && $0.id == value.callID && $0.result == nil })
             else { throw CommunicationError.unauthorized }
-            try await conversations.recordToolOutcome(
-                value.callID, for: current.input.id,
-                state: value.isCancellationOnly ? .cancelled : (value.hasFailure ? .failed : .completed),
-                output: value.value, error: value.failureCode)
+            if !toolOutcomeRecorded {
+                try await conversations.recordToolOutcome(
+                    value.callID, for: current.input.id,
+                    state: value.isCancellationOnly ? .cancelled : (value.hasFailure ? .failed : .completed),
+                    output: value.value, error: value.failureCode)
+            }
             guard let latest = pendingRounds[key] else { return true }
             current = latest
             guard current.calls[index].result == nil else { throw CommunicationError.unauthorized }
             try current.coordinator?.accept(value, roundID: key)
             current.calls[index].result = value
             current.calls[index].completedAt = Date()
-        case .actionResult(let value):
+        case .executionFeedback(.actionFinished(let value)):
             guard value.owner.agent == descriptor.id, value.owner.sessionID == input.sessionID,
                 let index = current.calls.firstIndex(where: { !$0.tool && $0.id == value.callID && $0.result == nil }),
                 current.calls[index].path == value.path.description
@@ -127,6 +136,58 @@ extension AssistantChatWorker {
         pendingRounds[key] = current
         try await publishPendingResults(key)
         if lifecycle == .running { drain() }
+        return true
+    }
+
+    func ownsExecutionRound(_ id: String, input: AgentInput) -> Bool {
+        guard let source = executionRoundSources[id] else { return false }
+        return input.metadata.origin == .runtime && input.metadata.source == "runtime"
+            && input.sessionID == source.sessionID && input.metadata.parentID == source.requestID
+            && input.metadata.rootID == source.rootID && input.turn == source.turn
+    }
+
+    func acceptExecutionLifecycle(_ feedback: ExecutionFeedback, input: AgentInput) async throws -> Bool {
+        guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
+            input.metadata.contract == ExecutionFeedback.contract
+        else { throw CommunicationError.unauthorized }
+        switch feedback {
+        case .roundStarted(let id), .actionStarted(let id, _):
+            guard ownsExecutionRound(id, input: input) else { return hasClosedExecutionRound(id) }
+            if case .actionStarted(_, let callID) = feedback {
+                if executionStartedCalls[id]?.contains(callID) == true { return true }
+                guard executionStartedCalls[id, default: []].count < 128 else {
+                    throw CommunicationError.capacityExceeded
+                }
+            }
+            try await persistFeedback(input)
+            if case .actionStarted(_, let callID) = feedback, executionRoundSources[id] != nil {
+                executionStartedCalls[id, default: []].insert(callID)
+            }
+        case .roundFinished(let end):
+            if hasClosedExecutionRound(end.id) { return true }
+            guard ownsExecutionRound(end.id, input: input) else { return false }
+            try await persistFeedback(input)
+            if try await acceptPendingFeedback(input, persisted: true) { return true }
+            if end.id == roundID, roundReceipt == nil { roundReceipt = end }
+            retireExecutionFeedback(end.id)
+        case .interruptionStarted(let id):
+            guard activeInterruption?.id == id, activeInterruption?.sessionID == input.sessionID else {
+                return true
+            }
+            try await persistFeedback(input)
+        case .interruptionFinished(let end):
+            guard activeInterruption?.id == end.id, activeInterruption?.sessionID == input.sessionID else {
+                return true
+            }
+            try await persistFeedback(input)
+            guard activeInterruption?.id == end.id else { return true }
+            if end.cleanupConfirmed {
+                activeInterruption?.cleanupConfirmed = true
+                try await finishExecutionInterruption()
+            }
+        case .actionFinished:
+            return false
+        }
         return true
     }
 

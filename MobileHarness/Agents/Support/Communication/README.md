@@ -9,7 +9,8 @@
 | 文件 | 职责 |
 | --- | --- |
 | [PerceptionMessage.swift](PerceptionMessage.swift) | 感知业务枚举，AgentMessage 工厂与类型化读取，按消息类型验证内容和字节上限 |
-| [SpeechActivityMessage.swift](SpeechActivityMessage.swift) | `perception.speech.activity.v1`：采集代、起声候选／确认、utterance 退休与感知角色停止事实（无 PCM／文本，≤ 1 KiB），变体与载荷一一校验 |
+| [SpeechActivityMessage.swift](SpeechActivityMessage.swift) | `perception.speech.activity.v1`：采集代、起声候选／确认、utterance 退休、续说窗口确认与感知角色停止事实（无 PCM／文本，≤ 1 KiB），变体与载荷一一校验 |
+| [SpeechPlaybackHistory.swift](SpeechPlaybackHistory.swift) | `agent.reply.activity.v1` 的同会话播放快照及有界历史。播放区间和续说观察使用同一进程的单调时钟偏移。 |
 | [PoseObservation.swift](PoseObservation.swift) | COCO-17 姿态、几何／置信度与观测新鲜度 |
 | [SoundSourceObservation.swift](SoundSourceObservation.swift) | 声源方向、质量、格式及有效状态 |
 | [AgentTasks.swift](AgentTasks.swift) | Task 内容／视图、用户回复、公开委派许可、固定任务准入和通信函数声明 |

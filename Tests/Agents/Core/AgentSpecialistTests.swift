@@ -206,10 +206,9 @@ extension LiveRuntimeTests {
                 return .completed
             })
         let scheduler = ChannelScheduler(
-            registry: try ActionRegistry(definitions: [binding]), resources: resources
-        ) {
-            await input.deliverActionResult($0)
-        }
+            registry: try ActionRegistry(definitions: [binding]), resources: resources,
+            deliverResult: { await input.deliverActionResult($0) },
+            deliverStart: { await input.deliverActionStart($0) })
         let gateway = await OutputGateway(
             manager: manager, requests: input, tools: ToolRegistry(), actions: scheduler, policy: policy, sink: { _ in }
         )
@@ -237,12 +236,47 @@ extension LiveRuntimeTests {
             #expect(await effects.failures.isEmpty)
             let snapshot = try await context.snapshot()
             #expect(snapshot.state.taskViews?.isEmpty != false)
-            #expect(snapshot.records.contains { $0.kind == "action.result.v1" })
+            let receipts = try snapshot.records.filter { $0.kind == ExecutionFeedback.contract }.compactMap {
+                let signal = try JSONDecoder().decode(SignalEvidence.self, from: $0.data)
+                return try signal.content.map { try JSONDecoder().decode(ExecutionFeedback.self, from: $0) }
+            }
+            var events: [String] = []
+            for receipt in receipts {
+                switch receipt {
+                case .roundStarted(let id): events.append("round-start:" + id)
+                case .actionStarted(let round, let call): events.append("action-start:" + round + "/" + call)
+                case .actionFinished(let result):
+                    events.append("action-end:" + (result.roundID ?? "") + "/" + (result.callID ?? ""))
+                case .roundFinished(let end): events.append("round-end:" + end.id)
+                default: break
+                }
+            }
+            let callStart = try #require(
+                receipts.compactMap { (receipt: ExecutionFeedback) -> (String, String)? in
+                    if case .actionStarted(let round, let call) = receipt { return (round, call) }
+                    return nil
+                }.first)
+            let (round, call) = callStart
+            #expect(
+                events.filter { $0.contains(round) } == [
+                    "round-start:" + round, "action-start:" + round + "/" + call,
+                    "action-end:" + round + "/" + call, "round-end:" + round,
+                ])
+            let nonActionRounds = receipts.compactMap {
+                if case .roundStarted(let id) = $0, id != round { return id }
+                return nil
+            }
+            #expect(nonActionRounds.count == 1)
+            for id in nonActionRounds {
+                #expect(events.filter { $0.contains(id) } == ["round-start:" + id, "round-end:" + id])
+            }
             var observations = try await input.observeSignals().makeAsyncIterator()
             let signals = try #require(await observations.next()).records
             #expect(!signals.contains { $0.task?.kind == .request })
             #expect(
-                signals.contains { $0.contract == "action.result.v1" && $0.branches.first?.target == .assistant })
+                signals.contains {
+                    $0.contract == ExecutionFeedback.contract && $0.branches.first?.target == .assistant
+                })
         } catch {
             await manager.stopAll()
             await gateway.shutdown()

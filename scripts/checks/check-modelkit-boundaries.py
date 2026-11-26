@@ -140,8 +140,8 @@ for product in package['products']:
 # Every implementation target has an explicit layer; providers must never import each other.
 expected_model_dependencies = {
     'ModelKit': set(), 'ModelKitRuntime': {'ModelKit'},
-    'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitHub', 'ModelKitNemotron', 'ModelKitSilero', 'ModelKitDeepFilterNet3',
-        'ModelKitMossNano', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy', 'ModelKitD3', 'ModelKitAppleLLM'},
+    'ModelKitDefaults': {'ModelKit', 'ModelKitRuntime', 'ModelKitHub', 'ModelKitNemotron', 'ModelKitSilero', 'ModelKitDeepFilterNet3', 'ModelKitZipformer', 'ModelKitSmartTurn',
+        'ModelKitMossNano', 'ModelKitKokoro', 'ModelKitGemma4', 'ModelKitYOLOPose', 'ModelKitOpenAI', 'ModelKitAppleSpeech', 'ModelKitEnergy', 'ModelKitD3', 'ModelKitAppleLLM'},
     'ModelKitHub': {'ModelKitRuntime'},
     'ModelKitCoreAI': set(), 'ModelKitCoreML': set(),
     'ModelKitD3': {'ModelKit', 'ModelKitCoreAI'},
@@ -149,6 +149,8 @@ expected_model_dependencies = {
     'ModelKitNemotron': {'ModelKit'}, 'ModelKitKokoro': {'ModelKit'}, 'ModelKitMossNano': {'ModelKit'},
     'ModelKitGemma4': {'ModelKit'}, 'ModelKitOpenAI': {'ModelKit'}, 'ModelKitAppleLLM': {'ModelKit'},
     'ModelKitDeepFilterNet3': {'ModelKit', 'ModelKitCoreML'},
+    'ModelKitZipformer': {'ModelKit', 'ModelKitCoreML'},
+    'ModelKitSmartTurn': {'ModelKit', 'ModelKitCoreML'},
     'ModelKitSilero': {'ModelKit', 'ModelKitCoreML'}, 'ModelKitYOLOPose': {'ModelKit', 'ModelKitCoreML'},
 }
 if set(model_targets) != set(expected_model_dependencies):
@@ -1143,7 +1145,7 @@ for name, filename in (
     if not re.search(rf'\b(?:struct|actor|class|enum)\s+{name}\b', content):
         errors.append(f'Missing speech helper declaration: {name}')
     imports = re.findall(r'^import (\w+)', content, re.MULTILINE)
-    if set(imports) - {'Foundation', 'ModelKit', 'StorageCore'}:
+    if set(imports) - {'Foundation', 'ModelKit', 'StorageCore', 'OSLog'}:
         errors.append(f'{name} must not import transport, UI or device modules')
 if (speech_root / 'LiveSpeechInput.swift').exists():
     errors.append('Obsolete LiveSpeechInput must not duplicate SpeechRecognitionTurn')

@@ -344,13 +344,16 @@ func binaryContextContainsOnlyCurrentReplyAndLatestInput(language: String) throw
             input: .init(id: "context", sessionID: "s", payload: .text("previous request and Web.Page.browse result")),
             text: "不是这个", currentAssistantReply: "北京是")
         let request = try snapshot.request()
-        let context = try JSONDecoder().decode([String: String].self, from: Data(request.text.utf8))
-        #expect(context == ["current_assistant_reply": "北京是", "incoming_user_input": "不是这个"])
         let pending = try InputDecisionSnapshot(input: snapshot.input, text: "等一下").request()
-        let pendingContext = try JSONDecoder().decode([String: String].self, from: Data(pending.text.utf8))
-        #expect(pendingContext == ["current_assistant_reply": "", "incoming_user_input": "等一下"])
-        #expect(request.instructions.contains("current_assistant_reply"))
-        #expect(request.instructions.contains(language == "en" ? "immediately" : "立即"))
+        if language == "zh-Hans" {
+            #expect(request.text + request.instructions == "当前你正在说“北京是”，此时用户对你说“不是这个”，请问：用户说这句话是否包含打断你的意图？")
+            #expect(pending.text == "当前你正在说“”，此时用户对你说“等一下”，")
+        } else {
+            #expect(request.text == "You are saying “北京是” when the user says to you “不是这个”.")
+            #expect(request.instructions == "Does the user intend to interrupt you by saying this?")
+            #expect(pending.text == "You are saying “” when the user says to you “等一下”.")
+        }
+        #expect(pending.instructions == request.instructions)
     }
 }
 
@@ -392,7 +395,7 @@ func idleMessageDispatchesWithoutDecisionAndCannotInterruptItself() async throws
     let context = try AgentContextRepository(
         agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
     let agent = try FixtureNativeAgent(inputDecision: decision, fullDuplex: true, chat: main, context: context)
-    await agent.bindInputInterruption { _ in await probe.record() }
+    await agent.bindFixtureInputInterruption { _ in await probe.record() }
     try await agent.start()
     try await agent.receive(.init(id: "idle", sessionID: "s", payload: .text("Hello")))
     for _ in 0..<100 {
@@ -437,7 +440,7 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
     _ = try await bindSpeechRequests(agent)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     let probe = InterruptProbe()
-    await agent.bindInputInterruption { _ in await probe.record() }
+    await agent.bindFixtureInputInterruption { _ in await probe.record() }
     try await agent.start()
     try await agent.receive(.init(id: "a", sessionID: "s", payload: .text("Explain A")))
     for _ in 0..<1000 {
@@ -466,8 +469,8 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
     #expect(logs.statuses["b"] == "target_expired")
     let request = try #require(await deferred.requests.last)
     let content = try #require(request.messages.first?.content)
-    #expect(content.contains(#""current_assistant_reply":"""#))
-    #expect(content.contains(#""incoming_user_input":"Stop A and explain B""#))
+    #expect(content.contains("You are saying “” when the user says to you “Stop A and explain B”."))
+    #expect(content.contains("Does the user intend to interrupt you by saying this?"))
     #expect(!content.contains("Explain A"))
     await agent.stop()
     pump.cancel()
@@ -486,7 +489,6 @@ private actor DeferredBooleanChat: ChatCapability {
     }
     var availability: CapabilityAvailability { .available }
     var requests: [ChatRequest] = []
-    var requestInstants: [ContinuousClock.Instant] = []
     private var released = false
     private var waiter: CheckedContinuation<Void, Never>?
     func release() {
@@ -496,7 +498,6 @@ private actor DeferredBooleanChat: ChatCapability {
     }
     func chat(_ request: ChatRequest) async throws -> InferenceSession<ChatEvent> {
         requests.append(request)
-        requestInstants.append(.now)
         let subsequent = requests.count > 1
         let value = replyValue ?? subsequent
         if (blocksFirst ? requests.count == 1 : subsequent) && !released {
@@ -537,7 +538,7 @@ func twoInterruptSignalsForOneReplyCancelOnlyOnceAndKeepBothInputs() async throw
     _ = try await bindSpeechRequests(agent)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     let probe = InterruptProbe()
-    await agent.bindInputInterruption { session in
+    await agent.bindFixtureInputInterruption { session in
         await probe.record()
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
@@ -608,7 +609,7 @@ func interruptedReplyIsRecordedAsInterruptedAndTheInterruptingInputKeepsItsDecis
         inputDecision: service, fullDuplex: true, chat: main, conversations: store, context: context)
     _ = try await bindSpeechRequests(agent)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
-    await agent.bindInputInterruption { session in
+    await agent.bindFixtureInputInterruption { session in
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
     try await agent.start()
@@ -645,7 +646,7 @@ func replyFinishedGeneratingButStillPlayingIsRecordedAsInterrupted() async throw
     let speech = try await bindSpeechRequests(agent)
     await speech.setPlaying(true)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
-    await agent.bindInputInterruption { session in
+    await agent.bindFixtureInputInterruption { session in
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
     try await agent.start()
@@ -682,7 +683,7 @@ func unifiedInterruptLocksTargetAndPreservesQueuedInput() async throws {
     _ = try await bindSpeechRequests(agent)
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     let probe = InterruptProbe()
-    await agent.bindInputInterruption { session in
+    await agent.bindFixtureInputInterruption { session in
         await probe.record()
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
@@ -726,6 +727,12 @@ private func speechSignal(_ activity: SpeechActivity, session: String = "s") -> 
         metadata: InputMetadata(
             payload: payload, source: AgentID.speechPerception.rawValue, incarnation: "i", origin: .agent, rootID: id,
             topic: SpeechActivity.channel))
+}
+
+private func finishVADWindow(_ agent: FixtureNativeAgent, generation: String = "capture") async throws {
+    let probe = try #require(await agent.speechContinuationProbe)
+    try await agent.receive(
+        speechSignal(SpeechActivity(.continuationReady, generation: generation, continuation: probe)))
 }
 
 private final class QuietListeningProbe: ListeningModeControlling, Sendable {
@@ -792,7 +799,7 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     let generation = UUID().uuidString
     try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: generation)))
-    await agent.bindInputInterruption { session in
+    await agent.bindFixtureInputInterruption { session in
         if scenario == "duringCleanup" {
             try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "new-turn")))
         }
@@ -821,9 +828,11 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     }
     #expect(try await agent.requestInterrupt(AssistantInterrupt(), sessionID: "s") == .interrupted)
     #expect(await main.requests.count == 1)
-    let releaseStarted = ContinuousClock.now
     if scenario == "captureClosed" {
         try await agent.receive(speechSignal(SpeechActivity(.captureStopped, generation: generation)))
+        try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "recovered")))
+        try await finishVADWindow(agent, generation: generation)
+        #expect(await agent.interruptionWait != nil)
     }
     if scenario == "empty" {
         try await agent.receive(speechSignal(SpeechActivity(.utteranceEnded, utterance: "new-turn")))
@@ -831,12 +840,14 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     if scenario == "twoTurns" {
         try await agent.receive(finalInput(id: "early", turn: "new-turn", text: "first addition"))
     }
-    if ["noSpeech", "candidate", "candidateClears"].contains(scenario) {
-        if scenario != "noSpeech" { try await agent.receive(speechSignal(SpeechActivity(.onsetStarted))) }
-        // The probe window has not elapsed, and a pending candidate keeps the wait open after it does.
+    if ["candidate", "candidateClears"].contains(scenario) {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetStarted)))
+    }
+    #expect(await main.requests.count == 1)
+    try await finishVADWindow(agent, generation: scenario == "captureClosed" ? "recovered" : generation)
+    if ["candidate", "candidateClears"].contains(scenario) {
+        #expect(await agent.interruptionWait != nil)
         #expect(await main.requests.count == 1)
-        try await Task.sleep(for: .milliseconds(1500))
-        if scenario != "noSpeech" { #expect(await main.requests.count == 1) }
         if scenario == "candidate" {
             try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "new-turn")))
             try await agent.receive(finalInput(id: "final", turn: "new-turn", text: "continue speaking"))
@@ -860,8 +871,6 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
         try await Task.sleep(for: .milliseconds(2))
     }
     #expect(await main.requests.count == 2)
-    let dispatched = try #require(await main.requestInstants.dropFirst().first)
-    #expect(releaseStarted.duration(to: dispatched) < .seconds(4))
     let text = await main.requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
     #expect(text.contains("stop"))
     if ["candidate", "final", "duringCleanup", "twoTurns"].contains(scenario) {
@@ -871,6 +880,183 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     await agent.stop()
     pump.cancel()
     _ = await pump.result
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["shortSpeech", "longSpeech", "slowCleanup"])
+func decisionInterruptKeepsFullProbeForFollowUpSpeech(scenario: String) async throws {
+    let main = DeferredBooleanChat(blocksFirst: true)
+    let cloud = DecisionCloudFixture(events: [.text("true"), .finished(.stop)])
+    let decision = decisionFixture(cloud: cloud)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        inputDecision: decision, fullDuplex: true, speechSessionID: "s", chat: main, context: context)
+    _ = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    defer { pump.cancel() }
+    let cleanup = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    await agent.bindFixtureInputInterruption { session in
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "next")))
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+        if scenario == "slowCleanup" {
+            try await finishVADWindow(agent)
+            #expect(await main.requests.count == 1)
+        }
+        cleanup.continuation.yield(())
+    }
+    try await agent.start()
+    try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
+    try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("tell a story")))
+    for _ in 0..<400 where await main.requests.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+    try #require(await main.requests.count == 1)
+
+    func final(id: String, turn: String, text: String) -> AgentInput {
+        let payload = InputPayload.observation(.transcript(text, final: true))
+        return AgentInput(
+            id: id, sessionID: "s", payload: payload,
+            metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: id),
+            turn: .init(id: turn, ordinal: 1))
+    }
+    try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "command")))
+    try await agent.receive(final(id: "command-final", turn: "command", text: "please stop"))
+    var observed = cleanup.stream.makeAsyncIterator()
+    _ = try #require(await observed.next())
+
+    if scenario == "longSpeech" {
+        try await finishVADWindow(agent)
+        #expect(await main.requests.count == 1)
+        #expect(await agent.interruptionWait != nil)
+    }
+    try await agent.receive(final(id: "next-final", turn: "next", text: "tell me something else"))
+    if scenario == "shortSpeech" {
+        #expect(await agent.interruptionWait != nil)
+        try await finishVADWindow(agent)
+    }
+    for _ in 0..<600 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+    #expect(await main.requests.count == 2)
+    let prompt = await main.requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
+    #expect(prompt.contains("please stop"))
+    #expect(prompt.contains("tell me something else"))
+    await agent.stop()
+    await decision.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
+func modelInterruptObservesVADWhilePlaybackActionCleansUp(keyword: Bool) async throws {
+    let main = DeferredBooleanChat()
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, speechSessionID: "s", chat: main, listening: FullKeywordListening(), context: context)
+    let nativeStopRequested = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let nativeStopped = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let speech = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    defer {
+        nativeStopped.continuation.finish()
+        pump.cancel()
+    }
+    await agent.bindFixtureInputInterruption { session in
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "follow-up")))
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+        nativeStopRequested.continuation.yield(())
+        var iterator = nativeStopped.stream.makeAsyncIterator()
+        _ = await iterator.next()
+    }
+    try await agent.start()
+    try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
+    try await agent.receive(.init(id: "old-reply", sessionID: "s", payload: .text("Tell a story")))
+    for _ in 0..<400 {
+        if await main.requests.count == 1, await agent.worker == nil { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    try #require(await main.requests.count == 1)
+    try #require(await agent.worker == nil)
+    await speech.setPlaying(true)
+    let target = try #require(await agent.currentReplyID(sessionID: "s"))
+    if keyword {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "keyword")))
+    }
+    let signal = AssistantInterrupt(target: .reply(target), speechTurn: keyword ? "keyword" : nil)
+    let interruption = Task {
+        try await agent.requestInterrupt(signal, sessionID: "s", source: keyword ? "speechPerception" : "decision")
+    }
+    defer { interruption.cancel() }
+    var stopRequests = nativeStopRequested.stream.makeAsyncIterator()
+    _ = try #require(await stopRequests.next())
+    if keyword { try await agent.receive(speechSignal(SpeechActivity(.utteranceEnded, utterance: "keyword"))) }
+    let payload = InputPayload.observation(.transcript("tell me something else", final: true))
+    try await agent.receive(
+        .init(
+            id: "follow-up-final", sessionID: "s", payload: payload,
+            metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: "follow-up-final"),
+            turn: .init(id: "follow-up", ordinal: 1)))
+    try await finishVADWindow(agent)
+    #expect(await main.requests.count == 1)
+
+    await speech.setPlaying(false)
+    nativeStopped.continuation.yield(())
+    #expect(try await interruption.value == .interrupted)
+    for _ in 0..<600 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+    let followUp = await main.requests.last?.messages
+    #expect(followUp?.contains(where: { $0.content.contains("tell me something else") }) == true)
+    await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["decision", "speechPerception"], [false, true])
+func modelInterruptKeepsOnsetCandidateReceivedBeforeSignal(source: String, confirms: Bool) async throws {
+    let main = DeferredBooleanChat(blocksFirst: true)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, speechSessionID: "s", chat: main, listening: FullKeywordListening(), context: context)
+    _ = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    defer { pump.cancel() }
+    await agent.bindFixtureInputInterruption { session in
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+    }
+    try await agent.start()
+    try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
+    try await agent.receive(.init(id: "original", sessionID: "s", payload: .text("Tell a story")))
+    for _ in 0..<400 where await main.requests.isEmpty { try await Task.sleep(for: .milliseconds(5)) }
+    let target = try #require(await agent.currentReplyID(sessionID: "s"))
+
+    func final(id: String, turn: String, text: String) -> AgentInput {
+        let payload = InputPayload.observation(.transcript(text, final: true))
+        return AgentInput(
+            id: id, sessionID: "s", payload: payload,
+            metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: id),
+            turn: .init(id: turn, ordinal: 1))
+    }
+    try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "command")))
+    if source == "decision" {
+        try await agent.receive(final(id: "command-final", turn: "command", text: "stop"))
+    }
+    try await agent.receive(speechSignal(SpeechActivity(.onsetStarted)))
+    let signal = AssistantInterrupt(target: .reply(target), speechTurn: source == "speechPerception" ? "command" : nil)
+    #expect(try await agent.requestInterrupt(signal, sessionID: "s", source: source) == .interrupted)
+    if source == "speechPerception" {
+        try await agent.receive(final(id: "command-final", turn: "command", text: "stop"))
+    }
+
+    // Only the candidate is outstanding when the window elapses. No second onsetStarted will arrive.
+    try await finishVADWindow(agent)
+    #expect(await main.requests.count == 1)
+    #expect(await agent.interruptionWait != nil)
+    if confirms {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "follow-up")))
+        #expect(await agent.interruptionWait != nil)
+        #expect(await main.requests.count == 1)
+        try await agent.receive(final(id: "follow-up-final", turn: "follow-up", text: "continue speaking"))
+    } else {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetCleared)))
+    }
+    for _ in 0..<400 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+    #expect(await main.requests.count == 2)
+    let prompt = await main.requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
+    #expect(prompt.contains("continue speaking") == confirms)
+    await agent.stop()
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
@@ -883,7 +1069,7 @@ func interruptedSpeechCleanupCannotRearmRetiredWait(stop: Bool) async throws {
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     let entered = AsyncStream<Void>.makeStream()
     let release = AsyncStream<Void>.makeStream()
-    await agent.bindInputInterruption { session in
+    await agent.bindFixtureInputInterruption { session in
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
         entered.continuation.yield(())
         var iterator = release.stream.makeAsyncIterator()
@@ -1059,6 +1245,39 @@ private actor LatestDecisionProbe {
     }
 }
 
+@Test(.timeLimit(.minutes(1)), arguments: ["Stop!", "停下。", "don't stop", "请解释停下"])
+func standaloneSpokenStopCanBackUpANegativeDecision(_ transcript: String) async throws {
+    let classifier = DecisionCloudFixture(events: [.text("false"), .finished(.stop)])
+    let service = AssistantInputDecision(local: UnavailableDecision(), configuration: { (false, { classifier }) })
+    let queue = AssistantDecisionQueue()
+    let probe = LatestDecisionProbe()
+    let completion = AsyncStream.makeStream(of: InputDecisionOutcome.self)
+    let input = AgentInput(
+        id: "voice-stop", sessionID: "voice", payload: .observation(.transcript(transcript, final: true)))
+    let target = UUID()
+    try await queue.submit(
+        .init(
+            snapshot: .init(input: input, text: transcript), target: target, allowsStandaloneSpokenStop: true,
+            interrupt: { signal, session in
+                #expect(signal.target == .reply(target))
+                #expect(session == "voice")
+                return await probe.interrupt()
+            },
+            complete: { _, outcome, _ in
+                completion.continuation.yield(outcome)
+                completion.continuation.finish()
+            }, updated: {}), using: service)
+    var iterator = completion.stream.makeAsyncIterator()
+    let outcome = try #require(await iterator.next())
+    let shouldStop = transcript == "Stop!" || transcript == "停下。"
+    #expect(outcome.modelResult == false)
+    #expect(outcome.signalStatus == (shouldStop ? "interrupted" : "not_requested"))
+    #expect(await classifier.requests.count == 1)
+    #expect(await probe.signals == (shouldStop ? 1 : 0))
+    await queue.cancelAndWait()
+    await service.stop()
+}
+
 @Test(.timeLimit(.minutes(1)))
 func latestDecisionCancelsOldRequestWaitsForCleanupAndSkipsIntermediateInput() async throws {
     let native = SlowCleanupDecision()
@@ -1214,4 +1433,98 @@ func unifiedInterruptGatewayRequiresDeclaredSenderPermission() async throws {
     }
     #expect(await model.requests.isEmpty)
     await manager.stopAll()
+}
+
+private struct FullKeywordListening: ListeningModeControlling {
+    var mode: ListeningMode { .full }
+    func apply(_ mode: ListeningMode, source: AgentStateSource, wakeCondition: String?) async throws {}
+    func receiveQuiet(_ text: String, _ input: AgentInput) {}
+}
+
+@Test(
+    .actionCatalog, .timeLimit(.minutes(1)),
+    arguments: ["unconfirmed", "command", "continuation", "sameTurnContinuation", "duringCleanup"])
+func keywordInterruptUsesConfirmedTurnAndPreservesFinalSpeech(scenario: String) async throws {
+    let confirm = scenario != "unconfirmed"
+    let main = DeferredBooleanChat(blocksFirst: true)
+    let cloud = DecisionCloudFixture(events: [.text("false"), .finished(.stop)])
+    let decision = decisionFixture(cloud: cloud)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        inputDecision: decision, fullDuplex: true, speechSessionID: "s", chat: main,
+        listening: FullKeywordListening(), context: context)
+    _ = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    let probe = InterruptProbe()
+    let text = scenario == "sameTurnContinuation" ? "please stop, tell me something else" : "please stop"
+    let payload = InputPayload.observation(.transcript(text, final: true))
+    let command = AgentInput(
+        id: "final", sessionID: "s", payload: payload,
+        metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: "final"),
+        turn: .init(id: "utterance", ordinal: 1))
+    await agent.bindFixtureInputInterruption { session in
+        await probe.record()
+        if scenario == "duringCleanup" { try await agent.receive(command) }
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+    }
+    try await agent.start()
+    try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
+    try await agent.receive(.init(id: "reply", sessionID: "s", payload: .text("Tell a story")))
+    for _ in 0..<200 where await main.requests.isEmpty {
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    let target = try #require(await agent.currentReplyID(sessionID: "s"))
+    if confirm {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "utterance")))
+    }
+    let signal = AssistantInterrupt(target: .reply(target), speechTurn: "utterance")
+    #expect(
+        try await agent.requestInterrupt(signal, sessionID: "s", source: "speechPerception")
+            == (confirm ? .interrupted : .targetExpired))
+
+    if confirm { #expect(await agent.interruptionWait != nil) }
+    if scenario == "sameTurnContinuation" {
+        try await finishVADWindow(agent)
+        #expect(await agent.interruptionWait != nil)
+        #expect(await main.requests.count == 1)
+    }
+    if scenario != "duringCleanup" { try await agent.receive(command) }
+    if scenario == "continuation" {
+        try await agent.receive(speechSignal(SpeechActivity(.onsetStarted)))
+        try await finishVADWindow(agent)
+        #expect(await main.requests.count == 1)
+        try await agent.receive(speechSignal(SpeechActivity(.onsetConfirmed, utterance: "next")))
+        #expect(await agent.interruptionWait != nil)
+        let continuation = InputPayload.observation(.transcript("tell me something else", final: true))
+        try await agent.receive(
+            .init(
+                id: "next-final", sessionID: "s", payload: continuation,
+                metadata: .init(
+                    payload: continuation, source: "speechPerception", origin: .agent, rootID: "next-final"),
+                turn: .init(id: "next", ordinal: 2)))
+    }
+    if confirm && !["continuation", "sameTurnContinuation"].contains(scenario) {
+        try await finishVADWindow(agent)
+    }
+    for _ in 0..<500 {
+        let received = confirm ? await main.requests.count > 1 : await !cloud.requests.isEmpty
+        if received { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(await probe.count == (confirm ? 1 : 0))
+    #expect(await cloud.requests.count == (confirm ? 0 : 1))
+    if confirm {
+        #expect(await main.requests.count == 2)
+        #expect(await main.requests.last?.messages.contains(where: { $0.content.contains("please stop") }) == true)
+        if scenario == "continuation" || scenario == "sameTurnContinuation" {
+            #expect(
+                await main.requests.last?.messages.contains(where: { $0.content.contains("tell me something else") })
+                    == true)
+        }
+    }
+    await agent.stop()
+    await decision.stop()
+    pump.cancel()
+    _ = await pump.result
 }

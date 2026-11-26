@@ -29,6 +29,10 @@ public final class ActionExecutionCoordinator: ActionExecutionEngine {
             guard let binding = value.withLock({ $0 }) else { return .closed }
             return await binding.deliver(result)
         }
+        func deliverStart(_ started: ExecutionStart) async -> ActionResultDelivery {
+            guard let binding = value.withLock({ $0 }) else { return .closed }
+            return await binding.deliverStart(started)
+        }
     }
     public let admission: ActionsAdmission
     public let scheduler: ChannelScheduler
@@ -50,7 +54,8 @@ public final class ActionExecutionCoordinator: ActionExecutionEngine {
         scheduler = ChannelScheduler(
             executor: executor, resources: resources, resultDeliveryTimeout: resultDeliveryTimeout,
             admission: admission, validateScope: { try await binding.validate($0, $1) },
-            deliverResult: { await binding.deliver($0) }, onExecutionSnapshot: onExecutionSnapshot)
+            deliverResult: { await binding.deliver($0) }, onExecutionSnapshot: onExecutionSnapshot,
+            deliverStart: { await binding.deliverStart($0) })
         direct = DirectExecutionDispatcher(
             executor: executor, resources: resources, admission: admission,
             validateScope: { try await binding.validate($0, $1) })
@@ -94,7 +99,7 @@ public final class ActionExecutionCoordinator: ActionExecutionEngine {
         await scheduler.cancel(inputID: inputID, source: source)
     }
     public func cancel(sessionID: String) async { await scheduler.cancel(sessionID: sessionID) }
-    public func cancel(endpoint: String, incarnation: String, sessionID: String?) async {
+    @discardableResult public func cancel(endpoint: String, incarnation: String, sessionID: String?) async -> Bool {
         await scheduler.cancel(endpoint: endpoint, incarnation: incarnation, sessionID: sessionID)
     }
     public func execute(_ input: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {

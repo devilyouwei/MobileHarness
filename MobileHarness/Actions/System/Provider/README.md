@@ -79,3 +79,5 @@ Writer配置的writerThinking是独立选择，默认false；可选持久覆盖�
 首次 Welcome 使用同一 SettingsOperating 保存完整 Provider 配置，沿 ApplicationControl/Gateway 请求与现有 ProviderSettingsService/ProviderSettingsStore 事务写入。仅新增 Provider 且尚未选择角色模型时保持既有本地配置；密钥仍经 credentialID 引用保存到钥匙串。Welcome 不引入新的凭据仓库、发现端点或模型默认策略。
 
 本地角色资格从 ModelKit 候选投影得出。Assistant 要求 Chat，Writer 要求支持工具的 Chat，Decision 接受原生 Decision 或可适配的 Chat。候选展示与更改选择时的保存校验使用同一投影。缺少下载或系统能力不可用会阻止变更保存。已选资源随后缺失时保留选择，使用时显式失败。保存本地模式清除对应云端引用。Decision 的旧模式和缺省 ID 继续从既有兼容路径恢复。
+
+Provider 保存比较 Assistant、Writer、Decision 各自的实际配置。变化的角色及本地新旧模型 ID 交给宿主维护入口。首页读取当前角色配置并取得 ModelKit 模型或客户端句柄，无需提交推理请求。

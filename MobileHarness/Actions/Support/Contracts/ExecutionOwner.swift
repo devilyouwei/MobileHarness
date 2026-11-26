@@ -12,7 +12,7 @@ public struct ExecutionOwner: Codable, Hashable, Sendable {
     }
 }
 public enum ActionFeedback: Sendable { case none, failuresOnly, terminal }
-public enum ActionResultDelivery: Sendable { case accepted, retry, closed }
+public enum ActionResultDelivery: Sendable, Equatable { case accepted, retry, closed }
 public enum ActionHostError: Error, Sendable {
     case outOfOrder, unavailable, scopeClosed, unauthorized, unsupportedContract, staleIncarnation, invalidPayload
 }

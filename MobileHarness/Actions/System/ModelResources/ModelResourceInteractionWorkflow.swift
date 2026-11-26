@@ -118,9 +118,13 @@ import UI
             if !state.saving, !preferenceFailed {
                 let saved = try await restoreConfirmedSource()
                 state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
+                state.present(.sourceUseKeywordInterrupt(saved.useKeywordInterrupt))
+                state.present(.sourceSpeechModels(saved.speechModels))
+                state.present(.sourceSynthesisVoice(saved.synthesisVoice))
                 state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
                 state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
                 state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
+                state.present(.keywordThreshold(saved.keywordThreshold))
             }
 
         } catch {
@@ -181,11 +185,57 @@ import UI
         }
         if let saved = confirmedSource {
             state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
+            state.present(.sourceUseKeywordInterrupt(saved.useKeywordInterrupt))
+            state.present(.sourceSpeechModels(saved.speechModels))
+            state.present(.sourceSynthesisVoice(saved.synthesisVoice))
             state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
             state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
             state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
         }
     }
+    public func selectSpeechModel(_ modelID: String, for capability: SpeechCapability) async {
+        await saveSpeechSelection { draft in
+            var models = draft.speechModels ?? [:]
+            guard models[capability.rawValue] != modelID else { return false }
+            models[capability.rawValue] = modelID
+            draft.speechModels = models
+            return true
+        }
+    }
+
+    public func selectSynthesisVoice(_ voice: String) async {
+        guard let selected = state.source.speechModels?[SpeechCapability.synthesis.rawValue],
+            state.speechOptions(for: .synthesis).first(where: { $0.id == selected })?
+                .voicesByLanguage?.values.contains(where: { $0.contains(voice) }) == true
+        else { return }
+        await saveSpeechSelection { draft in
+            guard draft.speechModels?[SpeechCapability.synthesis.rawValue] == selected,
+                draft.synthesisVoice != voice
+            else { return false }
+            draft.synthesisVoice = voice
+            return true
+        }
+    }
+
+    private func saveSpeechSelection(_ edit: (inout ModelResourceSourceDraft) -> Bool) async {
+        guard !stopped, state.hasRestored, !state.saving else { return }
+        state.present(.saving(true))
+        defer { finishSaving() }
+        do {
+            var draft = try await restoreConfirmedSource()
+            guard edit(&draft) else { return }
+            try await operations.saveSource(draft)
+            let saved = try await restoreConfirmedSource()
+            state.present(.sourceSpeechModels(saved.speechModels))
+            state.present(.sourceSynthesisVoice(saved.synthesisVoice))
+            state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
+            state.present(.sourceUseKeywordInterrupt(saved.useKeywordInterrupt))
+            state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
+            state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
+            state.present(.error(nil))
+        } catch { await handleSaveFailure(error) }
+    }
+
     public func setSpeechEnhancement(enabled: Bool) async {
         guard !stopped, state.hasRestored, !state.saving else { return }
         state.present(.saving(true))
@@ -193,9 +243,29 @@ import UI
         do {
             var draft = try await restoreConfirmedSource()
             draft.useSpeechEnhancement = enabled
+            draft.speechModels?.removeValue(forKey: SpeechCapability.enhancement.rawValue)
             try await operations.saveSource(draft)
             let saved = try await restoreConfirmedSource()
             state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
+            state.present(.sourceUseKeywordInterrupt(saved.useKeywordInterrupt))
+            state.present(.sourceSpeechModels(saved.speechModels))
+            state.present(.sourceSynthesisVoice(saved.synthesisVoice))
+            state.present(.error(nil))
+        } catch { await handleSaveFailure(error) }
+    }
+    public func setKeywordInterrupt(enabled: Bool) async {
+        guard !stopped, state.hasRestored, !state.saving else { return }
+        state.present(.saving(true))
+        defer { finishSaving() }
+        do {
+            var draft = try await restoreConfirmedSource()
+            draft.useKeywordInterrupt = enabled
+            draft.speechModels?.removeValue(forKey: SpeechCapability.keywordSpotting.rawValue)
+            try await operations.saveSource(draft)
+            let saved = try await restoreConfirmedSource()
+            state.present(.sourceUseKeywordInterrupt(saved.useKeywordInterrupt))
+            state.present(.sourceSpeechModels(saved.speechModels))
+            state.present(.sourceSynthesisVoice(saved.synthesisVoice))
             state.present(.error(nil))
         } catch { await handleSaveFailure(error) }
     }
@@ -213,6 +283,18 @@ import UI
             state.present(.error(nil))
         } catch { await handleSaveFailure(error) }
     }
+    public func setKeywordThreshold(_ threshold: Double) async {
+        guard !stopped, state.hasRestored, !state.saving, state.source.keywordThreshold != threshold else { return }
+        state.present(.saving(true))
+        defer { finishSaving() }
+        do {
+            var draft = try await restoreConfirmedSource()
+            draft.keywordThreshold = threshold
+            try await operations.saveSource(draft)
+            state.present(.keywordThreshold(try await restoreConfirmedSource().keywordThreshold))
+            state.present(.error(nil))
+        } catch { await handleSaveFailure(error) }
+    }
     public func setCustomModel(_ group: ModelResourceGroup, enabled: Bool) async {
         guard !stopped, !state.saving, group == .recognition || group == .synthesis else {
             return
@@ -224,14 +306,19 @@ import UI
             var draft = try await restoreConfirmedSource()
             if group == .recognition {
                 draft.useCustomRecognition = enabled
+                draft.speechModels?.removeValue(forKey: SpeechCapability.recognition.rawValue)
                 state.present(.sourceUseCustomRecognition(enabled))
             } else {
                 draft.useCustomSynthesis = enabled
+                draft.speechModels?.removeValue(forKey: SpeechCapability.synthesis.rawValue)
                 state.present(.sourceUseCustomSynthesis(enabled))
             }
             try await operations.saveSource(draft)
             let saved = try await restoreConfirmedSource()
             state.present(.sourceUseSpeechEnhancement(saved.useSpeechEnhancement))
+            state.present(.sourceUseKeywordInterrupt(saved.useKeywordInterrupt))
+            state.present(.sourceSpeechModels(saved.speechModels))
+            state.present(.sourceSynthesisVoice(saved.synthesisVoice))
             state.present(.sourceUseCustomRecognition(saved.useCustomRecognition))
             state.present(.sourceUseCustomSynthesis(saved.useCustomSynthesis))
             state.present(.speechDetection(windows: saved.vadOnsetWindows, threshold: saved.vadThreshold))
