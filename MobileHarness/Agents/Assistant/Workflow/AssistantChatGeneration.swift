@@ -434,6 +434,7 @@ extension AssistantChatWorker {
                 historyTaskID: decisionContext.state.skillState?.activeTaskID)
             // A runtime-origin input that continues a prior input is a ReACT round, not a user turn.
             if input.metadata.origin == .runtime, input.metadata.parentID != nil { historyRequest.isObservation = true }
+            if decisionTurn?.inputID == input.id { decisionTurn?.beginSpeechRequest() }
             try await conversations.beginModelRequest(historyRequest, for: input.id, awaitingDispatch: true)
             try beginReplyTurn(input)
             var generationError: (any Error)?

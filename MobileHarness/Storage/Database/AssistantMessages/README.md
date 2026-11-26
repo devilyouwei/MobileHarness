@@ -20,4 +20,6 @@ AssistantRecord.coordination 是实际请求携带的可选来源证据，包含
 
 AssistantInputCoordination 的可选 members 保存实际发起批次的成员 ID、来源、采集时间、分类及路径，沿用现有 coordination JSON。请求正文保存发送时的自然文本时间线，来源行只显示秒级本地时间。旧请求的原始证据保留，回放投影由 Agent 拥有。
 
-模型身份在标记实际发出的同一写入中保存，首轮及 ReACT 各自携带自己的模型身份和可用的执行信息。生成证据随完整日志清理，业务文本原样保留。
+模型身份在标记实际发出的同一写入中保存，首轮及 ReACT 各自携带自己的模型身份和可用的执行信息。模型传输证据随完整日志清理，业务正文保留。
+
+语音打断截断按已发请求 ID 写入。`assistant_response_json` 在正文旁保存 `replyTruncation`（轮次、Action 与该 Action 的已播单元数）及 `generatedResponse`（截断前原文），沿用现有 JSON 列。重复写入同一结果可重试，冲突结果拒绝。历史恢复保留正文与标记，工具配对和 Action journal 保留原有记录。

@@ -96,7 +96,7 @@ extension AssistantChatWorker {
                 try await AgentChatDriver.collect(
                     request, using: chat,
                     consumers: .init(
-                        text: { try await self.consumeActionText($0, input: input) },
+                        text: { try await self.consumeActionText($0, input: input, requestID: invocationID) },
                         native: { _ = try await self.consumeNativeTools($0, input: input) },
                         evidence: { event in
                             try await self.dispatchRequest(input, requestID: invocationID)
@@ -153,7 +153,9 @@ extension AssistantChatWorker {
         return answer
     }
 
-    func consumeActionText(_ fragments: AsyncThrowingStream<String, any Error>, input: AgentInput)
+    func consumeActionText(
+        _ fragments: AsyncThrowingStream<String, any Error>, input: AgentInput, requestID: String
+    )
         async throws -> String
     {
         let catalog = requestCatalog ?? modelCapabilities
@@ -166,10 +168,11 @@ extension AssistantChatWorker {
             try Task.checkCancellation()
             try await recordGenerationEvidence { try await conversations.append(delta, to: input.id) }
             text += delta
-            try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls)
+            try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls, requestID: requestID)
         }
         try Task.checkCancellation()
-        try await emitFunctions(generator.finish(), for: input, count: &emittedCalls)
+        try await emitFunctions(generator.finish(), for: input, count: &emittedCalls, requestID: requestID)
+        if decisionTurn?.inputID == input.id { decisionTurn?.finishSpeechRequest(requestID) }
         return text
     }
 
@@ -315,7 +318,9 @@ extension AssistantChatWorker {
             + (try AgentPrompts.text("Shared/ExecutionFeedback", "notExecuted")) + correction + loading
     }
 
-    func emitFunctions(_ calls: [GenerationEvent], for input: AgentInput, count: inout Int) async throws {
+    func emitFunctions(
+        _ calls: [GenerationEvent], for input: AgentInput, count: inout Int, requestID: String? = nil
+    ) async throws {
         for event in calls {
             if case .rejected(let rejection) = event {
                 try Task.checkCancellation()
@@ -381,7 +386,7 @@ extension AssistantChatWorker {
             if call.actionPath == ActionPath(domain: "Speech", module: "Playback", function: "speak"),
                 let text = call.parameters["text"]
             {
-                try await emitPlayback(text, for: input, modelGenerated: modelGenerated)
+                try await emitPlayback(text, for: input, modelGenerated: modelGenerated, requestID: requestID)
                 continue
             }
             if call.actionPath == Self.caption.path, listening?.isListening == false { continue }
@@ -390,14 +395,28 @@ extension AssistantChatWorker {
         }
     }
 
-    func emitPlayback(_ text: String, for input: AgentInput, modelGenerated: Bool = false) async throws {
+    func emitPlayback(
+        _ text: String, for input: AgentInput, modelGenerated: Bool = false, requestID: String? = nil
+    ) async throws {
         guard listening?.isListening != false else { return }
         guard let speechOutput else { throw CapabilityError.unavailable("Speech output not configured") }
-        let audioID = try await speechOutput.prepare(text: text, input: input)
+        let progress: AssistantSpeechProgress?
+        if requestID != nil, roundID != nil, decisionTurn?.inputID == input.id {
+            try AssistantSpeechOutput.validate(text: text)
+            progress = try AssistantSpeechProgress(text)
+        } else {
+            progress = nil
+        }
+        let audioID = try await speechOutput.prepare(text: text, input: input, tracking: progress)
         do {
             try Task.checkCancellation()
             let call = try Self.playback.call(["audioID": audioID])
             guard try emitAction(call, for: input, modelGenerated: modelGenerated) else { throw HarnessError.queueFull }
+            if let progress, let requestID, let roundID, let emitted = roundCalls.last,
+                decisionTurn?.inputID == input.id
+            {
+                decisionTurn?.recordSpeech(progress, requestID: requestID, roundID: roundID, callID: emitted.id)
+            }
             captureDecisionText(text, input: input)
         } catch {
             do { try await speechOutput.cancel(audioID: audioID, input: input) } catch let cleanup {

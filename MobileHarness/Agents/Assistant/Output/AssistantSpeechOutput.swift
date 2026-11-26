@@ -2,7 +2,27 @@ import AgentCore
 import Foundation
 import ModelKit
 import StorageCache
+import Synchronization
 import UI
+
+/// One decoded speak Action. Only its last PCM packet per unit can confirm that unit.
+public final class AssistantSpeechProgress: Sendable {
+    let units: [String]
+    private let completions: Mutex<[ContinuousClock.Instant?]>
+
+    init(_ text: String) throws {
+        units = try TextSegmentationPolicy.sentences.segments(in: text)
+        completions = Mutex(Array(repeating: nil, count: units.count))
+    }
+
+    func played(_ unit: Int, at instant: ContinuousClock.Instant) {
+        completions.withLock { if $0[unit] == nil { $0[unit] = instant } }
+    }
+
+    func completedUnits(at cutoff: ContinuousClock.Instant) -> Int {
+        completions.withLock { $0.prefix { $0.map { $0 <= cutoff } ?? false }.count }
+    }
+}
 
 /// Assistant-owned FIFO producer; playback and other Actions run independently.
 actor AssistantSpeechOutput: AssistantSpeechProducing {
@@ -22,6 +42,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         let text: String
         let input: AgentInput
         let binding: Binding
+        let progress: AssistantSpeechProgress?
     }
     private struct InputScope: Hashable {
         let session: String
@@ -104,6 +125,9 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         await island.submit(content)
     }
     func prepare(text: String, input: AgentInput) async throws -> String {
+        try await prepare(text: text, input: input, tracking: nil)
+    }
+    func prepare(text: String, input: AgentInput, tracking: AssistantSpeechProgress?) async throws -> String {
         try Task.checkCancellation()
         try Self.validate(text: text)
         guard !closed, let binding else { throw HarnessError.notRunning }
@@ -111,7 +135,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         guard handles.count + admissions.keys.filter({ handles[$0] == nil }).count < 32 else {
             throw HarnessError.queueFull
         }
-        let job = Job(id: UUID().uuidString, text: text, input: input, binding: binding)
+        let job = Job(id: UUID().uuidString, text: text, input: input, binding: binding, progress: tracking)
         let task = Task { try await admit(job) }
         admissions[job.id] = (InputScope(input), task)
         defer { admissions[job.id] = nil }
@@ -205,43 +229,7 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         do {
             try Task.checkCancellation()
             let audio = try await job.binding.store.begin(job.id)
-            let request = try SpeechSynthesisRequest(
-                text: job.text, locale: "auto", context: .init(requestID: job.id, scopeID: job.input.sessionID))
-            let session = try await job.binding.synthesis.synthesize(request)
-            try await session.withCleanup {
-                guard session.context == request.context else { throw SpeechSynthesisError.invalidOutput }
-                var finished = false
-                var bytes = 0
-                var format: ModelKit.AudioFormat?
-                var sequence: UInt64?
-                try await withTaskCancellationHandler {
-                    for try await event in session.events {
-                        try Task.checkCancellation()
-                        guard !finished else { throw SpeechSynthesisError.invalidOutput }
-                        switch event {
-                        case .audio(let frame):
-                            guard frame.format.channels == 1, frame.format.encoding == .float32,
-                                format == nil || format == frame.format,
-                                sequence.map({ frame.sequence > $0 }) ?? true,
-                                frame.data.count <= 8_388_608 - bytes
-                            else { throw SpeechSynthesisError.invalidOutput }
-                            format = frame.format
-                            sequence = frame.sequence
-                            bytes += frame.data.count
-                            try await audio.append(
-                                StorageCache.AudioFrame(
-                                    data: frame.data,
-                                    format: .init(sampleRate: frame.format.sampleRate, channels: 1, encoding: .float32),
-                                    sequence: frame.sequence, timestamp: frame.timestamp))
-                        case .finished: finished = true
-                        }
-                    }
-                } onCancel: {
-                    session.cancel()
-                }
-                try Task.checkCancellation()
-                guard finished, bytes > 0 else { throw SpeechSynthesisError.invalidOutput }
-            }
+            try await synthesize(job, into: audio)
             try Task.checkCancellation()
             await job.binding.store.complete(job.id)
         } catch {
@@ -255,6 +243,75 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         worker = nil
         processed += 1
         drain()
+    }
+
+    private struct PCMProgress: Sendable {
+        var bytes = 0
+        var format: StorageCache.AudioFormat?
+        var sequence: UInt64 = 0
+    }
+
+    private func synthesize(_ job: Job, into audio: AudioStream) async throws {
+        var streamProgress = PCMProgress()
+        let units = job.progress?.units ?? [job.text]
+        let joinedStream = units.count > 1
+        for (index, unit) in units.enumerated() {
+            try Task.checkCancellation()
+            let request = try SpeechSynthesisRequest(
+                text: unit, locale: "auto",
+                context: .init(requestID: index == 0 ? job.id : "\(job.id).\(index)", scopeID: job.input.sessionID))
+            let session = try await job.binding.synthesis.synthesize(request)
+            let initial = streamProgress
+            streamProgress = try await session.withCleanup {
+                guard session.context == request.context else { throw SpeechSynthesisError.invalidOutput }
+                var stream = initial
+                var finished = false
+                var received: UInt64?
+                var tail: StorageCache.AudioFrame?
+                try await withTaskCancellationHandler {
+                    for try await event in session.events {
+                        try Task.checkCancellation()
+                        guard !finished else { throw SpeechSynthesisError.invalidOutput }
+                        switch event {
+                        case .audio(let frame):
+                            guard frame.format.channels == 1, frame.format.encoding == .float32,
+                                received.map({ frame.sequence > $0 }) ?? true,
+                                frame.data.count <= 8_388_608 - stream.bytes
+                            else { throw SpeechSynthesisError.invalidOutput }
+                            let pcmFormat = try StorageCache.AudioFormat(
+                                sampleRate: frame.format.sampleRate, channels: 1, encoding: .float32)
+                            guard stream.format == nil || stream.format == pcmFormat else {
+                                throw SpeechSynthesisError.invalidOutput
+                            }
+                            if let tail { try await audio.append(tail) }
+                            let pcm = try StorageCache.AudioFrame(
+                                data: frame.data, format: pcmFormat,
+                                sequence: joinedStream ? stream.sequence : frame.sequence,
+                                timestamp: joinedStream
+                                    ? Double(stream.bytes / 4) / Double(pcmFormat.sampleRate) : frame.timestamp)
+                            if job.progress == nil {
+                                try await audio.append(pcm)
+                            } else {
+                                tail = pcm
+                            }
+                            stream.format = pcmFormat
+                            received = frame.sequence
+                            stream.sequence += 1
+                            stream.bytes += frame.data.count
+                        case .finished: finished = true
+                        }
+                    }
+                    try Task.checkCancellation()
+                    guard finished, received != nil else { throw SpeechSynthesisError.invalidOutput }
+                    if let tail, let progress = job.progress {
+                        try await audio.append(tail) { progress.played(index, at: $0) }
+                    }
+                } onCancel: {
+                    session.cancel()
+                }
+                return stream
+            }
+        }
     }
     func endSession() async {
         if let ending { return await ending.value }
@@ -294,6 +351,7 @@ private enum AssistantSpeechFailureContext { @TaskLocal static var audioID: Stri
 public protocol AssistantSpeechProducing: Sendable {
     func isPlaying(sessionID: String) async -> Bool?
     func prepare(text: String, input: AgentInput) async throws -> String
+    func prepare(text: String, input: AgentInput, tracking: AssistantSpeechProgress?) async throws -> String
     func cancel(audioID: String, input: AgentInput) async throws
     func cancel(input: AgentInput) async
     func stop() async
@@ -301,4 +359,7 @@ public protocol AssistantSpeechProducing: Sendable {
 
 extension AssistantSpeechProducing {
     public func isPlaying(sessionID: String) async -> Bool? { nil }
+    public func prepare(text: String, input: AgentInput, tracking: AssistantSpeechProgress?) async throws -> String {
+        try await prepare(text: text, input: input)
+    }
 }

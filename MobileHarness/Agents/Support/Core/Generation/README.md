@@ -29,7 +29,7 @@ flowchart LR
 | --- | --- |
 | [FunctionToken.swift](FunctionToken.swift) | 解析事件（含 Agent 控制事件）、CallRejection、GenerationError 与调度边界值 |
 | [FunctionTokenParser.swift](FunctionTokenParser.swift) | 增量 UTF-8／XML 词法、实体与资源限制 |
-| [SentenceFunctionBuffer.swift](SentenceFunctionBuffer.swift) | 句子／安全词边界与首段／后续软长度分段 |
+| [SentenceFunctionBuffer.swift](SentenceFunctionBuffer.swift) | 增量文本的句子／安全词边界与首段／后续软长度分段，也为完整播报文本提供保留原文的分段 |
 | [AgentGenerator.swift](AgentGenerator.swift) | 文本映射、Action 目录解析及有序输出事件 |
 | [ToolCallParser.swift](ToolCallParser.swift) | 完整 native 调用的字符串参数 JSON 校验与解析 |
 | [GenerationTrace.swift](GenerationTrace.swift) | 有界原始片段、解析错误位置和非执行事件证据 |

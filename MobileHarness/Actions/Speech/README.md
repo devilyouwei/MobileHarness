@@ -52,6 +52,8 @@ Assistant 的语音子能力预留并生产 AudioCache 句柄；Speech.Playback.
 
 [`Playback/`](Playback/) 的 [PlaybackActions.swift](Playback/PlaybackActions.swift) 校验参数并返回实际回执。[SpeechPlayback.swift](Playback/SpeechPlayback.swift) 借出预留的音频句柄，允许 Assistant 并行继续生产 PCM。播放结束等待原生排空，取消加入流清理和租约释放。聆听策略由根语音会话拥有。
 
+原生播放保留 PCM 包随附的可选完成回执。单包回执和整个 Action 的排空终态分别交付，回执的业务解释由上游语音生产者拥有。
+
 <a id="speech-shared-contracts"></a>
 
 ## Speech 共享契约

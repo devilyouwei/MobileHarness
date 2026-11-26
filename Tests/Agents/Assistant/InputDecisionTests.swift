@@ -501,9 +501,11 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
 private actor DeferredBooleanChat: ChatCapability {
     let blocksFirst: Bool
     let replyValue: Bool?
-    init(blocksFirst: Bool = false, replyValue: Bool? = nil) {
+    let firstReply: String?
+    init(blocksFirst: Bool = false, replyValue: Bool? = nil, firstReply: String? = nil) {
         self.blocksFirst = blocksFirst
         self.replyValue = replyValue
+        self.firstReply = firstReply
     }
     var availability: CapabilityAvailability { .available }
     var requests: [ChatRequest] = []
@@ -527,7 +529,7 @@ private actor DeferredBooleanChat: ChatCapability {
         }
         try Task.checkCancellation()
         let pair = InferenceSession<ChatEvent>.make(limits: try StreamLimits(), estimatedBytes: { $0.estimatedBytes })
-        try pair.emitter.yield(.text(value ? "true" : "false"))
+        try pair.emitter.yield(.text((subsequent ? nil : firstReply) ?? (value ? "true" : "false")))
         try pair.emitter.yield(.finished(.stop))
         pair.emitter.finish()
         return pair.session
@@ -1148,6 +1150,69 @@ func modelInterruptObservesVADWhilePlaybackActionCleansUp(keyword: Bool) async t
     let followUp = await main.requests.last?.messages
     #expect(followUp?.contains(where: { $0.content.contains("tell me something else") }) == true)
     await agent.stop()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [0, 1, 3])
+func interruptedReplyUsesPlayedPrefixInSQLiteAndNextModelRequest(playedCount: Int) async throws {
+    let original = "First complete. Second in progress. Third unheard."
+    let main = DeferredBooleanChat(firstReply: original)
+    let database = try SQLiteRepositories.temporary()
+    let records = try AssistantRecordStore(
+        repository: database.assistantMessages, tasks: database.assistantTasks,
+        conversations: database.assistantConversations, logs: database.logs)
+    let store = AssistantHistoryStore(records: records)
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(fullDuplex: true, chat: main, conversations: store, context: context)
+    let speech = try await bindSpeechRequests(agent)
+    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    defer { pump.cancel() }
+    await agent.bindFixtureInputInterruption { session in
+        // This completion arrives after the admission snapshot and must not become part of history.
+        for progress in await speech.tracked { progress.played(0, at: .now) }
+        try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
+    }
+    try await agent.start()
+    try await agent.receive(.init(id: "first-reply", sessionID: "s", payload: .text("Tell a story")))
+    for _ in 0..<400 {
+        if try await store.readCurrent().current.turns.first?.state == .completed { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    let progress = await speech.tracked
+    try #require(progress.count == 3)
+    for item in progress.prefix(playedCount) { item.played(0, at: .now) }
+    await speech.setPlaying(true)
+    #expect(try await agent.requestInterrupt(.init(), sessionID: "s") == .interrupted)
+    await speech.setPlaying(false)
+
+    let recovered = try await AssistantHistoryStore(records: records).readCurrent()
+    let request = try #require(recovered.current.turns.first?.modelRequests?.last)
+    let expected = progress.prefix(playedCount).flatMap(\.units).joined()
+    #expect(request.response == expected)
+    #expect((request.replyTruncation != nil) == (playedCount < 3))
+    #expect(request.generatedResponse == (playedCount < 3 ? original : nil))
+
+    await main.release()
+    try await agent.receive(.init(id: "next-reply", sessionID: "s", payload: .text("Continue the story")))
+    for _ in 0..<400 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
+    let chatRequest = try #require(await main.requests.last)
+    let projected = try #require(chatRequest.messages.first { $0.role == .assistant }?.content)
+    #expect(projected == expected + (playedCount < 3 ? "\n{\"replyInterruptedDuringPlayback\":true}" : ""))
+    await agent.stop()
+}
+
+@Test func interruptionUsesPlayedTextWhileSpeechParsingIsStillOpen() throws {
+    var turn = FixtureNativeAgent.DecisionTurn(id: UUID(), inputID: "input", sessionID: "session")
+    let cutoff = ContinuousClock.now
+    #expect(turn.truncatedReply(at: cutoff) == nil)
+    let heard = try AssistantSpeechProgress("Already spoken.")
+    turn.recordSpeech(heard, requestID: "request", roundID: "round", callID: "speak")
+    heard.played(0, at: cutoff)
+    let reply = try #require(turn.truncatedReply(at: cutoff))
+    #expect(reply.response == "Already spoken.")
+    #expect(reply.marker.playedUnits == 1)
+    turn.finishSpeechRequest("request")
+    #expect(turn.truncatedReply(at: cutoff) == nil)
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["decision", "speechPerception"], [false, true])

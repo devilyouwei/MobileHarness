@@ -98,3 +98,16 @@
 - `./scripts/check.sh` 退出 0：边界、格式、工具回归和 plist 通过；普通 IntegrationTests 1211 项、LiveRuntimeTests 232 项通过。NativePresentationTests 中 `cameraNativeMetalDrawStopAndLayerHandoff` 报窗口可见性失败，之后 Web 原生测试没有完整 suite 结束记录，不能视为完整通过。日志 `/tmp/mobileharness-speech-window-check.log`。完整检查发生在新增上述 1 秒断言之前，该断言由随后定向测试验证。
 - `./scripts/build-ios.sh` 退出 0：五个 Simulator scheme 构建成功，资源检查通过。日志 `/tmp/mobileharness-speech-window-ios.log`。
 - 未执行真实模型或真机语音体验验收。窗口按 PlatformKit 提供的 `capturedAt` 判别，原生 VPIO 路径目前使用音频回调时刻而非直接使用硬件帧起点；采集回调延迟及跨清理边界的缓冲区可能影响窗口边界，替身的精确时间戳测试不能证明物理设备上的采集时间精度。
+
+## 打断后按播报进度截断回复
+
+日期 2026-11-26。基线 `46950bb6`。详见[截断需求](../requirements/technical/Full-Duplex-Playback-Admission.md#打断后截断最后一个已完成的回复-action-文本)。
+
+- 最终 Swift 专项 5 项通过，覆盖 PCM 回执、截止时刻、未播、部分播完、完整播完、迟到回执、生成尚未解析完、SQLite 重读和下一次模型请求正文与标记。语音合成、原生播放回执和聊天模型使用确定性替身。
+- `./scripts/check.sh` 在边界检查退出，报告 `Agents/AgentContainer.swift` 的 State Value codec 以及 15 个 Xcode 本地化资源归属问题。这些问题已在[语音单向通信验证](One-Way-Speech-Perception.md#构建与静态检查)中记录。另行运行的变更 Swift 文件严格格式、8 项 Python 工程工具回归、plist 与 diff 检查通过。
+- 单独运行普通 Swift 阶段，IntegrationTests 的 1,277 项中报告 4 条失败。两条是 Action 取消状态断言，另两条来自 `toolRoundTripPreservesSessionAndCallID` 的两种返回路径。失败类型与基线验证记录一致，此阶段的播报截断用例通过。
+- 串行阶段的 `LiveRuntimeTests` 通过 232 项。`NativePresentationTests` 两项相机测试通过，Metal 交接用例开始后没有该 suite 的结束记录，原生呈现全套验收仍待完成。
+- `./scripts/build-ios.sh` 的五个 Simulator scheme 均通过。补充处理生成尚未解析完的尾部后，重新构建 `MobileHarnessSimulator`，94 项 Agent／Skill 资源、Live Activity 和双语资源校验通过。
+- 真机语音打断、实际音频与文本边界、真实模型对标记的理解留待独立验收。
+
+2026-11-26，签名版 MobileHarness 0.1.0（2026112605）通过真机构建、严格签名及 App 资源检查，在 iPhone 17 Pro 上从 2026112604 原位更新。安装回执序列为 8152，独立应用清单确认已安装构建号 2026112605。

@@ -46,6 +46,10 @@ public enum AssistantHistoryProjection {
         for invocation: AssistantModelRequest, nativeHistory: Bool = true, templates: PromptTemplates
     ) throws -> [ChatMessage] {
         let input = invocation.input
+        let reply =
+            invocation.replyTruncation == nil
+            ? invocation.response
+            : invocation.response + "\n{\"replyInterruptedDuringPlayback\":true}"
         if !nativeHistory {
             let evidence = try invocation.toolCalls.map { call in
                 try templates.render(
@@ -55,7 +59,7 @@ public enum AssistantHistoryProjection {
                         "result": call.output ?? "", "error": call.error ?? "",
                     ])
             }.joined(separator: "\n")
-            let text = invocation.response + (evidence.isEmpty ? "" : "\n" + evidence)
+            let text = reply + (evidence.isEmpty ? "" : "\n" + evidence)
             return [.init(role: .user, content: input), .init(role: .assistant, content: text)]
         }
         let calls = invocation.toolCalls.map {
@@ -63,7 +67,7 @@ public enum AssistantHistoryProjection {
         }
         var messages = [
             ChatMessage(role: .user, content: input),
-            ChatMessage(role: .assistant, content: invocation.response, toolCalls: calls),
+            ChatMessage(role: .assistant, content: reply, toolCalls: calls),
         ]
         for call in invocation.toolCalls {
             let content: String

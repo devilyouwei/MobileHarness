@@ -764,6 +764,30 @@ public actor AssistantHistoryStore {
         try await checkpoint(inputID: id)
     }
 
+    public func recordReplyTruncation(
+        _ marker: AssistantReplyTruncation, response: String, inputID: String, requestID: String
+    ) async throws {
+        try await updateTurn(inputID) { turn in
+            guard var requests = turn.modelRequests,
+                let index = requests.firstIndex(where: { $0.id == requestID && $0.awaitingDispatch != true }),
+                requests[index].state != .generating
+            else { throw AssistantHistoryError.invalidRecord }
+            if let existing = requests[index].replyTruncation {
+                guard existing == marker, requests[index].response == response else {
+                    throw AssistantHistoryError.conflict
+                }
+                return false
+            }
+            requests[index].generatedResponse = requests[index].response
+            requests[index].response = response
+            requests[index].replyTruncation = marker
+            turn.modelRequests = requests
+            turn.response = requests.map(\.response).joined()
+            return true
+        }
+        try await checkpoint(inputID: inputID)
+    }
+
     public func finish(
         _ id: String, state: AssistantRecord.State, reason: String? = nil, error: String? = nil,
         failureDiagnostic: ModelFailureDiagnostic? = nil

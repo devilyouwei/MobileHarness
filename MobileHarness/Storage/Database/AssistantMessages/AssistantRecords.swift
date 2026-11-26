@@ -30,6 +30,19 @@ public struct AssistantDecisionMetadata: Codable, Sendable {
     }
 }
 
+/// Proven playback boundary for the last completed reply Action at interruption admission.
+public struct AssistantReplyTruncation: Codable, Equatable, Sendable {
+    public let roundID: String
+    public let callID: String
+    public let playedUnits: Int
+
+    public init(roundID: String, callID: String, playedUnits: Int) {
+        self.roundID = roundID
+        self.callID = callID
+        self.playedUnits = playedUnits
+    }
+}
+
 /// One model invocation, nested under the input that owns its execution lifecycle.
 public struct AssistantModelRequest: Codable, Sendable, Identifiable {
     /// Prepared in memory; cleared only when the provider actually starts.
@@ -56,6 +69,8 @@ public struct AssistantModelRequest: Codable, Sendable, Identifiable {
     public var firstTokenLatency: Double?
     public var firstTokenAt: Date?
     public var response: String = ""
+    public var replyTruncation: AssistantReplyTruncation?
+    public var generatedResponse: String?
     public var toolCalls: [ModelToolCall] = []
     public var tokenUsage: ModelTokenUsage?
     public var state: AssistantRecord.State = .generating

@@ -71,6 +71,11 @@ extension SQLiteAssistantMessageRepository {
         request.historyOrder = UInt64(row["position"] as Int64)
         request.state = AssistantRecord.State(rawValue: row["state"]) ?? .interrupted
         request.response = response["text"] as? String ?? ""
+        request.generatedResponse = response["generatedResponse"] as? String
+        if let marker = response["replyTruncation"] {
+            request.replyTruncation = try JSONDecoder().decode(
+                AssistantReplyTruncation.self, from: Data(SQLiteRecordCoding.json(marker).utf8))
+        }
         request.producerMetadata = response["producerMetadata"] as? [String: String]
         request.toolCalls = try JSONDecoder().decode(
             [ModelToolCall].self, from: Data((row["tool_calls_json"] as String).utf8))

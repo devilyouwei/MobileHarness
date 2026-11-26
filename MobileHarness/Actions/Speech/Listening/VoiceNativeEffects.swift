@@ -118,7 +118,8 @@
                         try Task.checkCancellation()
                         guard let self else { throw CancellationError() }
                         try validate()
-                        guard let frame = try await stream.next() else { return nil }
+                        guard let packet = try await stream.nextPlaybackFrame() else { return nil }
+                        let frame = packet.audio
                         try Task.checkCancellation()
                         try validate()
                         guard frame.format.encoding == .float32, frame.format.channels == 1 else {
@@ -127,7 +128,7 @@
                         let samples = frame.data.withUnsafeBytes { bytes in
                             (0..<frame.sampleCount).map { bytes.loadUnaligned(fromByteOffset: $0 * 4, as: Float.self) }
                         }
-                        return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate)
+                        return PlaybackPCM(samples: samples, sampleRate: frame.format.sampleRate, played: packet.played)
                     })
             } catch {
                 await finishMeter()

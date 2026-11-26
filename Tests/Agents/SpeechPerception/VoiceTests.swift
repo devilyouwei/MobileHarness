@@ -72,6 +72,31 @@ private func sampleFrame() throws -> ModelKit.AudioFrame {
         format: ModelKit.AudioFormat(sampleRate: 16_000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
 }
 
+@Test func speechUnitReceiptsRequireContiguousCompletionAtCutoff() async throws {
+    let text = "First complete. Second unfinished. Third queued."
+    let input = AgentInput(id: "reply", sessionID: "session", payload: .text("hello"))
+    let store = AudioCache()
+    let synthesis = AssistantSpeechOutput()
+    try await synthesis.configure(synthesis: SynthesisFixture(probe: VoiceProbe()), store: store)
+    let progress = try AssistantSpeechProgress(text)
+    let id = try await synthesis.prepare(text: text, input: input, tracking: progress)
+    let owner = AudioCache.Owner(source: "assistant", session: input.sessionID, input: input.id)
+    let stream = try await store.checkout(id, owner: owner)
+    let first = try #require(try await stream.nextPlaybackFrame())
+    let second = try #require(try await stream.nextPlaybackFrame())
+    let third = try #require(try await stream.nextPlaybackFrame())
+    #expect(try await stream.nextPlaybackFrame() == nil)
+    let cutoff = ContinuousClock.now
+    #expect(progress.completedUnits(at: cutoff) == 0)
+    first.played?(cutoff)
+    third.played?(cutoff)
+    second.played?(cutoff.advanced(by: .milliseconds(1)))
+    #expect(progress.completedUnits(at: cutoff) == 1)
+    #expect(progress.completedUnits(at: cutoff.advanced(by: .milliseconds(1))) == 3)
+    try await store.release(id, owner: owner)
+    await synthesis.stop()
+}
+
 private func preparedSpeech(
     text: String, input: AgentInput, probe: VoiceProbe, producesAudio: Bool = true
 ) async throws -> (AssistantSpeechOutput, AudioCache, SpeechPlayback, any FunctionInput) {

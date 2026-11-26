@@ -157,6 +157,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id: String
         let sessionID: String
         let replyInputID: String
+        let truncation: ReplyTruncation?
         var generationJoined = false
         var cleanupConfirmed = false
         var settling = false
@@ -205,6 +206,55 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let sessionID: String
         let startedAt = SpeechSignalClock.offset(at: .now)
         var assistant: String = ""
+        private var speech: [(requestID: String, roundID: String, callID: String, progress: AssistantSpeechProgress)] =
+            []
+        private var speechRequestParsed = false
+
+        init(id: UUID, inputID: String, sessionID: String) {
+            self.id = id
+            self.inputID = inputID
+            self.sessionID = sessionID
+        }
+
+        mutating func beginSpeechRequest() {
+            speech.removeAll()
+            speechRequestParsed = false
+        }
+
+        mutating func finishSpeechRequest(_ requestID: String) {
+            if speech.last?.requestID == requestID { speechRequestParsed = true }
+        }
+
+        mutating func recordSpeech(
+            _ progress: AssistantSpeechProgress, requestID: String, roundID: String, callID: String
+        ) {
+            speech.append((requestID, roundID, callID, progress))
+        }
+
+        func truncatedReply(at cutoff: ContinuousClock.Instant) -> ReplyTruncation? {
+            guard let latest = speech.last else { return nil }
+            var response = ""
+            for (index, item) in speech.enumerated() {
+                let units = item.progress.completedUnits(at: cutoff)
+                response += item.progress.units.prefix(units).joined()
+                if units < item.progress.units.count {
+                    return .init(
+                        requestID: latest.requestID, response: response,
+                        marker: .init(
+                            roundID: latest.roundID, callID: latest.callID,
+                            playedUnits: index == speech.count - 1 ? units : 0))
+                }
+            }
+            guard !speechRequestParsed else { return nil }
+            return .init(
+                requestID: latest.requestID, response: response,
+                marker: .init(roundID: latest.roundID, callID: latest.callID, playedUnits: latest.progress.units.count))
+        }
+    }
+    struct ReplyTruncation {
+        let requestID: String
+        let response: String
+        let marker: AssistantReplyTruncation
     }
     var decisionTurn: DecisionTurn?
     let decisionQueue = AssistantDecisionQueue()
@@ -425,7 +475,14 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         guard let current = activeInterruption, current.cleanupConfirmed, current.generationJoined, !current.settling
         else { return }
         activeInterruption?.settling = true
-        do { try await markInterruptedAfterCleanup(current.replyInputID) } catch {
+        do {
+            if let truncation = current.truncation {
+                try await conversations.recordReplyTruncation(
+                    truncation.marker, response: truncation.response,
+                    inputID: current.replyInputID, requestID: truncation.requestID)
+            }
+            try await markInterruptedAfterCleanup(current.replyInputID)
+        } catch {
             if activeInterruption?.id == current.id { activeInterruption?.settling = false }
             throw error
         }
@@ -484,7 +541,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         executionCancellationBarrier = true
         let victim = turn.inputID
         let id = signal.id.uuidString
-        activeInterruption = ActiveInterruption(id: id, sessionID: sessionID, replyInputID: victim)
+        let admittedAt = ContinuousClock.now
+        activeInterruption = ActiveInterruption(
+            id: id, sessionID: sessionID, replyInputID: victim, truncation: turn.truncatedReply(at: admittedAt))
         interruptionCleanupWatchdog?.cancel()
         interruptionCleanupWatchdog = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(10)) } catch { return }
@@ -498,7 +557,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         worker?.cancel()
         // Only an accepted interruption against an active reply opens the 64-window post-interruption buffer.
         if fullDuplex, sessionID == speechSessionID {
-            let cutoff = SpeechSignalClock.offset(at: .now)
+            let cutoff = SpeechSignalClock.offset(at: admittedAt)
             continuationObservation = .init(id: signal.id, since: cutoff)
             interruptionBatchStartedAt = cutoff
             interruptionOnsetCandidate = onsetCandidateActive

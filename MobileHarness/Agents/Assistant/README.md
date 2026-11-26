@@ -218,6 +218,8 @@ Worker, speech producer and output scopes outlive pages. Interrupt/pause joins c
 
 AssistantSpeechOutput registers native playback against a reply input before scheduling and tracks the active handle within its session. Cancellation and native completion retire this handle. PlatformKit owns playback intervals for capture policy.
 
+Assistant also collects native completion for individual speech units. An accepted interrupt freezes the current request's fully played text and settles it with a history marker after cleanup. See [output](Output/README.md) and [workflow](Workflow/README.md).
+
 ## Unified interruption control
 
 `AssistantInterrupt.swift` owns the typed `agent.interruption.v1` communication contract. Targets are `.current` (lock the same-session reply when received) or `.reply(UUID)` (match an already captured reply). `AssistantChatWorker.requestInterrupt` is the shared entry for Decision, trusted host controls and authorized Agent messages. Idle user input never invokes Decision; an external idle request returns `no_target`. A public `currentReplyID(sessionID:)` exposes the opaque target to trusted callers without granting communication authority.
