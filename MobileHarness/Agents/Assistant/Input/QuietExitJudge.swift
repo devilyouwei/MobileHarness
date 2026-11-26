@@ -24,26 +24,23 @@ public struct QuietExitJudge: Sendable {
         try Task.checkCancellation()
         let utterance = String(
             sentence.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maximumSentenceCharacters))
-        if let wakeCondition, wakeCondition.hasPrefix(Self.literalPrefix) {
-            let phrase = wakeCondition.dropFirst(Self.literalPrefix.count).trimmingCharacters(in: .whitespaces)
-            guard !phrase.isEmpty else { throw AgentStateError.invalidValue("listening") }
-            return .init(
-                decision: utterance.contains(phrase) ? .exit : .stay,
-                tier: "literal", modelID: "literal-match", latencyMS: 0)
+        let condition = wakeCondition.map { value in
+            guard value.hasPrefix(Self.literalPrefix) else { return value }
+            return "The user must say this exact phrase: " + value.dropFirst(Self.literalPrefix.count)
         }
         let outcome = await decision.classify(receivedAt: started) {
             let text: String
-            if let wakeCondition {
+            if let condition {
                 let encoder = JSONEncoder()
                 encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
                 text = String(
-                    decoding: try encoder.encode(["latestUtterance": utterance, "wakeCondition": wakeCondition]),
+                    decoding: try encoder.encode(["latestUtterance": utterance, "wakeCondition": condition]),
                     as: UTF8.self)
             } else {
                 text = utterance
             }
             let instructions = try AgentPrompts.text(
-                "Assistant/Input/QuietExit", wakeCondition == nil ? "instructions" : "conditioned")
+                "Assistant/Input/QuietExit", condition == nil ? "instructions" : "conditioned")
             return try NoulRequest(text: text, instructions: instructions, context: context)
         }
         try Task.checkCancellation()

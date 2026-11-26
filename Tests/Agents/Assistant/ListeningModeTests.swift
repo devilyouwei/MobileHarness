@@ -96,7 +96,7 @@ private func until(_ condition: @Sendable () async -> Bool) async throws {
     let selected = Mutex("first")
     let service = AssistantInputDecision(
         localModel: { $0 == "first" ? first : second },
-        selectedConfiguration: { (selected.withLock { $0 }, nil) })
+        selectedConfiguration: { (selected.withLock { $0 }, nil) }, timeout: .seconds(8), localTimeout: .seconds(8))
     let judge = QuietExitJudge(decision: service)
     let input = try quietInput()
 
@@ -120,7 +120,9 @@ private func until(_ condition: @Sendable () async -> Bool) async throws {
 
 @Test(.actionCatalog) func quietUsesTheSelectedCloudDecision() async throws {
     let cloud = ScriptedChat([.success("true")])
-    let service = AssistantInputDecision(local: UnavailableDecision(), selection: { false }, cloud: { cloud })
+    let service = AssistantInputDecision(
+        local: UnavailableDecision(), configuration: { (false, { cloud }) },
+        timeout: .seconds(8), localTimeout: .seconds(8))
     let judge = QuietExitJudge(decision: service)
     let result = try await judge.judge("Go ahead.", context: .init(requestID: "cloud.awake"))
     #expect(result.tier == "cloud" && result.decision == .exit)
@@ -144,44 +146,40 @@ func quietFailureOrTimeoutDoesNotTryAnotherModel(timesOut: Bool) async throws {
     await service.stop()
 }
 
-private final class ModeWrites: Sendable {
-    private let values = Mutex<[ListeningMode]>([])
-    var modes: [ListeningMode] { values.withLock { $0 } }
-    func record(_ mode: ListeningMode) { values.withLock { $0.append(mode) } }
+private final class ListeningWrites: Sendable {
+    private let values = Mutex<[Bool]>([])
+    var valuesWritten: [Bool] { values.withLock { $0 } }
+    func record(_ mode: Bool) { values.withLock { $0.append(mode) } }
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func quietEpisodeEndsOnExitReturnsToThePreviousModeAndRecordsEveryJudgment() async throws {
+func quietEpisodeEnablesListeningOnExitAndRecordsEveryJudgment() async throws {
     let repositories = try SQLiteRepositories.temporary()
     let decision = ScriptedDecision([.success(false), .success(true)])
     let coordinator = ListeningCoordinator(
         judge: QuietExitJudge(decision: localDecision(decision)), dialogs: repositories.listeningDialogs, sessionID: "s"
     )
-    let writes = ModeWrites()
-    let published = ModeWrites()
+    let writes = ListeningWrites()
     let released = Mutex<[String]>([])
     let cancels = Mutex(0)
     coordinator.bind(
         cancelReply: { cancels.withLock { $0 += 1 } },
-        writeMode: { [coordinator] mode in
-            writes.record(mode)
-            try await coordinator.apply(mode, source: .host)
+        enableListening: { [coordinator] in
+            writes.record(true)
+            try await coordinator.apply(true, source: .host)
         },
-        publishMode: { published.record($0) },
         release: { input in released.withLock { $0.append(input.id) } })
-    try await coordinator.apply(.full, source: .model)
-    try await coordinator.apply(.quiet, source: .host)
-    #expect(coordinator.mode == .quiet && cancels.withLock { $0 } == 1)
+    try await coordinator.apply(true, source: .model)
+    try await coordinator.apply(false, source: .host)
+    #expect(!coordinator.isListening && cancels.withLock { $0 } == 1)
     coordinator.receiveQuiet("我想一想", try quietInput())
     try await until { (try? await repositories.listeningDialogs.recentListeningDialogs(limit: 10).count) == 1 }
-    #expect(coordinator.mode == .quiet && writes.modes.isEmpty)
+    #expect(!coordinator.isListening && writes.valuesWritten.isEmpty)
     let inviting = try quietInput()
     coordinator.receiveQuiet("好了，你可以跟我说话了", inviting)
-    try await until { coordinator.mode == .full }
-    #expect(writes.modes == [.full])
-    // The sentence that ended quiet is admitted as ordinary speech, and every mode change was published.
+    try await until { coordinator.isListening }
+    #expect(writes.valuesWritten == [true])
     try await until { released.withLock { $0 } == [inviting.id] }
-    #expect(published.modes == [.full, .quiet, .full])
     let rows = try await repositories.listeningDialogs.recentListeningDialogs(limit: 10).reversed()
     #expect(rows.map(\.decision) == [.stay, .exit])
     #expect(Set(rows.map(\.episodeID)).count == 1)
@@ -206,7 +204,7 @@ func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async th
         agent: .assistant, scope: UUID().uuidString, state: AssistantContextState())
     let model = ScriptedChat([
         .success(
-            "Okay. <state.set name=\"listening\" value=\"quiet\" wakeCondition=\"\(condition)\"/> This should stay silent."
+            "Okay. <state.set name=\"listening\" value=\"false\" wakeCondition=\"\(condition)\"/> This should stay silent."
         ),
         .success("I can speak again."),
     ])
@@ -217,20 +215,20 @@ func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async th
     let interruptions = Mutex(0)
     coordinator.bind(
         cancelReply: { interruptions.withLock { $0 += 1 } },
-        writeMode: { [weak agent] mode in
-            try await agent?.setHostState("listening", to: mode.rawValue)
+        enableListening: { [weak agent] in
+            try await agent?.setHostState("listening", to: "true")
         },
-        release: { [weak agent] in try await agent?.receive($0) })
+        release: { [weak agent] in try await agent?.receiveAwakeningSpeech($0) })
     try await agent.start()
     let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
     defer { pump.cancel() }
 
     try await agent.receive(.init(id: "enter", sessionID: "s", payload: .text("Listen quietly.")))
     try await until { (try? await context.snapshot().work["enter"]?.state) == .completed }
-    try #require(coordinator.mode == .quiet)
+    try #require(!coordinator.isListening)
     #expect(try await context.snapshot().work["enter"]?.state == .completed)
     #expect(try await context.snapshot().state.history.current.turns.last?.modelRequests?.last?.state == .completed)
-    #expect(try await context.snapshot().state.variables.value("listening") == "quiet")
+    #expect(try await context.snapshot().state.variables.value("listening") == "false")
     #expect(interruptions.withLock { $0 } == 0)
     #expect(await speech.cancelledInputs.contains("enter"))
     #expect(await speech.requests.values.allSatisfy { !$0.contains("stay silent") })
@@ -244,30 +242,35 @@ func modelCanEnterQuietAndSettleBeforeTheNextSpeechInput(literal: Bool) async th
     }
     let beforeWake = await agent.stateVariables().first { $0.path == "agents.assistant.listening" }
     let beforeJSON = try #require(beforeWake?.value)
-    #expect(
-        try JSONDecoder().decode([String: String].self, from: Data(beforeJSON.utf8))
-            == ["mode": "quiet", "wakeCondition": condition])
+    let state = try #require(JSONSerialization.jsonObject(with: Data(beforeJSON.utf8)) as? [String: Any])
+    #expect(state["listening"] as? Bool == false)
+    #expect(state["wakeCondition"] as? String == condition)
     try await receive("你是谁？", id: "greeting")
     try await until { (try? await repositories.listeningDialogs.recentListeningDialogs(limit: 10).count) == 1 }
-    #expect(coordinator.mode == .quiet)
+    #expect(!coordinator.isListening)
     #expect(try await context.snapshot().work["greeting"] == nil)
     try await receive("秦始皇", id: "wake")
     try await until { (try? await context.snapshot().work["wake"]?.state) == .completed }
     #expect(try await context.snapshot().work["wake"]?.state == .completed)
     let rows = try await repositories.listeningDialogs.recentListeningDialogs(limit: 10)
     #expect(rows.map(\.decision) == [.exit, .stay])
-    #expect(rows.map(\.modelTier) == (literal ? ["literal", "literal"] : ["local", "local"]))
-    #expect(judge.requests.count == (literal ? 0 : 2))
+    #expect(rows.map(\.modelTier) == ["local", "local"])
+    #expect(judge.requests.count == 2)
     for (request, text) in zip(judge.requests, ["你是谁？", "秦始皇"]) {
         #expect(request.instructions.contains("satisfy the agreement"))
         let fields = try JSONDecoder().decode([String: String].self, from: Data(request.text.utf8))
-        #expect(fields == ["wakeCondition": condition, "latestUtterance": text])
+        #expect(
+            fields == [
+                "wakeCondition": literal ? "The user must say this exact phrase: 秦始皇" : condition,
+                "latestUtterance": text,
+            ])
     }
     let afterWake = await agent.stateVariables().first { $0.path == "agents.assistant.listening" }
     let afterJSON = try #require(afterWake?.value)
-    let fields = try JSONDecoder().decode([String: String?].self, from: Data(afterJSON.utf8))
-    #expect(fields == ["mode": "full", "wakeCondition": nil])
-    #expect(coordinator.mode == .full)
+    let awakenedState = try #require(JSONSerialization.jsonObject(with: Data(afterJSON.utf8)) as? [String: Any])
+    #expect(awakenedState["listening"] as? Bool == true)
+    #expect(awakenedState["wakeCondition"] is NSNull)
+    #expect(coordinator.isListening)
     #expect(await speech.requests.values.contains("I can speak again."))
     await agent.stop()
     try await pump.value
@@ -280,8 +283,8 @@ func aNewerUtteranceReplacesAnUnfinishedJudgment() async throws {
         judge: QuietExitJudge(
             decision: localDecision(ScriptedDecision([.success(false), .success(false)], delay: .milliseconds(300)))),
         dialogs: repositories.listeningDialogs, sessionID: "s")
-    coordinator.bind(cancelReply: {}, writeMode: { _ in })
-    try await coordinator.apply(.quiet, source: .model)
+    coordinator.bind(cancelReply: {}, enableListening: {})
+    try await coordinator.apply(false, source: .model)
     coordinator.receiveQuiet("第一句", try quietInput())
     try await Task.sleep(for: .milliseconds(50))
     coordinator.receiveQuiet("第二句", try quietInput())
@@ -298,62 +301,50 @@ func judgeFailuresStayInQuietAreRecordedAndSurfacedOnce() async throws {
     let coordinator = ListeningCoordinator(
         judge: QuietExitJudge(decision: localDecision(ScriptedDecision([]))), dialogs: repositories.listeningDialogs,
         sessionID: "s", report: { message in reports.withLock { $0.append(message) } })
-    coordinator.bind(cancelReply: {}, writeMode: { _ in })
-    try await coordinator.apply(.quiet, source: .host)
+    coordinator.bind(cancelReply: {}, enableListening: {})
+    try await coordinator.apply(false, source: .host)
     for index in 0..<ListeningCoordinator.maximumConsecutiveFailures + 1 {
         coordinator.receiveQuiet("句子\(index)", try quietInput())
         try await until {
             (try? await repositories.listeningDialogs.recentListeningDialogs(limit: 10).count) == index + 1
         }
     }
-    #expect(coordinator.mode == .quiet)
+    #expect(!coordinator.isListening)
     #expect(reports.withLock { $0.count } == 1)
     let rows = try await repositories.listeningDialogs.recentListeningDialogs(limit: 10)
     #expect(rows.allSatisfy { $0.decision == .error && $0.error != nil })
 }
 
-@Test(.actionCatalog) func unavailableFullDuplexReturnsToHalfExplicitly() async throws {
-    let reports = Mutex<[String]>([])
-    let coordinator = ListeningCoordinator(
-        judge: nil, dialogs: nil, sessionID: "s", report: { message in reports.withLock { $0.append(message) } })
-    let writes = ModeWrites()
-    coordinator.bind(
-        cancelReply: {},
-        writeMode: { [coordinator] mode in
-            writes.record(mode)
-            try await coordinator.apply(mode, source: .host)
-        })
-    // No capture has reported yet, so `full` is accepted and re-checked when one does.
-    try await coordinator.apply(.full, source: .model)
-    await coordinator.captureDuplex(false)
-    #expect(coordinator.mode == .half && writes.modes == [.half] && reports.withLock { $0.count } == 1)
-    await #expect(throws: AgentStateError.self) { try await coordinator.apply(.full, source: .model) }
-    #expect(coordinator.mode == .half)
-    // An explicit half is never overridden; a fallback is undone when a capture supports echo cancellation.
-    await coordinator.captureDuplex(true)
-    #expect(coordinator.mode == .full && writes.modes == [.half, .full] && reports.withLock { $0.count } == 1)
-    try await coordinator.apply(.half, source: .model)
-    await coordinator.captureDuplex(true)
-    #expect(coordinator.mode == .half)
+@Test(.actionCatalog, arguments: ["quiet", "full", "half"])
+func assistantDecodesLegacyListeningState(value: String) throws {
+    let data = try JSONEncoder().encode(AssistantContextState())
+    var archive = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    archive["variables"] = ["entries": ["listening": ["value": value, "writtenAt": 0, "sequence": 1]], "sequence": 1]
+    if value == "quiet" { archive["listeningWakeCondition"] = "literal:继续" }
+    let restored = try JSONDecoder().decode(
+        AssistantContextState.self, from: JSONSerialization.data(withJSONObject: archive))
+    try restored.validateContextState()
+    #expect(restored.variables.value("listening") == String(value != "quiet"))
+    #expect(restored.listeningWakeCondition == (value == "quiet" ? "literal:继续" : nil))
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
-func endingTheSessionCancelsTheJudgmentAndReturnsToTheDefaultMode() async throws {
+func cancellingWakeJudgmentPreservesQuietState() async throws {
     let repositories = try SQLiteRepositories.temporary()
     let coordinator = ListeningCoordinator(
         judge: QuietExitJudge(decision: localDecision(ScriptedDecision([.success(false)], delay: .seconds(30)))),
         dialogs: repositories.listeningDialogs, sessionID: "s")
-    let writes = ModeWrites()
+    let writes = ListeningWrites()
     coordinator.bind(
         cancelReply: {},
-        writeMode: { [coordinator] mode in
-            writes.record(mode)
-            try await coordinator.apply(mode, source: .host)
+        enableListening: { [coordinator] in
+            writes.record(true)
+            try await coordinator.apply(true, source: .host)
         })
-    try await coordinator.apply(.quiet, source: .model)
+    try await coordinator.apply(false, source: .model)
     coordinator.receiveQuiet("还没说完", try quietInput())
-    await coordinator.perceptionEnded()
-    #expect(coordinator.mode == .full && writes.modes == [.full])
+    coordinator.cancelJudgment()
+    #expect(!coordinator.isListening && writes.valuesWritten.isEmpty)
     try await Task.sleep(for: .milliseconds(100))
     #expect(try await repositories.listeningDialogs.recentListeningDialogs(limit: 10).isEmpty)
 }

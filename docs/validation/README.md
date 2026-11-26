@@ -28,6 +28,8 @@
 
 [Writer 提示词与续写上下文](Writer-Resource-Organization.md) 记录模型请求、续写接纳、定向通信与资源打包的验证。
 
+[语音感知单向通信](One-Way-Speech-Perception.md) 记录 VAD、ASR、关键词的 Gateway 发布、快停时序、布尔聆听与播放区间回归。
+
 [ASR 用户输入通行](ASR-User-Input.md) 记录片段和最终文本路由、语音本地生命周期及验证范围。
 
 [拍照倒计时与显式打开](Photo-Countdown-And-Explicit-Open.md)：单轮打开/话术/拍照、单次倒计时、参数校验及构建/设备验收边界。

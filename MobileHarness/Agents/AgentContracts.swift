@@ -76,8 +76,15 @@ public enum AgentContracts {
                             try signal.validate()
                             guard message.eventScope == signal.scope.id else { throw CommunicationError.invalidPayload }
                         }),
-                    contract(
-                        PerceptionMessage.speechProtocol, channel: "user.input.speech", events: ["partial", "final"]),
+                    CommunicationContract(
+                        name: SpeechRecognition.contract, kind: .observation, channel: SpeechRecognition.channel,
+                        events: ["partial", "final"], maximumBytes: 16_384,
+                        validateMessage: { message in
+                            guard let value = message.content(as: SpeechRecognition.self),
+                                message.event == value.kind.rawValue
+                            else { throw CommunicationError.invalidPayload }
+                            try value.validate()
+                        }),
                     CommunicationContract(
                         name: SpeechActivity.contract, kind: .observation, channel: SpeechActivity.channel,
                         events: Set(SpeechActivity.Kind.allCases.map(\.rawValue)), maximumBytes: 1024,
@@ -85,23 +92,16 @@ public enum AgentContracts {
                             guard let value = message.content(as: SpeechActivity.self),
                                 message.event == value.kind.rawValue
                             else { throw CommunicationError.invalidPayload }
+                            try value.validate()
                         }),
                     CommunicationContract(
-                        name: ReplyActivitySignal.contract, kind: .observation, channel: ReplyActivitySignal.channel,
-                        maximumBytes: ReplyActivitySignal.maximumBytes,
+                        name: SpeechKeywordMatch.contract, kind: .observation, channel: SpeechKeywordMatch.channel,
+                        events: [SpeechKeywordMatch.event], maximumBytes: 1024,
                         validateMessage: { message in
-                            guard let activity = message.content(as: ReplyActivitySignal.self) else {
-                                throw CommunicationError.invalidPayload
-                            }
-                            try activity.validate()
-                        }),
-                    CommunicationContract(
-                        name: ListeningModeSignal.contract, kind: .observation, channel: ListeningModeSignal.channel,
-                        maximumBytes: 256,
-                        validateMessage: { message in
-                            guard message.content(as: ListeningModeSignal.self) != nil else {
-                                throw CommunicationError.invalidPayload
-                            }
+                            guard let match = message.content(as: SpeechKeywordMatch.self),
+                                message.event == SpeechKeywordMatch.event
+                            else { throw CommunicationError.invalidPayload }
+                            try match.validate()
                         }),
                     contract("perception.audio.source.v1", channel: "perception.audio.source"),
                     contract("perception.vision.pose.v1", channel: "perception.vision.pose", maximumBytes: 262_144),
@@ -189,8 +189,7 @@ extension AgentContracts {
     /// Low-rate, latency-sensitive facts that bypass ordinary input capacity limits.
     static func isControlContract(_ contract: String) -> Bool {
         [
-            AssistantInterrupt.contract, SpeechActivity.contract, ListeningModeSignal.contract,
-            ReplyActivitySignal.contract,
+            AssistantInterrupt.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
         ].contains(contract)
     }
     public static var eventImplementations: [AgentID: [AgentEventImplementation]] {
@@ -204,19 +203,15 @@ extension AgentContracts {
                     variants: Set(SpeechActivity.Kind.allCases.map(\.rawValue)), role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
                 .init(
+                    channel: SpeechKeywordMatch.channel, protocolID: SpeechKeywordMatch.contract,
+                    variants: [SpeechKeywordMatch.event], role: AssistantAgent.self,
+                    handler: { try await $0.receive($1) }),
+                .init(
                     channel: "agent.interruption", protocolID: "agent.interruption.v1", role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
                 .init(
                     channel: "agent.task", protocolID: "agent.task.events.v1", role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
-            ],
-            .speechPerception: [
-                .init(
-                    channel: ListeningModeSignal.channel, protocolID: ListeningModeSignal.contract,
-                    role: SpeechPerceptionAgent.self, handler: { try await $0.receive($1) }),
-                .init(
-                    channel: ReplyActivitySignal.channel, protocolID: ReplyActivitySignal.contract,
-                    role: SpeechPerceptionAgent.self, handler: { try await $0.receive($1) }),
             ],
             .photographer: [
                 .init(
@@ -228,12 +223,12 @@ extension AgentContracts {
     private static var publicationImplementations: [AgentID: Set<String>] {
         [
             .speechPerception: [
-                "user.input.speech.v1", SpeechActivity.contract, "perception.audio.source.v1",
-                AssistantInterrupt.contract,
+                SpeechRecognition.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
+                "perception.audio.source.v1",
             ],
             .visionPerception: ["perception.vision.pose.v1"],
             .applicationControl: ["agent.interruption.v1", "agent.task.events.v1"],
-            .assistant: ["agent.task.events.v1", "agent.listening.mode.v1", "agent.reply.activity.v1"],
+            .assistant: ["agent.task.events.v1"],
             .writer: ["agent.task.events.v1"],
             .memory: ["agent.task.events.v1"], .photographer: ["agent.task.events.v1"],
         ]

@@ -74,14 +74,15 @@ public typealias AudioDetectionConnections = DetectionConnections<any AudioCaptu
             gateway: AgentObservationAccess
         ) -> AudioDetectionConnections {
             let makeKeywordPerception: AudioDetectionConnections.MakePerception = { id, input, observe, fail in
-                let keywords = SpeechKeywordProbe.keywords(threshold: Float(try await keywordThreshold()))
+                let lexicon = try SpeechKeywordLexicon.load()
+                let keywords = lexicon.keywords(threshold: Float(try await keywordThreshold()))
                 let open: @Sendable () async throws -> any KeywordSpottingSession = {
                     guard let session = try await keywordSpotting?.openKeywords(keywords) else {
                         throw AudioDetectionError.keywordModelNotReady
                     }
                     return session
                 }
-                let test = SpeechKeywordTest(session: try await open(), reopen: open)
+                let test = SpeechKeywordTest(session: try await open(), lexicon: lexicon, reopen: open)
                 do {
                     let owner = try AudioDetectionAgentSession(
                         gateway: gateway, id: id, recognition: recognition, vad: vad, input: input,

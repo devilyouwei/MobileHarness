@@ -243,13 +243,15 @@ import StorageFiles
                     },
                     observedContracts: [PerceptionMessage.speechProtocol],
                     observeEvent: { input in
-                        if case .transcript(let text, true)? = input.payload.perception {
-                            try await business.observeTranscript(text, input.sessionID)
+                        if let recognition = input.payload.speechRecognition, recognition.kind == .final,
+                            !recognition.text.isEmpty
+                        {
+                            try await business.observeTranscript(recognition.text, input.sessionID)
                         }
                     },
                     publicationSettled: { input, delivered, rejected in
                         guard input.metadata.source == AgentID.speechPerception.rawValue,
-                            case .transcript(_, final: true)? = input.payload.perception,
+                            input.payload.speechRecognition?.kind == .final,
                             !delivered.contains(.assistant)
                         else { return }
                         await assistantControl.speechPublicationFailed(
@@ -380,8 +382,6 @@ import StorageFiles
                 modelName: modelName,
                 context: assistantContext, language: language)
             assistantControl.bind(main)
-            // The model sees the mode from the first request; the default is written as the host.
-            Task { try? await main.setHostState("listening", to: ListeningMode.default.rawValue) }
             log?.provideStateVariables { await main.stateVariables() }
             let interaction = AssistantExecutionSession(
                 agent: main, manager: manager, output: gateway, speech: speechOutput,
@@ -393,11 +393,10 @@ import StorageFiles
                 cancelReply: { [interactionSessionID] in
                     try await interaction.interruptConversation(sessionID: interactionSessionID)
                 },
-                writeMode: { [assistantControl] mode in
-                    try await assistantControl.setHostState("listening", to: mode.rawValue)
+                enableListening: { [assistantControl] in
+                    try await assistantControl.setHostState("listening", to: "true")
                 },
-                publishMode: { [weak main] in try await main?.publishListeningMode($0) },
-                release: { [weak main] in try await main?.receive($0) })
+                release: { [weak main] in try await main?.receiveAwakeningSpeech($0) })
             try assistantContainer.install(interaction)
             try applicationControlContainer.install(intents)
             try memoryContainer.install(history)
@@ -455,9 +454,8 @@ import StorageFiles
                     guard let speech = interaction.speech else { throw AgentContainerError.unavailable }
                     try await speech.preparePlayback(audioID: id)
                 },
-                playbackChanged: { [interaction] id, active, time in
-                    await interaction.speech?.playbackChanged(audioID: id, active: active, at: time)
-                    await interaction.agent.refreshReplyActivity()
+                playbackChanged: { [interaction] id, active, _ in
+                    await interaction.speech?.playbackChanged(audioID: id, active: active)
                 },
                 makePerception: {
                     [

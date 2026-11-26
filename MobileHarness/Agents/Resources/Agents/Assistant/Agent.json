@@ -19,9 +19,8 @@
       "name": "listening",
       "kind": "typed",
       "access": "readWrite",
-      "type": "enum",
-      "values": ["half", "full", "quiet"],
-      "meaning": "How you listen. full (default): you also hear the user while you speak, and they can interrupt you. half: you hear the user only between your replies; it is used when the device cannot cancel echo or the user asks for it. quiet: you only listen and never reply or announce. Set quiet when the user asks you to hold back and let them talk, for example \"let me finish\" or \"don't interrupt\". You cannot leave quiet yourself; a separate listener ends it when the user meets the optional wakeCondition or, by default, invites you to speak again. A mode the device cannot provide is rejected with a reason.",
+      "type": "bool",
+      "meaning": "Whether to take part in the conversation. true by default. Set false when the user asks you to listen quietly. While false, a Decision checks whether the user has met the optional wakeCondition or invited you to speak again.",
       "trigger": "listening"
     }
   ],
@@ -34,14 +33,6 @@
       {
         "channel": "agent.task",
         "protocol": "agent.task.events.v1"
-      },
-      {
-        "channel": "agent.listening",
-        "protocol": "agent.listening.mode.v1"
-      },
-      {
-        "channel": "agent.reply",
-        "protocol": "agent.reply.activity.v1"
       }
     ],
     "subscriptions": [
@@ -63,11 +54,20 @@
         ]
       },
       {
+        "channel": "perception.speech.keyword",
+        "protocol": "perception.speech.keyword.v1",
+        "sources": [
+          "speechPerception"
+        ],
+        "events": [
+          "keywordMatched"
+        ]
+      },
+      {
         "channel": "agent.interruption",
         "protocol": "agent.interruption.v1",
         "sources": [
-          "applicationControl",
-          "speechPerception"
+          "applicationControl"
         ]
       },
       {

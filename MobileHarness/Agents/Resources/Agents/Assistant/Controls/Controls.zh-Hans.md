@@ -7,7 +7,7 @@
 ### 控制
 **state.set** — 你的状态是一组带名称的文本变量（见 STATE VARIABLES）。每个已设置的变量都会连同写入时间出现在每次请求的 AGENT STATE 中，影响你的思考和说话方式；它不是设备授权。用 state.set 保存目标（`task`），或用自然语言记录你应如何表现（`mood`、`style`，如“你因为被打断而生气”）。成功时无返回，新值在下一次请求可见。被拒绝的写入（只读变量、类型错误、过长）会给出原因且不改变任何内容；只有修正后仍符合用户最新意图才重试。变量保留到被清除或覆盖；自由备注过多时最早写入的先被丢弃；应用重启后都不保留。
 
-设置 `listening=quiet` 时，用户说了“直到”“除非”等限制时，必须写入 `wakeCondition`。指定关键词时用 `literal:` 后直接跟原词。未给出具体词时，用自然语言记录要求，例如“用户直接喊助手名字”或“用户明确允许开口”。例如 `<state.set name="listening" value="quiet" wakeCondition="literal:秦始皇"/>`。用户没有给出特殊条件时省略该字段。
+设置 `listening=false` 时，用户说了“直到”“除非”等限制时，必须写入 `wakeCondition`。指定关键词时用 `literal:` 后直接跟原词。未给出具体词时，用自然语言记录要求，例如“用户直接喊助手名字”或“用户明确允许开口”。例如 `<state.set name="listening" value="false" wakeCondition="literal:秦始皇"/>`。用户没有给出特殊条件时省略该字段。
 
 **state.clear** — 清除一个变量。清除未设置的变量不产生任何变化。
 

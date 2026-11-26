@@ -5,8 +5,8 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
     case transcript(String, final: Bool)
     case soundSource(SoundSourceObservation)
     case pose(PoseObservation)
-    public static let userInputTopic = "user.input.speech"
-    public static let speechProtocol = "user.input.speech.v1"
+    public static let userInputTopic = SpeechRecognition.channel
+    public static let speechProtocol = SpeechRecognition.contract
 
     public var contract: String {
         switch self {
@@ -31,18 +31,22 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
 
 /// Typed domain access and creation remain outside the framework transport.
 extension AgentMessage {
-    public var perception: PerceptionMessage? { content(as: PerceptionMessage.self) }
-    public static func transcript(_ text: String, final: Bool) -> AgentMessage { wrap(.transcript(text, final: final)) }
+    public var perception: PerceptionMessage? {
+        if contract == SpeechRecognition.contract, let speech = content(as: SpeechRecognition.self) {
+            guard speech.kind == .partial || !speech.text.isEmpty else { return nil }
+            return .transcript(speech.text, final: speech.kind == .final)
+        }
+        return content(as: PerceptionMessage.self)
+    }
+    public static func transcript(_ text: String, final: Bool) -> AgentMessage {
+        SpeechRecognition(final ? .final : .partial, text: text, generation: nil).message()
+    }
     public static func soundSource(_ value: SoundSourceObservation) -> AgentMessage { wrap(.soundSource(value)) }
     public static func pose(_ pose: PoseObservation) -> AgentMessage { wrap(.pose(pose)) }
     private static func wrap(_ value: PerceptionMessage) -> AgentMessage {
         AgentMessage(
             contract: value.contract, content: value,
             maximumBytes: value.contract == "perception.vision.pose.v1" ? 262_144 : 16_384,
-            event: {
-                if case .transcript(_, let final) = value { return final ? "final" : "partial" }
-                return nil
-            }(),
             validate: { try $0.validate() })
     }
 }

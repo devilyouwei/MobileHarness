@@ -6,70 +6,54 @@ enum SpeechSignalClock {
     static func offset(at instant: ContinuousClock.Instant) -> Duration { origin.duration(to: instant) }
 }
 
-public struct SpeechContinuationProbe: Codable, Sendable, Equatable {
-    public static let windowCount = 64
-    public let id: UUID
-    public let since: Duration
-    init(id: UUID = UUID(), since: ContinuousClock.Instant = .now) {
-        self.id = id
-        self.since = SpeechSignalClock.offset(at: since)
-    }
-}
-
-/// Speech facts SpeechPerception publishes for any subscriber: capture generations and utterance onset/lifecycle.
-/// No audio or text; the final text travels as `user.input.speech.v1`.
+/// Voice-activity facts from one capture generation.
 public struct SpeechActivity: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
-        case captureStarted, captureStopped
-        /// Whether the current capture generation cancels echo, so full duplex may be used.
-        case duplexSupport
-        case continuationReady
-        /// A voice-activity onset candidate began, or ended before it was confirmed as speech.
-        case onsetStarted, onsetCleared
-        /// The candidate was confirmed; `utterance` identifies the new utterance.
-        case onsetConfirmed
-        /// An utterance was retired without a final text: empty or failed recognition, or failed publication.
-        case utteranceEnded
-        case utterancesCleared
-        /// The perception Agent stopped.
-        case ended
+        case captureStarted, captureStopped, onsetStarted, onsetCleared, onsetConfirmed, vadProgress
     }
+
     public static let contract = "perception.speech.activity.v1"
     public static let channel = "perception.speech.activity"
+    public static let progressWindowCount = 64
 
     public let kind: Kind
-    public let generation: String?
+    public let generation: String
     public let utterance: String?
-    public let fullDuplex: Bool?
-    public let continuation: SpeechContinuationProbe?
+    public let sequence: UInt64?
+    public let onsetRevision: UInt64?
+    /// Capture time of the oldest of the latest 64 complete VAD windows.
+    public let oldestWindow: Duration?
+    /// For an onset, the oldest of the 64 complete windows preceding its first candidate.
+    public let oldestWindowBeforeOnset: Duration?
 
     public init(
-        _ kind: Kind, generation: String? = nil, utterance: String? = nil, fullDuplex: Bool? = nil,
-        continuation: SpeechContinuationProbe? = nil
+        _ kind: Kind, generation: String, utterance: String? = nil,
+        sequence: UInt64? = nil, oldestWindow: Duration? = nil, onsetRevision: UInt64? = nil,
+        oldestWindowBeforeOnset: Duration? = nil
     ) {
         self.kind = kind
         self.generation = generation
         self.utterance = utterance
-        self.fullDuplex = fullDuplex
-        self.continuation = continuation
+        self.sequence = sequence
+        self.onsetRevision = onsetRevision
+        self.oldestWindow = oldestWindow
+        self.oldestWindowBeforeOnset = oldestWindowBeforeOnset
     }
 
     func validate() throws {
-        let valid: Bool
-        switch kind {
-        case .captureStarted, .captureStopped: valid = generation != nil
-        case .duplexSupport: valid = fullDuplex != nil
-        case .continuationReady: valid = generation != nil && continuation != nil
-        case .onsetConfirmed, .utteranceEnded: valid = utterance != nil
-        case .onsetStarted, .onsetCleared, .utterancesCleared, .ended: valid = true
-        }
-        guard valid, [generation, utterance].allSatisfy({ ($0?.utf8.count ?? 0) <= 128 }) else {
-            throw CommunicationError.invalidPayload
-        }
+        guard (1...128).contains(generation.utf8.count),
+            utterance.map({ (1...128).contains($0.utf8.count) }) ?? true,
+            (kind == .onsetConfirmed) == (utterance != nil),
+            (kind == .vadProgress) == (sequence != nil),
+            oldestWindow == nil || (sequence ?? 0) >= Self.progressWindowCount,
+            ([.captureStarted, .captureStopped].contains(kind)) == (onsetRevision == nil),
+            oldestWindowBeforeOnset == nil || kind == .onsetStarted || kind == .onsetConfirmed,
+            sequence != 0
+        else { throw CommunicationError.invalidPayload }
     }
 
     public func message() -> AgentMessage {
-        AgentMessage(
+        .init(
             contract: Self.contract, content: self, maximumBytes: 1024, event: kind.rawValue,
             validate: { try $0.validate() })
     }

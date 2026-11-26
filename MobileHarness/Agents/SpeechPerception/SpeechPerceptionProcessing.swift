@@ -29,8 +29,7 @@ public struct SpeechPerceptionSignalPreprocessor: SignalPreprocessor {
         case .actionResult: return .feedback
         case .observation(let message)
         where [
-            ListeningIntent.contract, SpeechCaptureEnded.contract, ListeningModeSignal.contract,
-            ReplyActivitySignal.contract,
+            ListeningIntent.contract, SpeechCaptureEnded.contract,
         ]
         .contains(message.contract):
             return .control

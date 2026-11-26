@@ -25,12 +25,16 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `Assistant/Instructions.md` | Assistant 自身的身份、用户沟通和如实汇报责任。业务流程归 Skill，共用协议提示词归 `Shared/`。 |
 | `Assistant/Prompts.json` | Assistant 主请求的执行证据、任务历史摘要及 Writer 协作事实模板。 |
 | `Assistant/InputDecision.json` and its Simplified Chinese sibling | Localized Decision action definitions and templates for execution/playback state (including unknown playback), the pending question, history, buffered user input and the quoted latest-input question, plus cloud tool prose. Dialog text retains its original language. |
+| `SpeechPerception/ZipformerKeywords.json` | 生产关键词检测与设置诊断共用的双语词表，维护标签、短语、词元及独立词规则。 |
+| `Assistant/Input/InterruptionKeywords.json` | Assistant 允许触发打断的关键词标签。新增声学关键词时，按业务需要在此配置允许打断的标签。 |
 | `Writer/Instructions.md` | Writer 私有共用身份，仅供自己的控制请求。 |
 | `Writer/Prompts.json` | Writer 作品库及编辑控制请求、补充输入和轮次模板。 |
 | `Writer/ContentPrompts.json` | 无工具内容请求的输出规则、文件格式、编辑上下文与重试模板。 |
 | `Writer/Recovery.json` | 失败修正、工具恢复与历史回放模板。 |
 | `Writer/WorkspaceFeedback.json` | 工作区操作的模型反馈模板。 |
 | `Memory/TitlePrompts.json` | 标题生成事务的专用模板，不生成普通历史记录。其他确定性 Agent 不添加普通对话模板。 |
+
+关键词词表包含中英文数据，标签使用稳定 ID。两份关键词配置均按固定路径由现有 Bundle 资产加载器读取。
 
 目录和固定资源文件采用 UpperCamelCase；配置名与 Swift 角色一致，运行时 `id` 使用既有 lowerCamelCase。重命名目录不能顺带修改身份、历史键或通信源。资源路径必须相对 Resources，不得含绝对路径、反斜杠或 `.` / `..` 路径段。加载器以 Bundle 中的 `Catalog.json` 定位资源根，不再次追加 Resources。
 
@@ -61,7 +65,7 @@ Use the unsuffixed resource for English and a `.zh-Hans` sibling for Simplified 
 | `meaning` | 进入系统提示的英文说明，≤ 1 KiB；中文说明按 `state.<name>` 写入声明所在 Agent 的 `Agent.zh-Hans.json`，缺失回退英文。 |
 | `trigger` | 可选，绑定的 Trigger 名（格式同变量名）。处理器由所属 Agent 注册，未注册的名字在 Agent 启动时报配置错误。 |
 
-同名声明、未知字段、缺失必填字段拒绝加载。Assistant 要求存在绑定 `task` Trigger 的声明，否则启动失败。Assistant 当前声明 `task`（semantic、readWrite、绑定 `task`）与 `listening`（typed enum `half`/`full`/`quiet`、readWrite、绑定 `listening`）。语义与实现见 [Assistant controls](../../Assistant/Controls/README.md#state-writes) 和 [Context](../../Support/Context/README.md#agent-state-variables)。
+同名声明、未知字段、缺失必填字段拒绝加载。Assistant 要求存在绑定 `task` Trigger 的声明，否则启动失败。Assistant 当前声明 `task`（semantic、readWrite、绑定 `task`）与 `listening`（typed bool、readWrite、绑定 `listening`）。语义与实现见 [Assistant controls](../../Assistant/Controls/README.md#state-writes) 和 [Context](../../Support/Context/README.md#agent-state-variables)。
 
 Assistant 的 `state.set` 控制声明提供 `wakeCondition`，仅供进入 quiet 时记录用户约定。中英文 `Input/QuietExit*.json` 各自拥有默认唤醒和按约定唤醒的独立提示。
 
@@ -74,7 +78,7 @@ Assistant 的 `state.set` 控制声明提供 `wakeCondition`，仅供进入 quie
 | `publications` | `{channel, protocol}` 声明本角色可发布的协议；启动校验实际生产代码及订阅配对，允许无订阅者。频道不携带协议版本，不由协议名推导。 |
 | `subscriptions` | `{channel, protocol, sources, events?}`；来源为实际运行时 Agent ID，events 可筛选同一协议的变体。 |
 
-SpeechPerception 发布 `user.input.speech` / `user.input.speech.v1`，变体为 partial/final；Assistant 只订阅 final。SpeechPerception 另发布 `perception.speech.activity` / `perception.speech.activity.v1`（采集、起声与 utterance 事实），Assistant 订阅；Assistant 发布 `agent.listening` / `agent.listening.mode.v1`（当前 `listening` 值），SpeechPerception 订阅；Assistant 另发布 `agent.reply` / `agent.reply.activity.v1`（同会话回复活动），同样由 SpeechPerception 订阅。姿态和声源分别绑定 `perception.vision.pose`、`perception.audio.source`。ApplicationControl 发布 `agent.interruption` / `agent.interruption.v1`，Assistant 的确定性处理器消费，不进入普通 Decision。
+SpeechPerception 发布 VAD 的 `perception.speech.activity.v1`、ASR 的 `user.input.speech.v1` 和关键词的 `perception.speech.keyword.v1`。Assistant 订阅 VAD、ASR 的 final 和 `keywordMatched`。姿态和声源保持各自的频道。ApplicationControl 在独立的 `agent.interruption` 频道发布 `agent.interruption.v1`，由 Assistant 处理。
 
 Writer、Memory、Photographer、ApplicationControl 启用 `agent.task.v1`，包含 submit/update/answer/status/cancel。代码目录声明正文能力；当前模型可见的文本适配器为 Writer，其他角色消费自身的类型化 scoped 正文。任务进度与终态通过 `agent.task.events.v1` 在 `agent.task` 频道按任务身份订阅，Assistant 从启动装配起静态订阅 Writer 的 agent.task 频道，按任务/session 跟踪返回；任务结束只清理跟踪，停止角色才关闭常驻频道。Writer 等任务执行角色通过 publications 声明 agent.task / agent.task.events.v1，实际按需发布，不能触发对方订阅。启动校验订阅来源配置及匹配的 publication，并验证双方真实代码能力；不要求双方在线，允许 publication 没有订阅者。任务恢复/消费失败由消费角色诊断。请求直接返回类型化 Reply；publish 只确认接纳。配置不包含发送者/接收者配对白名单。
 

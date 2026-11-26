@@ -1082,11 +1082,11 @@ private func photographyAcceptance(
     await agent.stop()
 }
 
-private actor ListeningProbe: ListeningModeControlling {
-    private(set) var applied: [(ListeningMode, AgentStateSource)] = []
+private actor ListeningProbe: ListeningControlling {
+    private(set) var applied: [(Bool, AgentStateSource)] = []
     var rejection: AgentStateError?
     func reject(_ error: AgentStateError?) { rejection = error }
-    func apply(_ mode: ListeningMode, source: AgentStateSource, wakeCondition: String?) async throws {
+    func apply(_ mode: Bool, source: AgentStateSource, wakeCondition: String?) async throws {
         if let rejection { throw rejection }
         applied.append((mode, source))
     }
@@ -1111,32 +1111,32 @@ private actor ListeningProbe: ListeningModeControlling {
     await #expect(throws: AgentStateError.unknownVariable("mood")) {
         _ = try await run(.stateSet, ["name": "mood", "value": "calm"])
     }
-    _ = try await run(.stateSet, ["name": "listening", "value": "quiet"])
-    #expect(try await context.snapshot().state.variables.value("listening") == "quiet")
-    #expect(await probe.applied.map(\.0) == [.quiet])
+    _ = try await run(.stateSet, ["name": "listening", "value": "false"])
+    #expect(try await context.snapshot().state.variables.value("listening") == "false")
+    #expect(await probe.applied.map(\.0) == [true, false])
     await #expect(throws: AgentStateError.invalidValue("listening")) {
         _ = try await run(.stateSet, ["name": "listening", "value": "maybe"])
     }
     await #expect(throws: AgentStateError.invalidValue("listening")) {
-        _ = try await run(.stateSet, ["name": "listening", "value": "full", "wakeCondition": "秦始皇"])
+        _ = try await run(.stateSet, ["name": "listening", "value": "true", "wakeCondition": "秦始皇"])
     }
     // A rejecting trigger leaves the previous value in force.
     await probe.reject(.rejected("listening", reason: "no echo cancellation"))
     await #expect(throws: AgentStateError.rejected("listening", reason: "no echo cancellation")) {
-        _ = try await run(.stateSet, ["name": "listening", "value": "full"])
+        _ = try await run(.stateSet, ["name": "listening", "value": "true"])
     }
-    #expect(try await context.snapshot().state.variables.value("listening") == "quiet")
+    #expect(try await context.snapshot().state.variables.value("listening") == "false")
     await probe.reject(nil)
     let value = try await run(.stateGet, ["path": "listening"])
     guard case .value(let json) = value else { throw CommunicationError.invalidPayload }
-    #expect(json.contains("\"mode\":\"quiet\"") && json.contains("writtenAt"))
+    #expect(json.contains("\"listening\":false") && json.contains("writtenAt"))
     let unset = try await run(.stateGet, ["path": "mood"])
     guard case .value(let empty) = unset else { throw CommunicationError.invalidPayload }
     #expect(empty.contains("\"value\":null"))
     // Clearing returns to the default mode through the same trigger.
     try await agent.setHostState("listening", to: nil)
     #expect(try await context.snapshot().state.variables.value("listening") == nil)
-    #expect(await probe.applied.map(\.0) == [.quiet, .full])
+    #expect(await probe.applied.map(\.0) == [true, false, true])
     #expect(await probe.applied.last?.1 == .host)
     await #expect(throws: AgentStateError.unknownVariable("task")) { try await agent.setHostState("task", to: "g") }
     await agent.stop()
@@ -2413,7 +2413,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
         }))
     let consumer = try await output.consumer(for: assistant)
     #expect(await assistant.trackedTaskCount == 0)
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(5))
     let collection = Task {
         do {
             try await IndependentOutputWorkflow.consumeGeneration(assistant.outputs) { envelope in
@@ -2465,7 +2465,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     }
     #expect(await model.requests.count == 1)
     #expect(await assistant.trackedTaskCount == 1)
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(5))
     let received = try #require(await child.inputs.last)
     guard case .observation(let message) = received.payload else { throw CommunicationError.invalidPayload }
     let request = try #require(message.content(as: AgentTaskRequest.self))
@@ -2744,7 +2744,7 @@ func writerFeedbackUpdatesAssistantStateWithoutModelTurns(foreground: Bool, outc
     try await writerRuntime.retireTask(#require(ended.signal))
     let settled = try await context.snapshot()
     #expect(await assistant.trackedTaskCount == 0)
-    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
+    #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(5))
     #expect(settled.state.taskViews?[scope.id]?.terminal == true)
     #expect(settled.state.taskViews?[scope.id]?.event?.kind == kind)
     #expect(settled.state.skillState?.activeTaskID == priorTask)
@@ -2946,7 +2946,7 @@ private func fixtureEventPublication(
         _ = try await output.consumer(for: assistant)
         try await assistant.start()
         #expect(await assistant.trackedTaskCount == 0)
-        #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(4))
+        #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(5))
         try await manager.remove(.assistant)
         #expect(try await signals.stateSnapshot().runtime["eventSubscriptions"] == .count(0))
     }

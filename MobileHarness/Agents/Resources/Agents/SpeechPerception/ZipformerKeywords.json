@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "keywords": [
+    {
+      "label": "zh-stop-talking",
+      "phrase": "先别说了",
+      "tokens": ["x", "iān", "b", "ié", "sh", "uō", "l", "e"],
+      "standalone": false
+    },
+    {
+      "label": "zh-stop-playback",
+      "phrase": "停止播报",
+      "tokens": ["t", "íng", "zh", "ǐ", "b", "ō", "b", "ào"],
+      "standalone": false
+    },
+    {
+      "label": "en-stop-talking",
+      "phrase": "stop talking",
+      "tokens": ["S", "T", "AA1", "P", "T", "AO1", "K", "IH0", "NG"],
+      "standalone": false
+    },
+    {
+      "label": "en-please-stop",
+      "phrase": "please stop",
+      "tokens": ["P", "L", "IY1", "Z", "S", "T", "AA1", "P"],
+      "standalone": false
+    },
+    {
+      "label": "en-stop",
+      "phrase": "stop",
+      "tokens": ["S", "T", "AA1", "P"],
+      "standalone": true
+    },
+    {
+      "label": "zh-stop",
+      "phrase": "停下",
+      "tokens": ["t", "íng", "x", "ià"],
+      "standalone": true
+    }
+  ]
+}

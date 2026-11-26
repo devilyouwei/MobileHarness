@@ -85,11 +85,13 @@ extension AssistantChatWorker {
         for declaration in schema?.declarations.values ?? [:].values {
             let entry = visible.entries[declaration.name]
             var value = entry?.value
-            if declaration.name == "listening", let mode = value {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-                let fields = ["mode": mode, "wakeCondition": context.state.listeningWakeCondition]
-                value = (try? encoder.encode(fields)).map { String(decoding: $0, as: UTF8.self) }
+            if declaration.name == "listening", let listening = value {
+                let fields: [String: Any] = [
+                    "listening": listening == "true",
+                    "wakeCondition": context.state.listeningWakeCondition as Any? ?? NSNull(),
+                ]
+                value = (try? JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys]))
+                    .map { String(decoding: $0, as: UTF8.self) }
             }
             items.append(
                 .init(

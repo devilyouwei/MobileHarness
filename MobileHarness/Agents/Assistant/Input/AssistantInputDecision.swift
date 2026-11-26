@@ -54,15 +54,6 @@ public struct InputDecisionSnapshot: Sendable {
         self.receivedAt = receivedAt
     }
 
-    var isStandaloneSpokenStop: Bool {
-        guard case .transcript(let transcript, final: true)? = input.payload.perception else { return false }
-        let boundary = CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)
-        switch transcript.trimmingCharacters(in: boundary).lowercased() {
-        case "stop", "停下": return true
-        default: return false
-        }
-    }
-
     func request() throws -> NoulRequest {
         let owner = "Assistant/Input/InputDecision"
         let context = try AgentPrompts.text(
@@ -557,7 +548,6 @@ actor AssistantDecisionQueue {
     struct Job: Sendable {
         let snapshot: InputDecisionSnapshot
         let target: UUID?
-        var allowsStandaloneSpokenStop = false
         let interrupt: @Sendable (AssistantInterrupt, String) async throws -> AssistantInterruptResult
         let complete: @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) async -> Void
         let updated: @Sendable () async -> Void
@@ -599,10 +589,7 @@ actor AssistantDecisionQueue {
                         requests: result.requests, modelName: result.modelName)
                     result.inference = evidence
                 }
-                let standaloneStop =
-                    result.signalStatus != "superseded" && job.allowsStandaloneSpokenStop
-                    && job.snapshot.isStandaloneSpokenStop
-                if result.modelResult == true || standaloneStop {
+                if result.modelResult == true {
                     if let target = job.target {
                         do {
                             result.signalStatus = try await job.interrupt(

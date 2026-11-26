@@ -20,29 +20,14 @@
         "protocol": "perception.speech.activity.v1"
       },
       {
-        "channel": "agent.interruption",
-        "protocol": "agent.interruption.v1"
+        "channel": "perception.speech.keyword",
+        "protocol": "perception.speech.keyword.v1"
       },
       {
         "channel": "perception.audio.source",
         "protocol": "perception.audio.source.v1"
       }
     ],
-    "subscriptions": [
-      {
-        "channel": "agent.listening",
-        "protocol": "agent.listening.mode.v1",
-        "sources": [
-          "assistant"
-        ]
-      },
-      {
-        "channel": "agent.reply",
-        "protocol": "agent.reply.activity.v1",
-        "sources": [
-          "assistant"
-        ]
-      }
-    ]
+    "subscriptions": []
   }
 }

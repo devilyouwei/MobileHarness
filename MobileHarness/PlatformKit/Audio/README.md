@@ -87,6 +87,8 @@ Native data/observation capabilities remain independent of business and transpor
 
 MicrophoneFrame.swift 定义跨平台 AudioCaptureObserving、带原生 generation 的 MicrophoneCaptureInput 及 SDK 私有 MicrophoneCapture；后者直接持有唯一 64 包源、一次性订阅和原生回调围栏。AppleAudioIO／SpatialAudioCapture 直接写入该源。startCapture 仅等待首有效 PCM 并返回完成，listenCapture 取得当前源而不启动硬件；重复订阅拒绝。停止、溢出或原生失败保留已接纳包并结束当前源，迟到回调不能写入替代源。
 
+`AudioCaptureObserving.playbackSnapshot()` returns the latest 32 native playback periods. AppleAudioIO opens a period when a buffer enters the native player and closes it when scheduled buffers drain or playback is stopped. Cancellation and native failure close the active period. Consumers query the monotonic capture instant and can supply an echo tail. The snapshot is read-only and shares the lifetime of the audio graph.
+
 跨平台 AudioCaptureControlling 明确权限、采集、事件和停止的执行端口；AudioInputOutput 继承它并保留 iOS 播放能力。Agent 仍只接收 AudioCaptureObserving。Actions 音频检测可用替身验证实际取消加入，不依赖原生硬件。
 
 ## Passive application audio facts

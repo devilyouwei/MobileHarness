@@ -9,7 +9,6 @@ actor SpeechRequestProbe: AssistantSpeechProducing {
     var requests: [String: String] = [:]
     private(set) var cancelledInputs: Set<String> = []
     var playing: Bool?
-    private var playback = SpeechPlaybackSnapshot()
     var beforePrepare: (@Sendable () async throws -> Void)?
     var prepared: (@Sendable (String, String) async -> Void)?
     init(
@@ -31,8 +30,6 @@ actor SpeechRequestProbe: AssistantSpeechProducing {
     func stop() {}
     func isPlaying(sessionID: String) -> Bool? { playing }
     func setPlaying(_ value: Bool) { playing = value }
-    func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot { playback }
-    func setPlaybackSnapshot(_ value: SpeechPlaybackSnapshot) { playback = value }
     func text(_ id: String) -> String? { requests[id] }
     func restored(_ output: AgentOutput) -> AgentOutput {
         guard case .actionCall(let call) = output, let id = call.parameters["audioID"], let text = requests[id] else {

@@ -1036,7 +1036,7 @@ sequenceDiagram
         participant P as Microphone
     end
     box rgb(238,239,255) ModelKit
-        participant M as Enhancement / VAD / Smart Turn / ASR
+        participant M as Enhancement / VAD / Smart Turn / ASR / Zipformer
     end
     UI->>S: typed listening request
     S->>S: check listening policy
@@ -1050,20 +1050,26 @@ sequenceDiagram
         M-->>S: enhanced PCM or explicit failure
     end
     S->>S: stateful 16 kHz conversion / capture-time slices
-    A-->>G: same-session reply activity and continuation request
-    G-->>S: deliver reply activity
-    S-->>G: onset, utterance and VAD-window facts
-    G-->>A: deliver speech activity
-    S->>M: VAD / ASR with playback-aware onset
-    M-->>S: VAD / recognition output
+    S->>P: read native playback intervals
+    S->>M: VAD and ASR with playback-aware onset
+    M-->>S: VAD and recognition output
+    S-->>G: VAD onset, capture and window progress
+    G-->>A: deliver VAD facts
+    opt Zipformer enabled on full-duplex capture
+        S->>M: probe the same voiced PCM
+        M-->>S: keyword match
+        S-->>G: keywordMatched
+        G-->>A: deliver keyword fact
+    end
+    S-->>G: ASR partial for explicit subscribers
     opt Silence endpoint and Smart Turn selected and ready
         S->>M: Score the current turn tail
         M-->>S: End-of-turn probability
     end
     S->>S: Continue the recognition turn or finalize transcript / direction
     S->>G: final caption and seal submissions
-    S->>G: authorized nonempty final transcript Signal
-    G-->>A: transcript with source ID
+    S-->>G: ASR final with text, empty result or failure
+    G-->>A: final with utterance identity and onset evidence
     S->>S: reset full-utterance state / resume eligible audio
     S-->>X: low-rate measurement
     X->>UI: present spectrum / diagnostic facts
@@ -1075,15 +1081,15 @@ SpeechPerception selects mono/W from validated native PCM and owns capture-scope
 
 BasicInteraction also exposes explicit startListening/stopListening Actions through Agent → Gateway → Actions. The voice execution owner calls the neutral perception policy port and directly applies its revision, without recursively scheduling another Action. Stop revokes consent and joins native capture cleanup without cancelling and joining its own reply execution. Reply completion cannot renew consent; a fresh screen hold or explicit user start is required. The owning [Listening design](Actions/Speech/Listening/README.md) defines the local lifecycle and failure details.
 
-Readiness depends on effective samples and native conditions. The role validates channel layout, rate, sequence and continuity before model adaptation; ordered PCM overflow fails explicitly. Partials do not independently start ordinary conversation. SpeechPerception submits the final caption and its seal before publishing a nonempty final through Gateway. Assistant subscribes to `user.input.speech.v1（final）` on the `user.input` topic. Sound-source estimation and low-rate measurements belong to perception, while Actions presents facts. A declared observation contract does not imply a current subscriber. See [SpeechPerception](Agents/SpeechPerception/README.md), [Listening](Actions/Speech/Listening/README.md) and [Platform Audio](PlatformKit/Audio/README.md).
+SpeechPerception validates capture layout, rate and sequence before preparing model input. It publishes VAD capture, onset and progress, ASR partial and final, and Zipformer keyword matches in the interaction session. Assistant subscribes to VAD, ASR final and keyword matches. A final can carry empty text or a recognition failure. Sound-source observations use their own channel. See [SpeechPerception](Agents/SpeechPerception/README.md).
 
-SpeechPerception starts recognition captions at confirmed VAD onset and publishes capture, onset and utterance facts through Gateway. Assistant publishes listening mode and reply activity through the same boundary. Onset leaves the current reply caption in place. Final ASR enters the ordinary queue. Decision checks interruption when same-session reply work or playback existed at arrival. At interrupt admission, the Assistant preserves existing onset candidates and ASR while the window and execution cleanup run concurrently. UI renders user and Assistant captions in independent regions. See [Assistant captions](Agents/Assistant/README.md#presentation-speech-and-cleanup) and [caption execution](Actions/UI/Conversation/README.md).
+The speech facts follow PlatformKit → SpeechPerception → Gateway → Assistant. VAD, ASR and keywords use separate channels. UI shows user and reply captions independently. See [Assistant full-duplex interaction](#assistant-full-duplex-interaction) for how the Assistant uses these facts.
 
-The Assistant's `listening` variable (`half`, `full`, `quiet`) selects how SpeechPerception listens. The Assistant publishes mode changes to SpeechPerception through Gateway. When a model control enters `quiet`, the Assistant keeps ownership of the original generation round and cancels the input's audio through its speech producer. In `quiet`, final ASR bypasses ordinary conversation admission. The Assistant matches a specified literal phrase locally or sends a boolean wake question to the same Settings-selected Decision model used for interruption. The listening coordinator restores the prior mode after a current true result and admits the utterance. An unavailable or failed Decision keeps the Assistant quiet. The condition is visible in Assistant State while quiet and cleared on exit. Storage records judgments in `listening_dialogs`. See [Assistant input](Agents/Assistant/Input/README.md#listening-and-quiet) and [SpeechPerception](Agents/SpeechPerception/README.md#聆听模式-listening).
+Assistant owns the Boolean `state.listening` gate. In quiet, only the selected Decision judges final ASR for wake. The wake agreement can include an exact phrase. A current positive result enables listening and admits the same utterance once. A negative result or failure preserves quiet. Storage records judgments in `listening_dialogs`. See [Assistant input](Agents/Assistant/Input/README.md#listening-and-quiet).
 
 #### Playback-aware speech admission
 
-Actions forwards native first-scheduled-buffer and completion timestamps with audio identity through App-bound host ports to AssistantSpeechOutput. Assistant publishes a bounded same-session playback snapshot in the Gateway reply-activity Signal. SpeechPerception applies playback-dependent onset thresholds from its local copy while PlatformKit keeps the shared capture/playback/voice-processing graph running. Playback onset and completed ASR introduce no timed audio rejection window. Confirmed user speech survives new playback; full utterance completion resets VAD and preprocessing history. See [speech admission](Agents/SpeechPerception/README.md#播放状态与连续接纳) and [native playback facts](Actions/Speech/Listening/README.md#播放时刻事实). Capture timestamps, preserved through preprocessing, select playback facts for each bounded model slice; processing time does not substitute for capture time. Maximum-duration model segments retain the same utterance. ASR finalization and restricted-route playback admission retain their own lifecycle fences.
+PlatformKit keeps bounded native playback intervals available to the read-only capture port. SpeechPerception queries the interval for each slice using its original PCM capture time. The onset policy includes a 200 ms tail and the short endpoint uses actual playback. Actions still forwards native audio handle callbacks to AssistantSpeechOutput for reply ownership and cleanup. See [speech admission](Agents/SpeechPerception/README.md#播放状态与连续接纳) and [PlatformKit audio](PlatformKit/Audio/README.md).
 
 Actions retires failed capture and owns one bounded recovery attempt per explicit listening session. PlatformKit rebuilds the stopped audio graph while Agents retains the current decision and listening intent. User stop and root shutdown retain cancellation and join authority. See [Listening recovery](Actions/Speech/Listening/README.md#采集故障隔离与受限恢复).
 
@@ -1154,10 +1160,9 @@ flowchart TB
     Presentation["UI<br/>Conversation presentation"]:::ui
     Records["Storage<br/>Message and Task records"]:::storage
     Capture -->|"PCM and duplex capability"| Speech
-    Speech -->|"Utterance lifecycle"| Assistant
-    Speech -->|"user.input.speech.v1（final） · user.input"| Signals
+    Speech -->|"VAD activity, ASR final and keywordMatched"| Signals
     Peers -->|"Authorized messages"| Signals
-    Signals -->|"Final speech and verified peer reports"| Assistant
+    Signals -->|"Speech facts and verified peer reports"| Assistant
     Input -->|"Typed user input"| Assistant
     Assistant <-->|"Requests and model events"| Models
     Assistant <-->|"Action calls and correlated results"| Execution
@@ -1174,11 +1179,27 @@ flowchart TB
     classDef storage fill:#faf3e4,stroke:#a18a4c,color:#61512a
 ```
 
-PlatformKit reports capture capability; SpeechPerception publishes partial and final ASR. Assistant admits authenticated final ASR and typed user text to its bounded ordinary queue and independently asks ModelKit for a boolean interruption decision only if the same session had reply work or playback when the input arrived. Idle arrivals dispatch without invoking Decision, even if admission starts their own reply. The frozen context contains only the current assistant reply text captured at arrival and the latest user input. A target-bound true signal can cancel the original reply after identity validation; an idle or stale signal cannot cancel a new reply. Errors leave admitted messages queued. ModelKit owns choice/noul protocol encoding for D3, Vela and Laya and strict boolean adaptation for Chat providers. Peer reports and execution observations bypass user Decision. See [Assistant input handling](Agents/Assistant/README.md#full-duplex-input-and-decision).
+Assistant owns both voice interruption paths. With keyword detection enabled, SpeechPerception publishes a Zipformer match from the same audio it sends to ASR. Assistant checks the configured label and current reply before admitting the interruption. An accepted hit suppresses the same utterance's ASR interruption Decision. A final that arrives first closes keyword eligibility and may use the selected Decision when the same session is busy. ApplicationControl sends explicit stop requests through `agent.interruption.v1`. See [Assistant input](Agents/Assistant/Input/README.md#speech-activity-and-listening-signals).
 
-Model generation closes the set of calls. The Actions Shell preserves ordering within each Channel and coordinates resource use across Channels. Assistant keeps accepting input while the round's Channels, native calls and result delivery settle. Once the admissions tracked at settlement finish, it freezes the ready items in that session into a time-ordered input batch. An interruption retains the new input and pending queue. When its generation still matches, Assistant cancels the old round and joins cleanup; the full-duplex speech session observes for possible continuation and, if speech is confirmed, waits for its final admission. Final settlement does not restart the observation; lifecycle closure retires it. Independent Writer work continues, and an unfinished foreground task remains available until `task.end` commits. Storage records dispatched requests, replies, Action results and Task commits at their respective boundaries. See [Assistant multi-Channel output](Agents/Assistant/README.md#input-timeline-and-channels), [Actions Shell scheduling](Actions/Support/Shell/README.md#scheduling) and [history and restart](#18-history-business-records-and-restart-behavior).
+#### Interruption and continuation
 
-Assistant interruption has one role-owned entry for internal Decision, trusted host requests and authorized `assistant.interrupt` messages delivered by Gateway. Target matching and dispatch fencing precede joined cancellation; ordinary text admission remains independent. External world signals are adapted by their owning role or host, never constructed by foundation modules. Details: [Assistant unified interruption](Agents/Assistant/README.md#unified-interruption-control).
+```mermaid
+flowchart LR
+    Admit["Assistant accepts interruption"] --> Capture["Keep active onset and observe 64 complete VAD windows"]
+    Admit --> Cleanup["Join old generation and session Action cleanup"]
+    Capture --> Boundary["64th window closes new onset admission"]
+    Capture --> ASR["Settle qualifying candidates and their ASR finals"]
+    Boundary --> Ready{"Window, speech and cleanup settled?"}
+    ASR --> Ready
+    Cleanup --> Ready
+    Boundary --> Late["Later onsets use the ordinary input queue"]
+    Ready -->|Yes| Dispatch["Dispatch the retained input batch"]
+    Ready -->|Pending| Hold["Keep the queue"]
+```
+
+The first 64 complete VAD windows after admission define the continuation interval. An onset already active at admission or starting by window 64 can wait for its complete ASR result beyond that point. A later onset enters ordinary admission and stays outside the retained batch. Cleanup and speech intake run in parallel. A capture replacement restarts window counting, while unconfirmed Action cleanup holds dispatch and surfaces a diagnostic. See [Assistant continuation workflow](Agents/Assistant/Input/README.md#post-interruption-wait).
+
+During ordinary generation, Assistant keeps admitting input while the round's Channels and feedback settle. Actions owns the effect ordering and execution results. Storage records dispatched requests, replies, Action results and Task commits. Independent Writer work may continue through an Assistant interruption. See [Assistant multi-Channel output](Agents/Assistant/README.md#input-timeline-and-channels) and [Actions scheduling](Actions/Support/Shell/README.md#scheduling).
 
 ### 13. Camera preview, vision and tracking
 
@@ -1498,7 +1519,7 @@ Download, installation, preference selection and model residency are separate st
 
 Agent Models manages shared cloud Providers and local model downloads. ModelKit projects model identity, language capabilities and availability from its registry and artifact state. Actions applies the Assistant, Writer and Decision selection rules and projects typed candidates into UI. ApplicationControl and Gateway carry settings intents to the Actions transaction owner. Writer requires tool-capable Chat, and Decision accepts native Decision or a compatible Chat binding. Selected models resolve through ModelKit by stable ID. Every dispatched Chat request carries the identity of its bound model plus optional execution evidence. Agents persists those values per invocation for history and projects the actual Decision identity to the runtime log. See [ModelKit](ModelKit/README.md#selectable-language-models-and-request-evidence), [Provider](Actions/System/Provider/README.md), [Settings](UI/Settings/README.md) and [Assistant Decision](Agents/Assistant/README.md#full-duplex-input-and-decision).
 
-Speech detection settings follow UI Settings → ApplicationControl → Actions resource preferences → Storage. App composition injects a read-only settings closure into Agents; SpeechPerception snapshots it when opening its VAD session. UI and PlatformKit do not own recognition thresholds.
+Speech settings apply saved model choices by capability. App composition supplies SpeechPerception with the detection settings it snapshots at capture. The Settings keyword diagnostic opens an isolated capture and uses the production lexicon to report keyword matches and tail silence. See [Voice models](UI/Settings/README.md#语音模型) and [keyword diagnostics](Agents/SpeechPerception/README.md#流式关键词探测).
 
 ### 18. History, business records and restart behavior
 
@@ -1787,7 +1808,7 @@ App requests iOS continued processing for eligible Writer segments while the sce
 | Scenario | Workflow | Completion boundary |
 | --- | --- | --- |
 | Album and settings | [UI execution](#3-ui-requests-and-shared-business-execution) · [Photo and album](#14-photovideo-capture-app-album-and-system-export) · [Provider settings](#17-settings-provider-and-model-resource-workflows) | Page path, business reply and media commit have separate receipts. |
-| Voice conversation | [ASR](#11-listening-asr-and-sound-source-observations) · [TTS](#12-reply-synthesis-playback-and-listening-restoration) · [Full duplex](#assistant-full-duplex-interaction) | Final ASR enters the ordinary queue; concurrent reply work or playback at arrival additionally triggers Decision. Round settlement gates the next batch. |
+| Voice conversation | [ASR](#11-listening-asr-and-sound-source-observations) · [TTS](#12-reply-synthesis-playback-and-listening-restoration) · [Full duplex](#assistant-full-duplex-interaction) | Assistant admits keyword or Decision interruption. The 64-window boundary and confirmed cleanup govern continuation dispatch. |
 | Expression and speech sequence | [Function Tokens](#8-function-token-and-action-call-protocol) · [Channel and wait](#9-channel-ordering-wait-and-resource-ownership) | The Actions Shell joins the wait group before the parent phase continues. |
 | Vision and tracking | [Camera and vision](#13-camera-preview-vision-and-tracking) · [Robot motion](#15-robot-motion-hardware-facts-and-control-handoff) | Pose freshness and motor authority gate effects. Observed feedback determines motion completion. |
 | Device or module change | [Bluetooth](#16-bluetooth-discovery-connection-and-recovery) · [Diagnostics](#20-diagnostics-ui-presentation-and-native-rendering) | Native facts and failures reach their owners and UI projections. |
@@ -1795,23 +1816,3 @@ App requests iOS continued processing for eligible Writer segments while the sce
 | Navigation and inactivity | [Navigation](#4-page-navigation-and-visible-page-context) · [Scene lifetime](#scene-visibility-versus-execution-lifetime) | Page acknowledgment and device cleanup follow their own owners. |
 
 Automated checks, iOS builds, real-model samples, native UI and physical-device acceptance are separate evidence categories maintained in [validation](../docs/validation/README.md). Requirements and decisions live in [requirements](../docs/requirements/README.md) and [ADR](../docs/adr/README.md); historical design rationale lives in [documentation history](../docs/history/Documentation-History.md).
-
-### Streaming keyword interruption
-
-During full-duplex replies, SpeechPerception starts the
-[keyword probe](Agents/SpeechPerception/README.md#流式关键词探测) at the first VAD
-candidate and continues ASR in parallel. A confirmed keyword can send a
-reply-scoped [interrupt](Agents/Assistant/Input/README.md#流式关键词快停).
-Assistant accepts the same utterance's final transcript and suppresses a duplicate
-decision after a successful fast interruption. Both keyword and Decision interruptions preserve any onset candidate pending at admission.
-All accepted full-duplex interruptions observe 64 scored VAD windows of 512 samples starting at admission.
-In parallel, Gateway closes Assistant’s in-flight execution for that session and sends its own start and terminal
-events alongside the per-Action and per-round events. Dispatch requires confirmed cleanup, a completed window,
-and settled onset and ASR. Capture recovery starts a new window count. Unconfirmed cleanup holds automatic replies.
-The final-ASR Decision handles utterances without an accepted fast interruption.
-
-设置的语音页面按能力选择模型，并按相同分组管理本地制品。Actions 持久化所选
-模型 ID 与可选的 Kokoro 音色，ModelKit 在取得会话前解析各能力的提供者并固定本次合成的音色。语音设置、默认项和模型下载
-行为见 [UI Settings](UI/Settings/README.md#语音模型)。
-
-语音设置的关键词测试通过 ApplicationControl 复用本地诊断请求和采集生命周期。独立 SpeechPerception 会话报告原始命中和尾部静音，快速打断仍由主语音会话处理。

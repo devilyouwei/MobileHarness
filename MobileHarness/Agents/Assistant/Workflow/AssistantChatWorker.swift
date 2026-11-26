@@ -203,30 +203,57 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id: UUID
         let inputID: String
         let sessionID: String
+        let startedAt = SpeechSignalClock.offset(at: .now)
         var assistant: String = ""
     }
     var decisionTurn: DecisionTurn?
     let decisionQueue = AssistantDecisionQueue()
     var interruptReceipts: [String] = []
     var keywordInterruptedTurns: [String] = []
+    let interruptionKeywordLabels: Set<String>
+    var speechTerminals: [String] = []
+    private var retiredSpeechGenerations: [String] = []
+    var keywordCleanup: (id: String, task: Task<Void, Never>)?
     func beginDecisionTurn(_ input: AgentInput) {
         guard decisionTurn?.inputID != input.id else { return }
         decisionTurn = .init(id: UUID(), inputID: input.id, sessionID: input.sessionID)
     }
     let speechSessionID: String?
     var speechUtterances: Set<String> = []
-    private var continuationObservation: SpeechContinuationProbe?
-    var interruptionWait: UUID? { continuationObservation?.id }
-    var speechContinuationProbe: SpeechContinuationProbe? {
-        continuationReady ? nil : continuationObservation
+    private struct ContinuationObservation: Equatable {
+        let id: UUID
+        let since: Duration
     }
+    private var continuationObservation: ContinuationObservation?
+    var interruptionWait: UUID? { continuationObservation?.id }
     private var onsetCandidateActive = false
     private var continuationReady = false
+    private var interruptionOnsetCandidate = false
+    private var interruptionUtterances: Set<String> = []
+    // Retained through the first speech batch dispatch to separate later finals from that batch.
+    var interruptionBatchStartedAt: Duration?
     private var speechCaptureGeneration: String?
+    private var speechWindowSequence: UInt64 = 0
+    private var speechOnsetRevision: UInt64 = 0
     private var continuationWatchdog: Task<Void, Never>?
 
+    func noteSpeechTerminal(_ input: AgentInput) -> Bool {
+        guard input.sessionID == speechSessionID, let turn = input.turn,
+            input.payload.speechRecognition?.kind == .final, !speechTerminals.contains(turn.id)
+        else { return false }
+        speechTerminals.append(turn.id)
+        if speechTerminals.count > 128 { speechTerminals.removeFirst() }
+        if continuationObservation != nil, let generation = input.payload.speechRecognition?.generation,
+            speechCaptureGeneration == nil || speechCaptureGeneration == generation,
+            !retiredSpeechGenerations.contains(generation), !isAfterSpeechWindow(input)
+        {
+            interruptionUtterances.insert(turn.id)
+        }
+        return true
+    }
+
     func speechStarted(_ id: String) throws {
-        guard lifecycle == .running else { return }
+        guard lifecycle == .running, !speechTerminals.contains(id) else { return }
         guard speechUtterances.count < 32 || speechUtterances.contains(id) else {
             throw CommunicationError.capacityExceeded
         }
@@ -234,15 +261,14 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
 
     func speechEnded(_ id: String) {
-        guard speechUtterances.remove(id) != nil else { return }
+        speechUtterances.remove(id)
+        interruptionUtterances.remove(id)
         keywordInterruptedTurns.removeAll { $0 == id }
         finishInterruptionWaitIfReady()
     }
 
     func speechPublicationFailed(_ input: AgentInput, reason: String) {
-        guard input.sessionID == speechSessionID, let turn = input.turn,
-            speechUtterances.contains(turn.id)
-        else { return }
+        guard noteSpeechTerminal(input), let turn = input.turn else { return }
         emit(.control("agent.error: speech delivery failed: \(reason)"), for: input)
         speechEnded(turn.id)
     }
@@ -250,24 +276,31 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     func clearSpeechUtterances() {
         onsetCandidateActive = false
         speechUtterances.removeAll()
-        keywordInterruptedTurns.removeAll(keepingCapacity: true)
+        interruptionOnsetCandidate = false
+        interruptionUtterances.removeAll()
         finishInterruptionWaitIfReady()
     }
 
-    func cancelInterruptionWait() {
+    func isAfterSpeechWindow(_ input: AgentInput) -> Bool {
+        guard input.sessionID == speechSessionID, let cutoff = interruptionBatchStartedAt,
+            let preceding = input.payload.speechRecognition?.oldestWindowBeforeOnset
+        else { return false }
+        return preceding >= cutoff
+    }
+
+    func cancelInterruptionWait(preserveBatchCutoff: Bool = false) {
+        if !preserveBatchCutoff { interruptionBatchStartedAt = nil }
         continuationWatchdog?.cancel()
         continuationWatchdog = nil
-        let wasObserving = continuationObservation != nil
         continuationObservation = nil
         continuationReady = false
-        if wasObserving { scheduleReplyActivityRefresh() }
     }
 
     func finishInterruptionWaitIfReady() {
         guard continuationObservation != nil, continuationReady, !executionCancellationBarrier,
-            !onsetCandidateActive, speechUtterances.isEmpty
+            !interruptionOnsetCandidate, interruptionUtterances.isEmpty
         else { return }
-        cancelInterruptionWait()
+        cancelInterruptionWait(preserveBatchCutoff: true)
         drain()
     }
 
@@ -278,68 +311,67 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     func isTrackedSpeechFinal(_ input: AgentInput) -> Bool {
         guard input.sessionID == speechSessionID, input.metadata.origin == .agent,
             input.metadata.source == AgentID.speechPerception.rawValue,
-            case .transcript(_, final: true)? = input.payload.perception,
-            let turn = input.turn
+            let recognition = input.payload.speechRecognition, recognition.kind == .final, let turn = input.turn
         else { return false }
         return speechUtterances.contains(turn.id)
+            || (recognition.generation != nil && recognition.generation == speechCaptureGeneration)
     }
 
-    /// Speech facts arrive only as the authenticated `perception.speech.activity.v1` Signal this Agent subscribes to.
-    func receiveSpeechActivity(_ input: AgentInput, _ activity: SpeechActivity) async throws {
+    /// VAD is ordered within its channel. ASR and keyword events correlate via the utterance ID.
+    func receiveSpeechActivity(_ input: AgentInput, _ activity: SpeechActivity) throws {
         guard input.sessionID == speechSessionID, lifecycle != .stopped else { return }
+        if activity.kind == .captureStarted {
+            speechCaptureStarted(activity.generation)
+            return
+        }
+        guard activity.generation == speechCaptureGeneration else { return }
         switch activity.kind {
         case .captureStarted:
-            if let generation = activity.generation { speechCaptureStarted(generation) }
-            await listening?.republish()
-            await refreshReplyActivity(force: true)
+            break
         case .captureStopped:
-            if let generation = activity.generation { speechCaptureStopped(generation) }
-        case .continuationReady:
-            if let generation = activity.generation, speechCaptureGeneration == generation,
-                let probe = activity.continuation, probe == continuationObservation
-            {
-                continuationReady = true
-                continuationWatchdog?.cancel()
-                continuationWatchdog = nil
-                scheduleReplyActivityRefresh()
-                finishInterruptionWaitIfReady()
-            }
-        case .duplexSupport:
-            if let supported = activity.fullDuplex { await listening?.captureDuplex(supported) }
-        case .onsetStarted:
-            onsetCandidateActive = true
-        case .onsetCleared:
-            onsetCandidateActive = false
+            speechCaptureStopped(activity.generation)
+        case .vadProgress:
+            guard let sequence = activity.sequence, sequence > speechWindowSequence else { return }
+            speechWindowSequence = sequence
+            guard let observation = continuationObservation, activity.onsetRevision == speechOnsetRevision,
+                let oldest = activity.oldestWindow, oldest >= observation.since
+            else { return }
+            continuationReady = true
+            continuationWatchdog?.cancel()
+            continuationWatchdog = nil
             finishInterruptionWaitIfReady()
-        case .onsetConfirmed:
-            onsetCandidateActive = false
+        case .onsetStarted, .onsetCleared, .onsetConfirmed:
+            guard let revision = activity.onsetRevision, revision == speechOnsetRevision + 1 else { return }
             if let utterance = activity.utterance { try speechStarted(utterance) }
-        case .utteranceEnded:
-            if let utterance = activity.utterance { speechEnded(utterance) }
-        case .utterancesCleared:
-            clearSpeechUtterances()
-        case .ended:
-            if let generation = speechCaptureGeneration { speechCaptureStopped(generation) }
-            clearSpeechUtterances()
-            await listening?.perceptionEnded()
+            speechOnsetRevision = revision
+            onsetCandidateActive = activity.kind == .onsetStarted
+            if let observation = continuationObservation {
+                let inWindow = activity.oldestWindowBeforeOnset.map { $0 < observation.since } ?? !continuationReady
+                if let utterance = activity.utterance, interruptionOnsetCandidate || inWindow,
+                    speechUtterances.contains(utterance)
+                {
+                    interruptionUtterances.insert(utterance)
+                }
+                interruptionOnsetCandidate = onsetCandidateActive && inWindow
+            }
+            finishInterruptionWaitIfReady()
         }
     }
 
     private func speechCaptureStarted(_ generation: String) {
-        guard speechCaptureGeneration != generation else { return }
-        resetContinuationProgress()
-        if speechCaptureGeneration != nil {
-            clearSpeechUtterances()
-            if continuationObservation != nil {
-                reportInterruptionFailure("Speech capture changed during interruption")
-            }
-        }
+        guard speechCaptureGeneration != generation, !retiredSpeechGenerations.contains(generation) else { return }
+        if let previous = speechCaptureGeneration { speechCaptureStopped(previous) }
         speechCaptureGeneration = generation
+        speechWindowSequence = 0
+        speechOnsetRevision = 0
+        resetContinuationProgress()
     }
 
     private func speechCaptureStopped(_ generation: String) {
         guard speechCaptureGeneration == generation else { return }
         speechCaptureGeneration = nil
+        retiredSpeechGenerations.append(generation)
+        if retiredSpeechGenerations.count > 32 { retiredSpeechGenerations.removeFirst() }
         if continuationObservation != nil { reportInterruptionFailure("Speech capture stopped during interruption") }
         resetContinuationProgress()
         clearSpeechUtterances()
@@ -347,10 +379,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
 
     private func resetContinuationProgress() {
         continuationReady = false
-        if continuationObservation != nil {
-            startContinuationWatchdog()
-            scheduleReplyActivityRefresh()
-        }
+        if continuationObservation != nil { startContinuationWatchdog() }
     }
 
     private func startContinuationWatchdog() {
@@ -362,13 +391,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
     }
 
-    private func continuationStalled(_ probe: SpeechContinuationProbe) {
+    private func continuationStalled(_ probe: ContinuationObservation) {
         guard continuationObservation == probe, !continuationReady else { return }
         reportInterruptionFailure("Speech interruption observation stalled")
-        if speechCaptureGeneration != nil {
-            continuationObservation = SpeechContinuationProbe(id: probe.id)
-            scheduleReplyActivityRefresh()
-        }
     }
 
     func reportInterruptionFailure(_ reason: String, cleanup: Bool = false) {
@@ -422,6 +447,12 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     public func requestInterrupt(
         _ signal: AssistantInterrupt, sessionID: String, source: String = "runtime"
     ) async throws -> AssistantInterruptResult {
+        try await admitInterrupt(signal, sessionID: sessionID, source: source, keyword: nil)
+    }
+
+    func admitInterrupt(
+        _ signal: AssistantInterrupt, sessionID: String, source: String, keyword: SpeechKeywordMatch?
+    ) async throws -> AssistantInterruptResult {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         let key = "\(source)|\(sessionID)|\(signal.id)"
         guard !interruptReceipts.contains(key) else { return .duplicate }
@@ -438,16 +469,17 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         guard active, let turn = decisionTurn, turn.sessionID == sessionID, turn.id == target,
             !executionCancellationBarrier, !hostCancellationInProgress
         else { return .targetExpired }
-        let keywordTurn: String?
-        if source == "speechPerception" {
-            guard fullDuplex, sessionID == speechSessionID, listening?.mode == .full,
-                let turn = signal.speechTurn, speechUtterances.contains(turn)
-            else { return .targetExpired }
-            keywordTurn = turn
-        } else {
-            keywordTurn = nil
-        }
         guard let inputInterruption else { throw CommunicationError.unavailableTarget }
+        if let keyword {
+            guard lifecycle == .running, listening?.isListening != false,
+                !retiredSpeechGenerations.contains(keyword.generation),
+                speechCaptureGeneration == nil || speechCaptureGeneration == keyword.generation,
+                !speechTerminals.contains(keyword.utterance),
+                !keywordInterruptedTurns.contains(keyword.utterance),
+                keyword.onset >= turn.startedAt
+            else { return .targetExpired }
+            try speechStarted(keyword.utterance)
+        }
         // Install both gates at admission, before crossing any cleanup boundary.
         executionCancellationBarrier = true
         let victim = turn.inputID
@@ -464,24 +496,54 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         decisionTurn = nil
         interruptedInputs.insert(victim)
         worker?.cancel()
+        // Only an accepted interruption against an active reply opens the 64-window post-interruption buffer.
         if fullDuplex, sessionID == speechSessionID {
-            continuationObservation = SpeechContinuationProbe(id: signal.id)
+            let cutoff = SpeechSignalClock.offset(at: .now)
+            continuationObservation = .init(id: signal.id, since: cutoff)
+            interruptionBatchStartedAt = cutoff
+            interruptionOnsetCandidate = onsetCandidateActive
+            interruptionUtterances = speechUtterances
             resetContinuationProgress()
         }
-        if let keywordTurn {
-            keywordInterruptedTurns.append(keywordTurn)
-            if keywordInterruptedTurns.count > 32 { keywordInterruptedTurns.removeFirst() }
-        }
-        do {
-            try await inputInterruption(sessionID, id)
-            guard activeInterruption == nil else { throw CommunicationError.unavailableTarget }
-        } catch {
-            interruptionCleanupWatchdog?.cancel()
-            interruptionCleanupWatchdog = nil
-            reportInterruptionFailure("Could not confirm interruption cleanup: \(error)", cleanup: true)
-            throw error
+        if let keyword {
+            keywordInterruptedTurns.append(keyword.utterance)
+            if keywordInterruptedTurns.count > 128 { keywordInterruptedTurns.removeFirst() }
+            keywordCleanup = (
+                id,
+                Task { [weak self] in
+                    guard let self else { return }
+                    await self.completeKeywordInterruption(inputInterruption, sessionID: sessionID, id: id)
+                }
+            )
+        } else {
+            try await confirmInterruption(inputInterruption, sessionID: sessionID, id: id)
         }
         return .interrupted
+    }
+
+    private func completeKeywordInterruption(
+        _ inputInterruption: @Sendable (String, String) async throws -> Void, sessionID: String, id: String
+    ) async {
+        defer { if keywordCleanup?.id == id { keywordCleanup = nil } }
+        do { try await confirmInterruption(inputInterruption, sessionID: sessionID, id: id) } catch {
+            // The shared path reports failures and leaves the dispatch barrier in place.
+        }
+    }
+
+    private func confirmInterruption(
+        _ inputInterruption: @Sendable (String, String) async throws -> Void, sessionID: String, id: String
+    ) async throws {
+        do {
+            try await inputInterruption(sessionID, id)
+            guard activeInterruption?.id != id else { throw CommunicationError.unavailableTarget }
+        } catch {
+            if activeInterruption?.id == id {
+                interruptionCleanupWatchdog?.cancel()
+                interruptionCleanupWatchdog = nil
+                reportInterruptionFailure("Could not confirm interruption cleanup: \(error)", cleanup: true)
+            }
+            throw error
+        }
     }
 
     private func interruptionCleanupStalled(_ id: String) {
@@ -561,10 +623,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var reportHostCancellationFailure = false
     var hostCancelledInput: (id: String, round: String?)?
     var worker: Task<Void, Never>?
-    var activeInput: AgentInput? { didSet { scheduleReplyActivityRefresh() } }
-    var publishedReplyActivity: ReplyActivitySignal?
-    var replyActivityRefreshing = false
-    var replyActivityDirty = false
+    var activeInput: AgentInput?
     var begunInputID: String?
     var begunSession: String?
     var begunTurn: AgentTurn?
@@ -614,7 +673,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         var cancelled = false
         var publishing = false
     }
-    var pendingRounds: [String: PendingRound] = [:] { didSet { scheduleReplyActivityRefresh() } }
+    var pendingRounds: [String: PendingRound] = [:]
     var settlementAdmissions: Set<String> = []
     var batchMembers: [String: [AgentInput]] = [:]
     var batchTexts: [String: String] = [:]
@@ -674,7 +733,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var uiInputs = AgentUIInputs()
     var uiTextOrdinal: UInt64 = 0
     let stateContext: AgentStateContext?
-    let listening: (any ListeningModeControlling)?
+    let listening: (any ListeningControlling)?
     /// Handlers for the triggers `Agent.json` declares; installed at the end of initialization.
     private let triggerSlot = Mutex<AgentStateTriggers>(AgentStateTriggers())
     var stateTriggers: AgentStateTriggers { triggerSlot.withLock { $0 } }
@@ -695,7 +754,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         configuration: AgentConfiguration? = nil,
         conversations: AssistantHistoryStore = AssistantHistoryStore(),
         communications: (any AgentMessageRepository)? = nil,
-        listening: (any ListeningModeControlling)? = nil,
+        listening: (any ListeningControlling)? = nil,
         modelName: @escaping @Sendable () async throws -> String = { "Unspecified model" },
         observations:
             @escaping @Sendable ([AssistantChatObservation], AgentInput, any ChatCapability) async throws ->
@@ -759,6 +818,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
         taskRecords = supportsSkills ? conversations.tasks : nil
         self.communicationPolicy = configuration.communication
+        interruptionKeywordLabels = State.agentID == .assistant ? try InterruptionKeywordPolicy.load() : []
         self.listening = listening
         self.modelCapabilities = runtimeCapabilities
         _ = try AgentPrompts.load(named: State.configurationName)
@@ -778,7 +838,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
         handlers["listening"] = { [weak self] write in
             guard let self else { throw CommunicationError.unavailableTarget }
-            try await self.applyListeningMode(write)
+            try await self.applyListeningState(write)
             return .publish
         }
         let triggers = try AgentStateTriggers(handlers)
@@ -786,14 +846,14 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         triggerSlot.withLock { $0 = triggers }
     }
 
-    private func applyListeningMode(_ write: AgentStateWrite) async throws {
+    private func applyListeningState(_ write: AgentStateWrite) async throws {
         guard let listening else { return }
-        let mode = ListeningMode(variable: write.new)
+        let enabled = write.new != "false"
         let reply =
-            write.source == .model && mode == .quiet && listening.mode != .quiet
+            write.source == .model && !enabled && listening.isListening
             ? activeInput.flatMap { $0.id == write.inputID && $0.sessionID == write.sessionID ? $0 : nil }
             : nil
-        try await listening.apply(mode, source: write.source, wakeCondition: write.wakeCondition)
+        try await listening.apply(enabled, source: write.source, wakeCondition: write.wakeCondition)
         if let reply {
             // Join only audio production here. The caller still owns generation and round settlement.
             await speechOutput?.cancel(input: reply)

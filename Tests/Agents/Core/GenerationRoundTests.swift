@@ -2022,11 +2022,15 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput(cleanupConfirmed: 
         try await outputs
     }
     try await agent.receive(next)
-    for _ in 0..<1000 where await agent.speechContinuationProbe == nil {
+    for _ in 0..<1000 where await agent.interruptionWait == nil {
         try await Task.sleep(for: .milliseconds(2))
     }
-    let probe = try #require(await agent.speechContinuationProbe)
-    try await agent.receive(activity(SpeechActivity(.continuationReady, generation: capture, continuation: probe)))
+    _ = try #require(await agent.interruptionWait)
+    try await agent.receive(
+        activity(
+            SpeechActivity(
+                .vadProgress, generation: capture, sequence: 64,
+                oldestWindow: SpeechSignalClock.offset(at: .now), onsetRevision: 0)))
     for _ in 0..<1000 {
         let turns = try await harness.store.snapshot().current.turns
         if cleanupConfirmed, turns.first(where: { $0.id == next.id })?.state == .completed { break }

@@ -1,16 +1,21 @@
+import AgentCore
 import Foundation
 import ModelKit
 import Testing
 
 @testable import Agents
 
-private actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSession {
+actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSession {
     var received = 0
     var cancelled = false
     private(set) var thresholds: [Float] = []
     let label: String?
+    let minimumSamples: Int
     var availability: CapabilityAvailability { .available }
-    init(label: String? = "zh-stop") { self.label = label }
+    init(label: String? = "zh-stop", minimumSamples: Int = 2560) {
+        self.label = label
+        self.minimumSamples = minimumSamples
+    }
 
     func openKeywords(_ keywords: [SpeechKeyword]) -> (any KeywordSpottingSession)? {
         thresholds = keywords.map(\.threshold)
@@ -19,7 +24,7 @@ private actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSe
 
     func accept(_ samples: [Float]) throws -> String? {
         received += samples.count
-        return received >= 2560 ? label : nil
+        return received >= minimumSamples ? label : nil
     }
 
     func cancel() { cancelled = true }
@@ -27,8 +32,8 @@ private actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSe
 
 @Test(arguments: [false, true]) func keywordTestReportsRawHitIrrespectiveOfTail(silent: Bool) async throws {
     let model = MatchingKeywordModel()
-    let session = try #require(await model.openKeywords(SpeechKeywordProbe.keywords))
-    let trial = SpeechKeywordTest(session: session, reopen: { model })
+    let session = try #require(await model.openKeywords(try SpeechKeywordLexicon.load().keywords()))
+    let trial = SpeechKeywordTest(session: session, lexicon: try SpeechKeywordLexicon.load(), reopen: { model })
     let packet = Array(repeating: Float(silent ? 0 : 0.01), count: 512)
     for _ in 0..<4 { #expect(try await trial.accept(packet).hit == nil) }
     let update = try await trial.accept(packet)
@@ -43,7 +48,7 @@ private actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSe
 @Test func keywordTestReopensOnSpeechAfterAQuietGap() async throws {
     let initial = MatchingKeywordModel(label: nil)
     let next = MatchingKeywordModel()
-    let trial = SpeechKeywordTest(session: initial, reopen: { next })
+    let trial = SpeechKeywordTest(session: initial, lexicon: try SpeechKeywordLexicon.load(), reopen: { next })
     let audible = [Float](repeating: 0.03, count: 512)
     let quiet = [Float](repeating: 0, count: 512)
     _ = try await trial.accept(audible)
@@ -57,25 +62,37 @@ private actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSe
     #expect(update.audio?.samples == 22 * 512)
 }
 
-@Test func keywordProbeAppliesSilentTailAtFirstMatch() async {
+@Test func keywordProbeAppliesSilentTailAtFirstMatch() async throws {
+    let keywords = try SpeechKeywordLexicon.load().keywords(threshold: 0.20)
     for silent in [false, true] {
         let capability = MatchingKeywordModel()
-        let reply = UUID()
-        let capture = UUID()
-        let events = AsyncStream.makeStream(of: UUID.self)
-        let probe = SpeechKeywordProbe(capability: capability, replyID: reply, captureID: capture, threshold: 0.20) {
-            match in
-            events.continuation.yield(match)
+        let capture = UUID().uuidString
+        let events = AsyncStream.makeStream(of: (UUID, String, Duration).self)
+        let probe = SpeechKeywordProbe(capability: capability, generation: capture, onset: .zero, keywords: keywords) {
+            id, label, time in
+            events.continuation.yield((id, label, time))
             events.continuation.finish()
         }
-        #expect(probe.replyID == reply)
-        #expect(probe.captureID == capture)
-        #expect(probe.submit(Array(repeating: silent ? 0 : 0.01, count: 2560)))
+        #expect(probe.generation == capture)
+        #expect(probe.submit(Array(repeating: silent ? 0 : 0.01, count: 2560), capturedAt: .zero))
         await probe.finished()
         events.continuation.finish()
         var iterator = events.stream.makeAsyncIterator()
-        #expect(await iterator.next() == (silent ? probe.id : nil))
+        let match = await iterator.next()
+        #expect(match?.0 == (silent ? probe.id : nil))
+        if silent { #expect(match?.1 == "zh-stop" && match?.2 == .milliseconds(160)) }
         #expect(await capability.cancelled)
-        #expect(await capability.thresholds == Array(repeating: Float(0.20), count: 6))
+        #expect(await capability.thresholds == Array(repeating: Float(0.20), count: keywords.count))
+    }
+}
+
+@Test func interruptionKeywordResourcesUseStableZipformerLabels() throws {
+    let lexicon = try SpeechKeywordLexicon.load()
+    let labels = Set(lexicon.keywords().map(\.label))
+    #expect(try InterruptionKeywordPolicy.load().isSubset(of: labels))
+    #expect(lexicon.phrase(for: "zh-stop") == "停下")
+    #expect(lexicon.phrase(for: "en-stop") == "stop")
+    #expect(throws: AgentConfigurationError.self) {
+        try SpeechKeywordLexicon.decode(Data(#"{"version":1,"keywords":[]}"#.utf8))
     }
 }

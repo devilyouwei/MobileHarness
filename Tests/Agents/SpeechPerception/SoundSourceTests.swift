@@ -191,13 +191,11 @@ extension LiveRuntimeTests {
         #expect(configuration.communication.requests.isEmpty)
         #expect(configuration.communication.subscriptions.isEmpty)
         #expect(configuration.communication.publications.map(\.protocol) == ["perception.audio.source.v1"])
-        #expect(
-            original.communication.subscriptions.map(\.protocol) == [
-                "agent.listening.mode.v1", "agent.reply.activity.v1",
-            ])
+        #expect(original.communication.subscriptions.isEmpty)
         #expect(
             original.communication.publications.map(\.protocol) == [
-                PerceptionMessage.speechProtocol, SpeechActivity.contract, "perception.audio.source.v1",
+                SpeechRecognition.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
+                "perception.audio.source.v1",
             ])
         #expect(configuration.agentID == original.agentID && configuration.version == original.version)
         let policy = try CommunicationPolicy(

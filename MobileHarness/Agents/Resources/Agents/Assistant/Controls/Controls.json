@@ -26,7 +26,7 @@
           },
           {
             "name": "wakeCondition", "valueType": "string", "required": false,
-            "description": "The user’s condition for speaking again, only for listening=quiet. Preserve any exact words the user requires.",
+            "description": "The user’s condition for speaking again, only for listening=false. Preserve any exact words the user requires.",
             "constraints": "Optional, nonempty, at most 512 UTF-8 bytes", "values": []
           }
         ]

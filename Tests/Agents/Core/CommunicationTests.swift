@@ -370,17 +370,20 @@ extension LiveRuntimeTests {
     #expect(policy.destinations(for: signal(final: true, topic: "user.input.speech.v1")).isEmpty)
     #expect(
         Set(speech.publications.map(\.protocol)) == [
-            "user.input.speech.v1", "perception.speech.activity.v1", "perception.audio.source.v1",
-            AssistantInterrupt.contract,
+            SpeechRecognition.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
+            "perception.audio.source.v1",
+        ])
+    #expect(assistant.publications == [.init(channel: "agent.task", protocol: "agent.task.events.v1")])
+    #expect(speech.subscriptions.isEmpty)
+    let inputs = assistant.subscriptions.filter { $0.sources == [AgentID.speechPerception.rawValue] }
+    #expect(
+        Set(inputs.map(\.protocol)) == [
+            SpeechRecognition.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
         ])
     #expect(
-        Set(assistant.publications) == [
-            .init(channel: "agent.task", protocol: "agent.task.events.v1"),
-            .init(channel: "agent.listening", protocol: "agent.listening.mode.v1"),
-            .init(channel: "agent.reply", protocol: "agent.reply.activity.v1"),
+        assistant.subscriptions.first { $0.protocol == AssistantInterrupt.contract }?.sources == [
+            AgentID.applicationControl.rawValue
         ])
-    #expect(Set(speech.subscriptions.map(\.protocol)) == ["agent.listening.mode.v1", "agent.reply.activity.v1"])
-    #expect(speech.subscriptions.allSatisfy { $0.sources == ["assistant"] })
 
     #expect(assistant.requests.isEmpty)
     #expect(Set(assistant.feedback) == [ExecutionFeedback.contract])
@@ -433,7 +436,9 @@ extension LiveRuntimeTests {
         from: Data("{\"width\":0,\"height\":480,\"sequence\":1,\"timestamp\":0,\"rotation\":0,\"people\":[]}".utf8))
     #expect(throws: CommunicationError.invalidPayload) { try AgentMessage.pose(pose).validatedSize() }
     let valid = AgentMessage.transcript("hello", final: true)
-    #expect(try JSONDecoder().decode(PerceptionMessage.self, from: valid.encodedContent()) == valid.perception)
+    #expect(
+        try JSONDecoder().decode(SpeechRecognition.self, from: valid.encodedContent())
+            == SpeechRecognition(.final, text: "hello", generation: nil))
     #expect(try valid.validatedSize() > 0)
 }
 

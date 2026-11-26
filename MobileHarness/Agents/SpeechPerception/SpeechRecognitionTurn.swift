@@ -20,11 +20,14 @@ actor SpeechRecognitionTurn {
     private var cancelled = false
     private var sentSamplesWithoutText = 0
     private var hasRecognizedText = false
+    private var inspectedEventCount: UInt64 = 0
     private var finalizedText = ""
     private var deadlineTranscript: String?
 
     var reachedNoTextEndpoint: Bool {
-        !hasRecognizedText && sentSamplesWithoutText >= Self.noTextSampleLimit
+        guard !hasRecognizedText, sentSamplesWithoutText >= Self.noTextSampleLimit, let session else { return false }
+        // A provider may have already emitted text while its reader is still waiting for this actor.
+        return inspectedEventCount == session.output.acceptedEventCount
     }
 
     init(
@@ -70,25 +73,26 @@ actor SpeechRecognitionTurn {
             throw CancellationError()
         }
         session = stream
+        inspectedEventCount = 0
         let prefix = completed
         let preview = preview
         reader = Task { [weak self] in
             var transcript = TranscriptAccumulator(prefix: prefix)
             for try await event in stream.output.events {
                 try Task.checkCancellation()
-                if let visible = try transcript.accept(event) {
-                    await self?.recordTranscript(
-                        visible, final: event.isFinal ? Self.join(prefix, transcript.finalText) : nil)
-                    try await preview(visible)
-                }
+                let visible = try transcript.accept(event)
+                let final = event.isFinal && visible != nil ? Self.join(prefix, transcript.finalText) : nil
+                await self?.recordEvent(visible, final: final)
+                if let visible { try await preview(visible) }
             }
             return transcript.finalText
         }
     }
 
-    private func recordTranscript(_ text: String, final: String?) {
+    private func recordEvent(_ text: String?, final: String?) {
         guard !cancelled else { return }
-        if !hasRecognizedText, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        inspectedEventCount += 1
+        if !hasRecognizedText, let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             hasRecognizedText = true
         }
         if let final { finalizedText = final }

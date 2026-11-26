@@ -26,7 +26,7 @@
           },
           {
             "name": "wakeCondition", "valueType": "string", "required": false,
-            "description": "仅用于 listening=quiet。概括用户指定的恢复条件，保留用户要求的原词。",
+            "description": "仅用于 listening=false。概括用户指定的恢复条件，保留用户要求的原词。",
             "constraints": "可省略，非空，最多 512 UTF-8 字节", "values": []
           }
         ]

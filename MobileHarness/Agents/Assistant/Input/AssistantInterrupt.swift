@@ -10,22 +10,13 @@ public struct AssistantInterrupt: Codable, Sendable, Equatable {
     public static let contract = "agent.interruption.v1"
     public let id: UUID
     public let target: Target
-    public let speechTurn: String?
-    public init(id: UUID = UUID(), target: Target = .current, speechTurn: String? = nil) {
+    public init(id: UUID = UUID(), target: Target = .current) {
         self.id = id
         self.target = target
-        self.speechTurn = speechTurn
     }
+
     public func message() -> AgentMessage {
-        AgentMessage(
-            contract: Self.contract, content: self, maximumBytes: 1024, id: id.uuidString,
-            validate: { signal in
-                if let turn = signal.speechTurn {
-                    guard !turn.isEmpty, turn.utf8.count <= 128, case .reply = signal.target else {
-                        throw CommunicationError.invalidPayload
-                    }
-                }
-            })
+        .init(contract: Self.contract, content: self, maximumBytes: 1024, id: id.uuidString, validate: { _ in })
     }
 }
 

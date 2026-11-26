@@ -38,6 +38,8 @@ public final class InferenceSession<Event: Sendable>: Sendable {
     @_spi(InferenceAdapter) public let metadataRecorder: InferenceMetadataRecorder
     public var metadata: InferenceMetadata { metadataRecorder.snapshot }
     public var phase: InferencePhase { storage.phase }
+    /// Cumulative events admitted by the producer, including events the consumer already read.
+    public var acceptedEventCount: UInt64 { storage.acceptedEventCount }
     public func waitForCompletion() async { await cleanup() }
     /// Join this request's native cleanup on every consumer exit, including early return.
     public func withCleanup<Value: Sendable>(_ operation: @Sendable () async throws -> Value) async throws -> Value {
@@ -209,6 +211,7 @@ private final class SessionStorage<Event: Sendable>: Sendable {
         var consumerClaimed = false
         var phase: InferencePhase = .running
         var outstanding = 0
+        var acceptedEventCount: UInt64 = 0
         var capacityWaiter: CheckedContinuation<Void, Error>?
     }
     private let state: Mutex<State>
@@ -225,6 +228,7 @@ private final class SessionStorage<Event: Sendable>: Sendable {
     }
 
     var phase: InferencePhase { state.withLock { $0.phase } }
+    var acceptedEventCount: UInt64 { state.withLock { $0.acceptedEventCount } }
     func markRunning() { state.withLock { if $0.termination == nil { $0.phase = .running } } }
 
     func claimConsumer() -> Bool {
@@ -248,6 +252,7 @@ private final class SessionStorage<Event: Sendable>: Sendable {
                 guard let continuation = state.continuation else { throw CapabilityError.sessionClosed }
                 if let capacity, state.outstanding >= capacity { throw CapabilityError.bufferOverflow }
                 state.outstanding += 1
+                state.acceptedEventCount += 1
                 return continuation
             }
         } catch {

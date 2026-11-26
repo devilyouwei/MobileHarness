@@ -258,7 +258,10 @@ func processCameraFixture(_ input: AgentInput, using agent: VisionPerceptionAgen
 
 actor NativeMicrophoneFixture: AudioCaptureObserving {
     nonisolated let capture = MicrophoneCapture()
+    private var playback = AudioPlaybackSnapshot()
     func listenCapture() throws -> MicrophoneCaptureInput { try capture.subscribe() }
+    func playbackSnapshot() async -> AudioPlaybackSnapshot { playback }
+    func setPlayback(_ value: AudioPlaybackSnapshot) { playback = value }
 }
 
 func syntheticAudioInput(

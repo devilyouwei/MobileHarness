@@ -67,6 +67,8 @@ ModelContext's management SPI reads an existing resource's inferenceActive flag.
 
 InferenceSession.phase exposes queued/running/finished/failed/cancelled; emitter marks execution start. Chat adapters bind waitForCompletion to their native worker cleanup. Cancelling a stream suppresses delivery immediately, while its owner can join actual provider exit before releasing serial execution.
 
+`InferenceSession.acceptedEventCount` reports cumulative output events accepted by its bounded queue. A consumer can compare its processed count to this value when making a decision that depends on observing all output emitted so far.
+
 InferenceSession.withCleanup scopes event consumption and joins native cleanup on success, parse/storage errors, early return and cancellation. An already drained normal terminal remains finished; cancelling unconsumed buffered output still suppresses its delivery.
 
 ## External state listeners

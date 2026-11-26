@@ -384,14 +384,14 @@ extension AssistantChatWorker {
                 try await emitPlayback(text, for: input, modelGenerated: modelGenerated)
                 continue
             }
-            if call.actionPath == Self.caption.path, listening?.mode == .quiet { continue }
+            if call.actionPath == Self.caption.path, listening?.isListening == false { continue }
             guard try emitAction(call, for: input, modelGenerated: modelGenerated) else { throw HarnessError.queueFull }
             try await recordSkillUse(path: call.actionPath.description, callType: "action", input: input)
         }
     }
 
     func emitPlayback(_ text: String, for input: AgentInput, modelGenerated: Bool = false) async throws {
-        guard listening?.mode != .quiet else { return }
+        guard listening?.isListening != false else { return }
         guard let speechOutput else { throw CapabilityError.unavailable("Speech output not configured") }
         let audioID = try await speechOutput.prepare(text: text, input: input)
         do {

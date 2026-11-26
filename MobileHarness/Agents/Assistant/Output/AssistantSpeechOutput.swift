@@ -44,7 +44,6 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
     private var processed = 0
     private var playing: String?
     private var nativePlayback: [String: InputScope] = [:]
-    private var playbackHistory = SpeechPlaybackHistory()
     private let island = AgentIslandPublication()
 
     func configure(synthesis: any SpeechSynthesisCapability, store: AudioCache) throws {
@@ -72,22 +71,17 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
         guard nativePlayback.count < 32 else { throw HarnessError.queueFull }
         nativePlayback[audioID] = scope
     }
-    func playbackChanged(audioID: String, active: Bool, at time: ContinuousClock.Instant = .now) async {
-        guard !closed, binding != nil, let scope = nativePlayback[audioID] else { return }
+    func playbackChanged(audioID: String, active: Bool) async {
+        guard !closed, binding != nil, nativePlayback[audioID] != nil else { return }
         if active {
             playing = audioID
-            playbackHistory.started(id: audioID, sessionID: scope.session, at: time)
         } else {
-            playbackHistory.ended(id: audioID, at: time)
             if playing == audioID { playing = nil }
             nativePlayback[audioID] = nil
         }
         await refreshIsland()
     }
-    func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot {
-        playbackHistory.read(sessionID: sessionID)
-    }
-    func isPlaying(sessionID: String) -> Bool? {
+    func isPlaying(sessionID: String) async -> Bool? {
         guard !closed, binding != nil else { return nil }
         guard let playing else { return false }
         return nativePlayback[playing]?.session == sessionID
@@ -279,7 +273,6 @@ actor AssistantSpeechOutput: AssistantSpeechProducing {
             await producer?.value
             handles.removeAll()
             playing = nil
-            playbackHistory = SpeechPlaybackHistory()
             await refreshIsland()
         }
         ending = task
@@ -300,7 +293,6 @@ private enum AssistantSpeechFailureContext { @TaskLocal static var audioID: Stri
 /// A role-owned text-to-audio boundary. Admission reserves a handle, not audible completion.
 public protocol AssistantSpeechProducing: Sendable {
     func isPlaying(sessionID: String) async -> Bool?
-    func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot
     func prepare(text: String, input: AgentInput) async throws -> String
     func cancel(audioID: String, input: AgentInput) async throws
     func cancel(input: AgentInput) async
@@ -309,5 +301,4 @@ public protocol AssistantSpeechProducing: Sendable {
 
 extension AssistantSpeechProducing {
     public func isPlaying(sessionID: String) async -> Bool? { nil }
-    public func playbackSnapshot(sessionID: String) async -> SpeechPlaybackSnapshot { .init() }
 }

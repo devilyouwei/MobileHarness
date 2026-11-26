@@ -100,6 +100,26 @@ public struct AssistantContextState: AssistantChatState {
         reconcileTaskCompressions()
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case skillState, variables, listeningWakeCondition, taskViews, history, admissionSequence
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        skillState = try values.decodeIfPresent(AgentTaskSkillState.self, forKey: .skillState)
+        variables = try values.decodeIfPresent(AgentStateVariables.self, forKey: .variables) ?? .init()
+        listeningWakeCondition = try values.decodeIfPresent(String.self, forKey: .listeningWakeCondition)
+        taskViews = try values.decodeIfPresent([String: AgentTaskView].self, forKey: .taskViews)
+        history = try values.decodeIfPresent(AssistantArchive.self, forKey: .history) ?? .init()
+        admissionSequence = try values.decodeIfPresent(UInt64.self, forKey: .admissionSequence) ?? 0
+        if let entry = variables.entries["listening"], ["full", "half", "quiet"].contains(entry.value) {
+            let schema = try AgentConfigurations.stateSchema(named: Self.configurationName)
+            try variables.set(
+                "listening", String(entry.value != "quiet"), source: .host, schema: schema,
+                at: entry.writtenAt)
+        }
+    }
+
 }
 
 // MARK: - Signal preprocessing

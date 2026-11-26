@@ -7,18 +7,48 @@ import StorageCore
 import StorageTasks
 import UI
 
+struct InterruptionKeywordPolicy: Decodable {
+    private let version: Int
+    private let labels: [String]
+
+    static func load() throws -> Set<String> {
+        let path = "Agents/Assistant/Input/InterruptionKeywords.json"
+        let policy = try JSONDecoder().decode(Self.self, from: AgentConfigurations.data(path))
+        let labels = Set(policy.labels)
+        guard policy.version == 1, (1...32).contains(labels.count), labels.count == policy.labels.count,
+            labels.allSatisfy({ (1...128).contains($0.utf8.count) })
+        else { throw AgentConfigurationError.invalidField(path) }
+        return labels
+    }
+}
+
 extension AssistantChatWorker {
     public func receive(_ input: AgentInput) async throws {
+        try await receive(input, awakened: false)
+    }
+
+    func receiveAwakeningSpeech(_ input: AgentInput) async throws {
+        try await receive(input, awakened: true)
+    }
+
+    private func receive(_ input: AgentInput, awakened: Bool) async throws {
         if input.metadata.origin == .local {
             try input.context.validate()
             if case .text(let text) = input.payload, text.utf8.count > 16_384 {
                 throw CommunicationError.invalidPayload
             }
         }
+        let recognition = input.payload.speechRecognition
+        if let recognition, input.sessionID == speechSessionID {
+            guard recognition.kind == .final else { return }
+            guard !input.metadata.expired else { throw CommunicationError.expired }
+            if case .observation(let message) = input.payload { try input.validate(message) }
+            if !awakened, input.turn != nil, !noteSpeechTerminal(input) { return }
+        }
         let ordered: Bool
         if case .text = input.payload {
             ordered = true
-        } else if case .transcript(_, final: true)? = input.payload.perception {
+        } else if recognition?.kind == .final {
             ordered = true
         } else if case .observation(let message) = input.payload,
             message.content(as: AgentTaskResponse.self) != nil
@@ -29,14 +59,19 @@ extension AssistantChatWorker {
         } else {
             ordered = false
         }
-        if ordered && State.agentID == .assistant { try await inputAdmission.acquire() }
-        defer { if ordered && State.agentID == .assistant { inputAdmission.release() } }
-        do { try await receiveSignal(input) } catch {
+        do {
+            let serial = ordered && State.agentID == .assistant
+            if serial { try await inputAdmission.acquire() }
+            defer { if serial { inputAdmission.release() } }
+            try await receiveSignal(input, awakened: awakened)
+        } catch {
+            if input.sessionID == speechSessionID, recognition?.kind == .final, let turn = input.turn {
+                speechEnded(turn.id)
+            }
             if (error as? CommunicationError) == .invalidPayload {
                 ContainerInputMetrics.rejected(input, role: "ChatWorker")
             }
-            if input.metadata.origin == .local
-                || { if case .some(.transcript(_, final: true)) = input.payload.perception { true } else { false } }(),
+            if input.metadata.origin == .local || recognition?.kind == .final,
                 (error as? CommunicationError) != .unauthorized,
                 (error as? HarnessError) != .notRunning,
                 descriptor.inputs.contains(input.payload.kind)
@@ -48,7 +83,8 @@ extension AssistantChatWorker {
     }
 
     func receiveSignal(
-        _ input: AgentInput, semantic: AssistantInputMessage? = nil, attachments: [ChatMessage] = []
+        _ input: AgentInput, semantic: AssistantInputMessage? = nil, attachments: [ChatMessage] = [],
+        awakened: Bool = false
     ) async throws {
         if case .observation(let message) = input.payload, message.contract == AssistantInterrupt.contract {
             guard State.agentID == .assistant,
@@ -86,21 +122,45 @@ extension AssistantChatWorker {
                 throw CommunicationError.invalidPayload
             }
             try input.validate(message)
-            try await receiveSpeechActivity(input, activity)
+            try receiveSpeechActivity(input, activity)
             return
         }
-        if case .transcript(let text, final: true)? = input.payload.perception, input.sessionID == speechSessionID,
-            let listening, listening.mode == .quiet
+        if case .observation(let message) = input.payload, message.contract == SpeechKeywordMatch.contract {
+            guard State.agentID == .assistant, input.metadata.origin == .agent, input.metadata.incarnation != nil,
+                communicationPolicy.subscriptions.contains(where: {
+                    $0.channel == SpeechKeywordMatch.channel && $0.protocol == SpeechKeywordMatch.contract
+                        && $0.sources.contains(input.metadata.source) && input.metadata.topic == $0.channel
+                }),
+                let match = message.content(as: SpeechKeywordMatch.self)
+            else { throw CommunicationError.unauthorized }
+            guard !input.metadata.expired else { throw CommunicationError.expired }
+            guard input.metadata.contract == SpeechKeywordMatch.contract, input.metadata.version == 1,
+                input.turn?.id == match.utterance
+            else { throw CommunicationError.invalidPayload }
+            try input.validate(message)
+            try await receiveSpeechKeyword(input, match)
+            return
+        }
+        if let recognition = input.payload.speechRecognition, recognition.kind == .final,
+            input.sessionID == speechSessionID
         {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-            // `quiet` keeps the utterance out of the conversation; only the exit judgment reads it.
-            if let turn = input.turn { speechEnded(turn.id) }
-            listening.receiveQuiet(text, input)
-            return
+            if recognition.text.isEmpty {
+                if let failure = recognition.failure {
+                    emit(.control("agent.error: speech recognition: \(failure)"), for: input)
+                }
+                if let turn = input.turn { speechEnded(turn.id) }
+                return
+            }
+            if !awakened, let listening, !listening.isListening {
+                if let turn = input.turn { speechEnded(turn.id) }
+                listening.receiveQuiet(recognition.text, input)
+                return
+            }
         }
         let arrivedAt = ContinuousClock.now
         let turnAtArrival = decisionTurn
-        let replyAtArrival = hasReplyWork(sessionID: input.sessionID)
+        let replyAtArrival = !executionCancellationBarrier && hasReplyWork(sessionID: input.sessionID)
         let playbackAtArrival = inputDecision == nil ? nil : await speechOutput?.isPlaying(sessionID: input.sessionID)
         if case .observation(let message) = input.payload, message.contract == ContainerFailureEvent.contract {
             throw CommunicationError.unauthorized
@@ -508,7 +568,6 @@ extension AssistantChatWorker {
         // Freeze context and target before enqueue can trigger this input's own reply.
         let occupied = replyAtArrival || playbackAtArrival == true
         let turn = occupied ? turnAtArrival.flatMap { $0.sessionID == input.sessionID ? $0 : nil } : nil
-        // Idle arrivals never need an interrupt signal, even if admission starts a new reply.
         let keywordInterrupted: Bool
         if input.sessionID == speechSessionID, let turn = input.turn,
             case .transcript(_, final: true)? = input.payload.perception,
@@ -519,7 +578,8 @@ extension AssistantChatWorker {
         } else {
             keywordInterrupted = false
         }
-        let snapshot = (occupied && !keywordInterrupted ? userText : nil).map { text in
+        // Idle input skips interruption Decision and uses ordinary queue admission.
+        let snapshot = (turn != nil && !keywordInterrupted && !awakened ? userText : nil).map { text in
             InputDecisionSnapshot(
                 input: input, text: text,
                 currentAssistantReply: turn?.assistant ?? "", receivedAt: arrivedAt)
@@ -533,9 +593,6 @@ extension AssistantChatWorker {
                 try await decisionQueue.submit(
                     .init(
                         snapshot: snapshot, target: turn?.id,
-                        allowsStandaloneSpokenStop: input.sessionID == speechSessionID && fullDuplex
-                            && listening?.mode == .full && input.metadata.origin == .agent
-                            && input.metadata.source == AgentID.speechPerception.rawValue,
                         interrupt: { [weak self] signal, session in
                             guard let self else { throw CommunicationError.unavailableTarget }
                             return try await self.requestInterrupt(signal, sessionID: session, source: "decision")
@@ -560,6 +617,16 @@ extension AssistantChatWorker {
             speechEnded(turn.id)
         }
         if lifecycle == .running { drain() }
+    }
+
+    func receiveSpeechKeyword(_ input: AgentInput, _ match: SpeechKeywordMatch) async throws {
+        guard input.sessionID == speechSessionID, fullDuplex, listening?.isListening != false,
+            interruptionKeywordLabels.contains(match.label), let reply = decisionTurn,
+            match.onset >= reply.startedAt
+        else { return }
+        _ = try await admitInterrupt(
+            .init(target: .reply(reply.id)), sessionID: input.sessionID, source: "keyword",
+            keyword: match)
     }
 
     func interactionViews(sessionID: String) async throws -> [AgentTaskView] {
@@ -710,12 +777,22 @@ extension AssistantChatWorker {
             guard waitingForSettlement || settlementAdmissions.isEmpty else { return }
         }
         while lifecycle == .running && !queue.isEmpty {
-            let excluded = Set(
+            var excluded = Set(
                 queue.inputs.filter { queued in
                     !settlements.contains(queued.id)
                         && (waitingForSettlement || blockedSessions.contains(queued.sessionID)
                             || (queued.sessionID == speechSessionID && interruptionWait != nil))
                 }.map(\.id))
+            let ordinarySpeech = queue.inputs.filter {
+                $0.sessionID == speechSessionID && !excluded.contains($0.id) && !settlements.contains($0.id)
+            }
+            let laterSpeech: Set<String>
+            if ordinarySpeech.contains(where: { !isAfterSpeechWindow($0) }) {
+                laterSpeech = Set(ordinarySpeech.filter { isAfterSpeechWindow($0) }.map(\.id))
+                excluded.formUnion(laterSpeech)
+            } else {
+                laterSpeech = []
+            }
             guard let entry = queue.take(excluding: excluded) else { return }
             let input = entry.input
             processed += 1
@@ -725,6 +802,7 @@ extension AssistantChatWorker {
             } else if fullDuplex, Self.inputText(input) != nil {
                 let excluded = Set(pendingRounds.values.map { $0.input.id })
                     .union(queue.inputs.filter { Self.inputText($0) == nil }.map(\.id))
+                    .union(laterSpeech)
                 let entries = [input] + queue.takeAll(sessionID: input.sessionID, excluding: excluded).map(\.input)
                 var seen: Set<String> = []
                 let members = entries.flatMap { batchMembers[$0.id] ?? [$0] }.filter { seen.insert($0.id).inserted }
@@ -745,7 +823,10 @@ extension AssistantChatWorker {
                         messages: values, interruptedIntentions: interruptedIntents[input.sessionID]
                     ).text()
                     batchTexts[input.id] = text
-                    if handleText(text, input: input) { return }
+                    if handleText(text, input: input) {
+                        if input.sessionID == speechSessionID { interruptionBatchStartedAt = nil }
+                        return
+                    }
                 } catch {
                     blockedSessions.insert(input.sessionID)
                     do { try queue.admit(input, disposition: .enqueue(priority: 0)) } catch {

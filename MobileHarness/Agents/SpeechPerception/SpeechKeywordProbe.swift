@@ -1,63 +1,88 @@
+import AgentCore
 import Foundation
 import ModelKit
 import OSLog
 
-/// One candidate feeds one bounded worker. Saturation retires the candidate instead of delaying ASR.
-struct SpeechKeywordProbe {
-    private static let log = Logger(subsystem: "dev.mobileharness", category: "SpeechKeyword")
-    private static let lexicon: [(keyword: SpeechKeyword, phrase: String)] = [
-        (.init(label: "zh-stop-talking", tokens: ["x", "iān", "b", "ié", "sh", "uō", "l", "e"]), "先别说了"),
-        (.init(label: "zh-stop-playback", tokens: ["t", "íng", "zh", "ǐ", "b", "ō", "b", "ào"]), "停止播报"),
-        (
-            .init(label: "en-stop-talking", tokens: ["S", "T", "AA1", "P", "T", "AO1", "K", "IH0", "NG"]),
-            "stop talking"
-        ),
-        (.init(label: "en-please-stop", tokens: ["P", "L", "IY1", "Z", "S", "T", "AA1", "P"]), "please stop"),
-        (.init(label: "en-stop", tokens: ["S", "T", "AA1", "P"], standalone: true), "stop"),
-        (.init(label: "zh-stop", tokens: ["t", "íng", "x", "ià"], standalone: true), "停下"),
-    ]
-    static let keywords = lexicon.map(\.keyword)
+/// Acoustic vocabulary shared by production spotting and the Settings diagnostic.
+struct SpeechKeywordLexicon: Decodable, Sendable {
+    private struct Entry: Decodable, Sendable {
+        let label: String
+        let phrase: String
+        let tokens: [String]
+        let standalone: Bool
 
-    static func keywords(threshold: Float) -> [SpeechKeyword] {
+        var valid: Bool {
+            (1...128).contains(label.utf8.count) && (1...128).contains(phrase.utf8.count)
+                && (1...32).contains(tokens.count) && tokens.allSatisfy { (1...32).contains($0.utf8.count) }
+        }
+    }
+
+    private let version: Int
+    private let keywords: [Entry]
+    private static let bundled = Result {
+        try decode(AgentConfigurations.data("Agents/SpeechPerception/ZipformerKeywords.json"))
+    }
+
+    static func load() throws -> Self { try bundled.get() }
+
+    static func decode(_ data: Data) throws -> Self {
+        let value = try JSONDecoder().decode(Self.self, from: data)
+        guard value.version == 1, (1...32).contains(value.keywords.count),
+            Set(value.keywords.map(\.label)).count == value.keywords.count,
+            value.keywords.allSatisfy(\.valid)
+        else { throw AgentConfigurationError.invalidField("ZipformerKeywords.json") }
+        return value
+    }
+
+    func keywords(threshold: Float = SpeechKeyword.defaultThreshold) -> [SpeechKeyword] {
         keywords.map { .init(label: $0.label, tokens: $0.tokens, standalone: $0.standalone, threshold: threshold) }
     }
 
-    static func phrase(for label: String) -> String {
-        lexicon.first { $0.keyword.label == label }?.phrase ?? label
+    func phrase(for label: String) -> String? {
+        keywords.first { $0.label == label }?.phrase
     }
+}
+
+/// One candidate feeds one bounded worker. Saturation retires the candidate instead of delaying ASR.
+struct SpeechKeywordProbe {
+    private static let log = Logger(subsystem: "dev.mobileharness", category: "SpeechKeyword")
 
     let id = UUID()
-    let replyID: UUID
-    let captureID: UUID
-    var matched = false
+    let generation: String
+    let onset: Duration
+    var match: (label: String, at: Duration)?
     var delivered = false
-    private let input: AsyncStream<[Float]>.Continuation
+    private struct Packet: Sendable {
+        let samples: [Float]
+        let capturedAt: Duration
+    }
+    private let input: AsyncStream<Packet>.Continuation
     private let worker: Task<Void, Never>
 
     init(
-        capability: any KeywordSpottingCapability, replyID: UUID, captureID: UUID,
-        threshold: Float = SpeechKeyword.defaultThreshold,
-        onMatch: @escaping @Sendable (UUID) async -> Void
+        capability: any KeywordSpottingCapability, generation: String, onset: Duration, keywords: [SpeechKeyword],
+        onMatch: @escaping @Sendable (UUID, String, Duration) async -> Void
     ) {
-        self.replyID = replyID
-        self.captureID = captureID
-        let stream = AsyncStream.makeStream(of: [Float].self, bufferingPolicy: .bufferingOldest(8))
+        self.generation = generation
+        self.onset = onset
+        let stream = AsyncStream.makeStream(of: Packet.self, bufferingPolicy: .bufferingOldest(8))
         input = stream.continuation
         let id = id
         worker = Task(priority: .userInitiated) {
             defer { stream.continuation.finish() }
             do {
-                guard let session = try await capability.openKeywords(Self.keywords(threshold: threshold)) else {
+                guard let session = try await capability.openKeywords(keywords) else {
                     return
                 }
                 do {
                     var tail: [Float] = []
-                    for await samples in stream.stream {
+                    for await packet in stream.stream {
+                        let samples = packet.samples
                         try Task.checkCancellation()
                         tail = Array((tail + samples).suffix(2560))
-                        if try await session.accept(samples) != nil {
+                        if let label = try await session.accept(samples) {
                             if Self.hasSilentTail(tail), !Task.isCancelled {
-                                await onMatch(id)
+                                await onMatch(id, label, packet.capturedAt + .nanoseconds(samples.count * 62_500))
                             } else if !Task.isCancelled {
                                 Self.log.debug("Keyword hit rejected by the silent tail gate")
                             }
@@ -76,8 +101,8 @@ struct SpeechKeywordProbe {
         }
     }
 
-    func submit(_ samples: [Float]) -> Bool {
-        switch input.yield(samples) {
+    func submit(_ samples: [Float], capturedAt: Duration) -> Bool {
+        switch input.yield(Packet(samples: samples, capturedAt: capturedAt)) {
         case .enqueued, .terminated: return true
         case .dropped:
             Self.log.notice("Keyword probe queue full; deferring to the ASR transcript")
@@ -111,6 +136,7 @@ actor SpeechKeywordTest {
 
     private var session: any KeywordSpottingSession
     private let reopen: @Sendable () async throws -> any KeywordSpottingSession
+    private let lexicon: SpeechKeywordLexicon
     private var tail: [Float] = []
     private var finished = false
     private var heardAudio = false
@@ -120,10 +146,11 @@ actor SpeechKeywordTest {
     private var peakRMS: Float = 0
 
     init(
-        session: any KeywordSpottingSession,
+        session: any KeywordSpottingSession, lexicon: SpeechKeywordLexicon,
         reopen: @escaping @Sendable () async throws -> any KeywordSpottingSession
     ) {
         self.session = session
+        self.lexicon = lexicon
         self.reopen = reopen
     }
 
@@ -165,7 +192,7 @@ actor SpeechKeywordTest {
         guard let label else { return observation }
         let silentTail = SpeechKeywordProbe.hasSilentTail(tail)
         await stop()
-        observation.hit = (SpeechKeywordProbe.phrase(for: label), silentTail)
+        observation.hit = (lexicon.phrase(for: label) ?? label, silentTail)
         return observation
     }
 

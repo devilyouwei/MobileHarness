@@ -10,7 +10,16 @@ import UI
 extension AssistantChatWorker {
     public func start() async throws {
         guard lifecycle == .registered else { throw HarnessError.invalidTransition }
-        _ = try await contextRepository.snapshot()
+        let saved = try await contextRepository.snapshot()
+        if let listening {
+            let value = saved.state.variables.value("listening")
+            if value == nil {
+                try await setHostState("listening", to: "true")
+            } else {
+                try await listening.apply(
+                    value != "false", source: .model, wakeCondition: saved.state.listeningWakeCondition)
+            }
+        }
         try await AssistantHistoryContext.attach(repository: contextRepository, store: conversations)
         _ = try await conversations.readCurrent()
         if usesSkills {
@@ -138,6 +147,8 @@ extension AssistantChatWorker {
     }
     public func stop() async {
         lifecycle = .stopped
+        let cleanup = keywordCleanup?.task
+        cleanup?.cancel()
         retireExecutionInterruption()
         listening?.cancelJudgment()
         cancelInterruptionWait()
@@ -189,6 +200,7 @@ extension AssistantChatWorker {
         routingWorkers.removeAll()
         await speechOutput?.stop()
         await worker?.value
+        await cleanup?.value
         replyInputs.removeAll()
         await publishInputQueue()
         do { try await conversations.checkpoint() } catch {

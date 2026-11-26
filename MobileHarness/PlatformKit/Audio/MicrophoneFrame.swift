@@ -69,6 +69,7 @@ struct AudioPCMContinuity: Sendable {
 /// Read-only current capture. Subscription never requests permission or starts hardware.
 public protocol AudioCaptureObserving: Sendable {
     func listenCapture() async throws -> MicrophoneCaptureInput
+    func playbackSnapshot() async -> AudioPlaybackSnapshot
 }
 
 /// Explicit capture execution. Read-only observers receive AudioCaptureObserving instead.
@@ -158,4 +159,31 @@ final class MicrophoneCapture: Sendable {
         }
     }
     deinit { continuation.finish() }
+}
+
+/// Bounded native playback history for capture-time policy. Ended periods can supply a short onset tail.
+public struct AudioPlaybackSnapshot: Sendable {
+    public struct Period: Sendable {
+        public let start: ContinuousClock.Instant
+        public let end: ContinuousClock.Instant?
+
+        public init(start: ContinuousClock.Instant, end: ContinuousClock.Instant? = nil) {
+            self.start = start
+            self.end = end
+        }
+    }
+
+    private let periods: [Period]
+
+    public init(periods: [Period] = []) { self.periods = Array(periods.suffix(32)) }
+
+    public func isPlaying(at time: ContinuousClock.Instant, tail: Duration = .zero) -> Bool {
+        periods.contains { period in
+            time >= period.start && period.end.map { time < $0 + tail } != false
+        }
+    }
+}
+
+extension AudioCaptureObserving {
+    public func playbackSnapshot() async -> AudioPlaybackSnapshot { .init() }
 }

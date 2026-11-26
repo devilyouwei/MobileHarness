@@ -25,7 +25,7 @@ A thrown error becomes a `controlFailed` tool result and a value result is busin
 
 The model supplies only a short name; the variable always lives in the Assistant's own table, so Container State and other Agents are unreachable. Declared variables come from `states` in Agent.json (see [Resources/Agents](../../Resources/Agents/README.md)); every other lowercase name is a free note. The model cannot write a `readOnly` variable, and nothing about access appears in the prompt: the write is rejected with `readOnly` and the decision continues. The host writes through `setHostState` (source `host`), which ignores `access` but accepts only declared names and never the `task` variable.
 
-`wakeCondition` is accepted only for `listening=quiet`. It is optional and limited to 512 UTF-8 bytes after trimming. Use `literal:` followed by the exact phrase for a keyword, or plain text for a semantic condition. The mode write commits the condition alongside the variable and clears it whenever the mode leaves quiet. `state.get("listening")` returns an object with `mode` and `wakeCondition`. See [listening input](../Input/README.md#listening-and-quiet).
+`wakeCondition` is optional for `listening=false` and accepts up to 512 UTF-8 bytes. Use `literal:` followed by the exact phrase, or plain text for a semantic condition. The write stores the condition with the Boolean state. A write enabling listening clears the condition. `state.get("listening")` returns `listening`, `wakeCondition` and the write timestamp. See [listening input](../Input/README.md#listening-and-quiet).
 
 `task` is the variable bound to the `task` trigger. Its value is owned by the foreground goal record, not by the variable table, so exactly one copy exists:
 

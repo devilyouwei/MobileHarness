@@ -28,7 +28,7 @@ flowchart LR
     Ports["App-bound neutral host ports"] --> Assistant
 ```
 
-Native observations and UI requests have role-owned consumers. Final SpeechPerception transcripts arrive through authenticated communication. Assistant does not consume raw PCM/video, directly switch devices or import Actions/CallRuntime/ExecutionRuntime implementations. App binds narrow collaboration interfaces. Home text acknowledgment establishes admission, not reply or effect completion.
+SpeechPerception sends authenticated VAD, ASR and keyword facts. Assistant owns admission, conversation and interruption. Native PCM and camera frames stay with perception roles. App binds the runtime collaboration interfaces. Home text acknowledgment confirms admission.
 
 ## Files
 
@@ -56,7 +56,7 @@ The root keeps the Agent entry, container, execution session and processing asse
 | [AssistantProcessing.swift](AssistantProcessing.swift) | Concrete state, prompt/capability assembly, preprocessing and history binding. |
 | [AssistantSessionControl.swift](Workflow/AssistantSessionControl.swift) | Runtime cleanup/close message and typed decoding. |
 | [AssistantInterrupt.swift](Input/AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
-| [AssistantListeningSignal.swift](Input/AssistantListeningSignal.swift) | `agent.listening.mode.v1` / `agent.reply.activity.v1` messages and their publication. |
+| [ListeningControl.swift](Input/ListeningControl.swift) | Assistant 私有布尔聆听门控。 |
 | [ListeningCoordinator.swift](Input/ListeningCoordinator.swift) / [QuietExitJudge.swift](Input/QuietExitJudge.swift) | `listening` Trigger handler, `quiet` exit judgment and its record. |
 | [AssistantInputDecision.swift](Input/AssistantInputDecision.swift) | Settings-selected Decision model, bounded inference for interrupt and quiet wake, and targeted interrupt settlement. |
 | [AssistantInputBatch.swift](Input/AssistantInputBatch.swift) | Trusted source timeline, batch text, source-line markers and input prompt access. |
@@ -112,7 +112,7 @@ State, Skill and send are Assistant-owned controls (see [Agent controls](../Supp
 
 Goal creation validates a candidate, commits business identity, then binds runtime context; failed binding explicitly closes that identity. Only admitted valid model calls count as Skill use; execution failure counts, rejected parsing/parameters do not. Recent Skills reset to five decisions on load/use. Full user decisions settle retention once; system observations do not decrement it. Skills never depend on the goal: an active goal neither holds Skills nor pauses their counters. [Context](../Support/Context/README.md#task-and-skill-lifecycle) owns dependency, LRU, capacity and rollback algorithms.
 
-Interrupt/failure retains the unfinished goal and returns it to waitingUser. Close releases matching session-scoped recent Skills but does not fabricate goal completion. Explicit change of goal reports the old outcome (the `note` of the replacing `state.set`) before proceeding. Unclear continuation is resolved with the user. Camera/media and draft effects are confirmed by their own receipts. While `listening` is `quiet`, unsolicited peer reports are kept in the conversation but never admitted as input or played; see [聆听模式](../SpeechPerception/README.md#聆听模式-listening).
+Interrupt/failure retains the unfinished goal and returns it to waitingUser. Close releases matching session-scoped recent Skills but does not fabricate goal completion. Explicit change of goal reports the old outcome (the `note` of the replacing `state.set`) before proceeding. Unclear continuation is resolved with the user. Camera/media and draft effects are confirmed by their own receipts. While `state.listening` is `false`, unsolicited peer reports are kept in the conversation but never admitted as input or played; see [quiet wake](Input/README.md#listening-and-quiet).
 
 ## Delegation and peer facts
 
@@ -164,9 +164,9 @@ Shared driver queue and provider lifecycle limits are documented in [Chat](../Su
 
 ## Full-duplex input and Decision
 
-The Assistant owns the `listening` mode. When its model enters `quiet`, the active round publishes the change and cancels its input's audio handles, then settles normally. Host entry uses the session interruption path. The Assistant keeps the optional wake condition in its private State for the current quiet episode. See [input and mode handling](Input/README.md#listening-and-quiet).
+The Assistant owns the Boolean `state.listening` gate. When its model enters `quiet`, the active round updates its private state and cancels its input's audio handles, then settles normally. Host entry uses the session interruption path. The Assistant keeps the optional wake condition in its private State for the current quiet episode. See [input and mode handling](Input/README.md#listening-and-quiet).
 
-Authenticated SpeechPerception final transcripts and local user text enter the ordinary queue before any eligible Decision runs. Only arrivals during same-session reply work (including tool settlement) or playback submit Decision; idle arrivals dispatch without a Decision request or fabricated result. Peer reports and correlated Action facts bypass Decision. Queue capacity, attribution, batching and round settlement remain admission/dispatch concerns; classification never gates them.
+Nonempty final ASR and local user text enter ordinary admission. A final that arrived while the same session had reply work or playback is eligible for interruption Decision. An accepted keyword interruption suppresses Decision for its utterance. ASR arriving first closes eligibility for a later keyword. Idle and wake admissions skip the interrupt Decision. Peer reports and execution feedback retain their own admission paths.
 
 AssistantInputDecision sends a localized sentence quoting the reply captured at admission and the latest user input, followed by one question asking whether the user intends to interrupt. The reply is empty before natural-language output is admitted to playback. ModelKit implements provider encoding and the boolean readout through `noul`.
 
@@ -176,7 +176,7 @@ Selected models are exclusive: D3 Edge, Vela, or existing local/cloud Chat throu
 
 Logs distinguish the raw boolean from signal status (`not_requested`, `no_target`, `target_expired`, `interrupted`, `interrupt_failed`, `decision_failed`), selected model, submitted semantic request and failure details. The measured duration covers classification, excluding earlier queue waiting and signal application/cleanup. Historical UI dispositions remain readable but are not produced by the new classifier. Only a completed interruption emits transient Island feedback. There is no discard/continue-listening path, held speech buffer or fragment concatenation.
 
-The `agent.reply.activity.v1` Signal carries same-session reply activity, recent native playback intervals and an optional continuation observation. Assistant starts that observation when it accepts a full-duplex interruption. SpeechPerception replies after 64 scored VAD windows of 512 samples in the current capture. Pending onset candidates and up to 32 tracked utterances must settle before dispatch. Final ASR travels on `user.input.speech.v1`. Empty or failed ASR, or failed final-text delivery, settles the tracked utterance explicitly. The window and utterance facts use `perception.speech.activity.v1`, with a capture-generation fence for window completion. Capture recovery restarts the count. Generation and Action cleanup proceed alongside the speech observation, and both must be confirmed. If cleanup is unconfirmed, Assistant shows a Home toast, preserves queued input and holds automatic replies. This runtime state stays outside the model context.
+A full-duplex interruption waits for at least 64 actual VAD windows. Assistant retains onset active at admission and any candidate that starts by window 64. Qualifying speech may finish beyond the boundary. A later utterance uses ordinary admission and stays outside the retained batch. Execution cleanup runs in parallel; dispatch requires the full window, settled speech and confirmed cleanup. See [post-interruption wait](Input/README.md#post-interruption-wait).
 
 ## Input timeline and channels
 
@@ -216,11 +216,11 @@ Speech presentation has its own identity. Actual audioID playback callbacks prev
 
 Worker, speech producer and output scopes outlive pages. Interrupt/pause joins current owned work while retaining unfinished Task/Skills; close ends matching execution/State scopes; root stop joins all workers. AssistantChatState decodes its host-control contract into AssistantChatControl and the worker validates local runtime origin before cleanup. Fixture state does not inherit another role's host-control schema. Listening remains SpeechPerception-owned, and other roles retain their own lifetimes.
 
-AssistantSpeechOutput registers native playback against a reply input before the first scheduled buffer, retains the registration through cancellation, and acknowledges stop once native playback returns. It records paired native playback start and stop times separately from synthesis and reply work. Its bounded SpeechPlaybackHistory retains at most 32 intervals. When the snapshot changes, the Assistant publishes it with the same-session reply activity Signal. Late ends cannot close another audio ID. Audio-scope shutdown clears the history. The native start timestamp describes when playback first schedules a buffer.
+AssistantSpeechOutput registers native playback against a reply input before scheduling and tracks the active handle within its session. Cancellation and native completion retire this handle. PlatformKit owns playback intervals for capture policy.
 
 ## Unified interruption control
 
-`AssistantInterrupt.swift` owns the typed `assistant.interrupt` v1 communication contract. Targets are `.current` (lock the same-session reply when received) or `.reply(UUID)` (match an already captured reply). `AssistantChatWorker.requestInterrupt` is the shared entry for Decision, trusted host controls and authorized Agent messages. Idle user input never invokes Decision; an external idle request returns `no_target`. A public `currentReplyID(sessionID:)` exposes the opaque target to trusted callers without granting communication authority.
+`AssistantInterrupt.swift` owns the typed `agent.interruption.v1` communication contract. Targets are `.current` (lock the same-session reply when received) or `.reply(UUID)` (match an already captured reply). `AssistantChatWorker.requestInterrupt` is the shared entry for Decision, trusted host controls and authorized Agent messages. Idle user input never invokes Decision; an external idle request returns `no_target`. A public `currentReplyID(sessionID:)` exposes the opaque target to trusted callers without granting communication authority.
 
 The worker validates and claims the reply before invoking AssistantExecutionSession. ExecutionSession cancels generation and asks Gateway to cancel all in-flight Assistant execution in that session. Gateway acknowledges the interruption scope separately from each Action and each model round. Assistant accepts the session cleanup terminal for the same request ID and dispatches only once the generation and continuation conditions also settle. See [ExecutionFeedback](../Support/Core/Output/README.md) and [Workflow](Workflow/README.md).
 
@@ -233,13 +233,16 @@ flowchart LR
  Queue -->|Busy at arrival only| Decision[Independent Decision queue]
  Decision -->|targeted true signal| Entry[requestInterrupt]
  Host[Host stop request] --> Entry
- Peer[Authorized Agent] --> Gateway[Gateway / assistant.interrupt]
+ Peer[ApplicationControl] --> Gateway[Gateway / agent.interruption.v1]
  Gateway --> Entry
+ Keyword[Zipformer hit] --> Labels[Check configured label and current reply]
+ Labels --> Entry
  Entry --> Claim[Claim matching reply and fence dispatch]
  Claim --> Cleanup[Join generation and execution cleanup]
- Claim --> Observe[Observe 64 VAD windows and settle ASR]
+ Claim --> Observe[Count 64 VAD windows and settle qualifying ASR]
+ Observe --> Late[Later onsets use ordinary queue]
  Cleanup -->|Scope terminal confirms cleanup| Dispatch
- Observe -->|Current capture sends ready and ASR settles| Dispatch
+ Observe -->|Windows complete and qualifying speech settles| Dispatch
  Cleanup -->|Unconfirmed| Hold[Keep queue and show Home toast]
 ```
 

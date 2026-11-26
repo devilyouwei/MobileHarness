@@ -156,17 +156,3 @@ struct SpeechOnsetPolicy: Equatable {
         onsetWindows = raised ? min(Self.maximumWindows, windows + Self.playbackWindowIncrease) : windows
     }
 }
-
-extension SpeechPlaybackSnapshot {
-    func state(at time: ContinuousClock.Instant) -> (playing: Bool, known: Bool) {
-        let offset = Self.offset(at: time)
-        if let retainedSince, offset < retainedSince { return (false, false) }
-        for period in periods.reversed() where offset >= period.start {
-            if let end = period.end, offset >= end + .milliseconds(200) {
-                continue
-            }
-            return (true, true)
-        }
-        return (false, true)
-    }
-}

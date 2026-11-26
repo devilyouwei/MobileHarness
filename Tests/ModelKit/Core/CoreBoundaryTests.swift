@@ -84,3 +84,18 @@ private actor CoreLoadLatch {
     #expect(await context.status == ModelResourceState.ready)
     await context.shutdown()
 }
+
+@Test func inferenceEventCountTracksProducerAdmissionAcrossConsumerReads() async throws {
+    let pipe = InferenceSession<Int>.make(
+        limits: try StreamLimits(capacity: 2), estimatedBytes: { _ in MemoryLayout<Int>.size })
+    #expect(pipe.session.acceptedEventCount == 0)
+    try pipe.emitter.yield(1)
+    try pipe.emitter.yield(2)
+    #expect(pipe.session.acceptedEventCount == 2)
+    pipe.emitter.finish()
+    var events = pipe.session.events.makeAsyncIterator()
+    #expect(try await events.next() == 1)
+    #expect(try await events.next() == 2)
+    #expect(try await events.next() == nil)
+    #expect(pipe.session.acceptedEventCount == 2)
+}

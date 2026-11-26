@@ -2,6 +2,8 @@
 
 日期：2026-11-23。
 
+2026-11-26：两个角色当前的接口与事件见 [单向语音通信](One-Way-Speech-Perception.md)。下文记录迁移到 Signal 的前一阶段。
+
 ## 问题
 
 1. `quiet` 退出判定（QuietExitJudge、提示词、ListeningCoordinator）位于 SpeechPerception。感知角色不思考、不拥有语言模型，判断 `listening` 状态变化的模型与 pipeline 应属 Assistant。

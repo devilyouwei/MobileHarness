@@ -134,7 +134,7 @@ extension AssistantChatWorker {
         if fullDuplex {
             let snapshot = try await contextRepository.snapshot()
             guard view.originDialog == snapshot.state.history.current.id else { return }
-            if ListeningMode(variable: snapshot.state.variables.value("listening")) == .quiet {
+            if snapshot.state.variables.value("listening") == "false" {
                 // A report is kept in the conversation but never admitted as input, which would make the Assistant speak.
                 if let event = view.event, let originDialog = view.originDialog {
                     try await recordPeerTurn(id: event.eventID, text: view.text, originDialog: originDialog)
@@ -200,7 +200,7 @@ extension AssistantChatWorker {
             try Task.checkCancellation()
             guard lifecycle == .running, snapshot.state.history.current.id == notice.originDialog else { return }
             // `quiet` silences every unsolicited announcement, including peer reports.
-            guard ListeningMode(variable: snapshot.state.variables.value("listening")) != .quiet else { return }
+            guard snapshot.state.variables.value("listening") != "false" else { return }
             if notice.kind == .userInput || notice.kind?.isMilestone == true {
                 let view = snapshot.state.taskViews?[notice.scopeID]
                 guard view?.terminal == false else { return }

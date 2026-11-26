@@ -130,7 +130,8 @@ extension AssistantChatWorker {
                 fields["writtenAt"] = AgentStatePrompt.time(entry.writtenAt, language: AgentPrompts.language)
                 if path == "listening" {
                     fields["value"] = [
-                        "mode": entry.value, "wakeCondition": state.listeningWakeCondition as Any? ?? NSNull(),
+                        "listening": entry.value == "true",
+                        "wakeCondition": state.listeningWakeCondition as Any? ?? NSNull(),
                     ]
                 }
             }
@@ -173,7 +174,7 @@ extension AssistantChatWorker {
         let new = try value.map { try AgentStateVariables.normalized(name, $0, source: source, schema: schema) }
         let condition = wakeCondition?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let condition {
-            guard name == "listening", new == ListeningMode.quiet.rawValue, !condition.isEmpty else {
+            guard name == "listening", new == "false", !condition.isEmpty else {
                 throw AgentStateError.invalidValue(name)
             }
             guard condition.utf8.count <= 512 else { throw AgentStateError.valueTooLong(name) }
@@ -187,7 +188,7 @@ extension AssistantChatWorker {
         try await contextRepository.transaction { context in
             var variables = context.state.variables
             if name == "listening" {
-                if new != ListeningMode.quiet.rawValue || old != new || condition != nil {
+                if new != "false" || old != new || condition != nil {
                     context.state.listeningWakeCondition = condition
                 }
             }

@@ -2,7 +2,7 @@
 
 Everything leaving the Assistant: Action and Tool emission, speech and caption production, Action feedback presentation and playback failures.
 
-While the listening coordinator reports quiet, output skips new playback and reply captions. On model entry to quiet, Assistant cancels audio for the initiating input through its speech producer, which joins audio cleanup independently of the generation worker. Normal round settlement records the state control and any admitted Action outcomes.
+While `state.listening` is false, output skips new playback and reply captions. On model entry to quiet, Assistant cancels audio for the initiating input through its speech producer, which joins audio cleanup independently of the generation worker. Normal round settlement records the state control and any admitted Action outcomes.
 
 Native playback registers its audio handle before scheduling PCM. The registration keeps the reply input and session identity through cache revocation and reports audible intervals for perception. Interruption cancels synthesis and revokes handles. Native stop is joined by the scheduled playback Action and confirmed in the execution scope terminal. Playback that exits before the first PCM adds no audible interval.
 

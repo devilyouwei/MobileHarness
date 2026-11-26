@@ -346,6 +346,9 @@
                         admission?.report("audio", "interrupted", AudioIOError.interrupted)
                         self.captureReadiness?.resolve(.failure(AudioIOError.interrupted))
                         self.captureSource?.finish(throwing: AudioIOError.interrupted)
+                        if let token = self.playbackToken {
+                            self.failPlayback(token: token, error: AudioIOError.interrupted)
+                        }
                         events.send(.interrupted)
                     }
                 },
@@ -364,6 +367,9 @@
                         if self.captureToken != nil, self.captureContext.supportsFullDuplex,
                             !(await self.playback.isEchoCancellationActive())
                         {
+                            if let token = self.playbackToken {
+                                self.failPlayback(token: token, error: AudioIOError.interrupted)
+                            }
                             events.send(.routeChanged)
                             continue
                         }
@@ -371,6 +377,9 @@
                             applicationChange: reason == .categoryChange || reason == .override,
                             unavailable: reason == .noSuitableRouteForCategory, previous: previous, current: current)
                         {
+                            if let token = self.playbackToken {
+                                self.failPlayback(token: token, error: AudioIOError.interrupted)
+                            }
                             events.send(event)
                         }
                     }
@@ -418,6 +427,20 @@
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         private var playbackWaiter: CheckedContinuation<Void, Error>?
         private var playbackToken: String?
+        private var playbackPeriods: [AudioPlaybackSnapshot.Period] = []
+
+        public func playbackSnapshot() async -> AudioPlaybackSnapshot { .init(periods: playbackPeriods) }
+
+        private func recordPlaybackStarted() {
+            guard playbackPeriods.last?.end != nil || playbackPeriods.isEmpty else { return }
+            playbackPeriods.append(.init(start: .now))
+            if playbackPeriods.count > 32 { playbackPeriods.removeFirst() }
+        }
+
+        private func recordPlaybackEnded() {
+            guard let period = playbackPeriods.last, period.end == nil else { return }
+            playbackPeriods[playbackPeriods.count - 1] = .init(start: period.start, end: .now)
+        }
         private var spaceWaiter: CheckedContinuation<Void, Error>?
         private var scheduled: Set<String> = []
         private var playbackFailure: (any Error)?
@@ -664,6 +687,7 @@
                             streamRate = pcm.sampleRate
                             try await schedule(pcm, token: token)
                             try checkPlayback(token)
+                            if !scheduled.isEmpty { recordPlaybackStarted() }
                             if !started {
                                 started = true
                                 onStarted?()
@@ -676,6 +700,7 @@
                     } onCancel: {
                         Task { @MainActor [weak self] in self?.failPlayback(token: token, error: CancellationError()) }
                     }
+                    recordPlaybackEnded()
                     await playback.finish(token)
                     try checkPlayback(token)
                     playbackToken = nil
@@ -721,6 +746,7 @@
             spaceWaiter = nil
             space?.resume()
             if scheduled.isEmpty {
+                recordPlaybackEnded()
                 let drained = playbackWaiter
                 playbackWaiter = nil
                 drained?.resume()
@@ -730,6 +756,7 @@
         private func failPlayback(token: String, error: any Error) {
             guard playbackToken == token else { return }
             playbackFailure = error
+            recordPlaybackEnded()
             playbackToken = nil
             let previous = playbackCleanup
             playbackCleanup = Task { [playback] in

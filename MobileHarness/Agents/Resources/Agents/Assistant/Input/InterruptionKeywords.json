@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "labels": [
+    "zh-stop-talking",
+    "zh-stop-playback",
+    "en-stop-talking",
+    "en-please-stop",
+    "en-stop",
+    "zh-stop"
+  ]
+}

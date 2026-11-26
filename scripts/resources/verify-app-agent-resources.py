@@ -45,8 +45,14 @@ if set(expected) != set(actual):
 for path, original in expected.items():
     if original.read_bytes() != actual[path].read_bytes():
         raise SystemExit(f'Stale Agent asset: {path}')
+keyword_assets = {
+    pathlib.Path('Agents/SpeechPerception/ZipformerKeywords.json'),
+    pathlib.Path('Agents/Assistant/Input/InterruptionKeywords.json'),
+}
+if not keyword_assets.issubset(expected):
+    raise SystemExit(f'Missing speech keyword assets: {keyword_assets - expected.keys()}')
 for path, original in expected.items():
-    if '.zh-Hans.' in path.name or path.name == 'README.md':
+    if '.zh-Hans.' in path.name or path.name == 'README.md' or path in keyword_assets:
         continue
     if path.suffix not in ('.json', '.md') or path.name in ('Agent.json', 'Skill.json', 'Catalog.json'):
         continue

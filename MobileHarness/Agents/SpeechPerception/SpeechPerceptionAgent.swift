@@ -64,8 +64,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         } else {
             if islandListeningStart == nil { islandListeningStart = Date() }
             content = .init(
-                title: listeningMode == .quiet
-                    ? "Listening quietly" : phase == .speaking ? "Listening to you" : "Listening",
+                title: phase == .speaking ? "Listening to you" : "Listening",
                 primary: .symbol(name: "mic.fill", effect: .pulse), tone: .blue, priority: .normal,
                 secondary: .elapsed(startedAt: islandListeningStart ?? Date()), localizedLabels: true)
         }
@@ -75,13 +74,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let recognition: any SpeechRecognitionCapability
     private let vad: any VoiceActivityCapability
-    /// The last reply activity the Assistant published; the shorter silence endpoint applies while it is active.
-    var replyActive = false
-    private var activeReplyID: UUID?
     private let endpointConfirmation: (any SpeechEndpointCapability)?
     private let keywordSpotting: (any KeywordSpottingCapability)?
+    private let keywordLexicon: SpeechKeywordLexicon?
     private let keywordDetection: @Sendable () async throws -> (enabled: Bool, threshold: Double)
-    private var keywordInterruptEnabled = false
+    private var keywordDetectionEnabled = false
     private var keywordThreshold = SpeechKeyword.defaultThreshold
     private var keywordProbe: SpeechKeywordProbe?
     private var keywordRetirement: Task<Void, Never>?
@@ -89,31 +86,29 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private var keywordSawSpeech = false
     private let speechDetection: @Sendable () async throws -> (windows: Int, threshold: Double)
     private var detectionSettings = (windows: 8, threshold: 0.65)
-    private var playbackSnapshot = SpeechPlaybackSnapshot()
-    private var continuationProbe: SpeechContinuationProbe?
-    private var continuationCapture: String?
+    private var vadGeneration: String?
     private var recentVADWindows: [Duration] = []
-    private var continuationReported = false
+    private var vadWindowSequence: UInt64 = 0
+    private var publishedVADWindowSequence: UInt64 = 0
+    private var onsetRevision: UInt64 = 0
     private var speechFrameSequence: UInt64 = 0
     private let pcmPreparation: SpeechPCMPreparation
     private let speechEnhancementEnabled: @Sendable () async throws -> Bool
     private var sessionID: String
     private let interactionSessionID: String?
     private let residentListening: Bool
-    private let communication: CommunicationDeclaration
     private var captureOpen: Bool
     private var listeningPolicy = SpeechListeningPolicy()
-    var listeningMode = ListeningMode.default
-    /// Whether the native capture graph confirmed echo cancellation; `nil` until a capture has started.
-    var captureSupportsFullDuplex: Bool?
     /// An onset candidate has been published and neither confirmed nor cleared yet.
     private var onsetCandidatePublished = false
+    private var oldestWindowBeforeOnset: Duration?
     private var listeningAdmissionEpoch = UUID()
     private static let listeningAction = InternalAction(
         domain: "Speech", module: "Listening", function: "update", channel: "Listening",
         required: ["enabled", "paused", "revision"])
     private var segmenter: VoiceActivitySegmenter?
     private var recognitionTurn: SpeechRecognitionTurn?
+    private var publishedRecognitionFinal = false
     var lifecycle: AgentLifecycle = .registered
     private var lastSequence: UInt64?
     private var lastTimestamp: TimeInterval?
@@ -166,6 +161,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         self.pcmPreparation = try SpeechPCMPreparation(enhancement: enhancement)
         self.speechEnhancementEnabled = speechEnhancementEnabled
         self.keywordSpotting = keywordSpotting
+        keywordLexicon = keywordSpotting == nil ? nil : try SpeechKeywordLexicon.load()
         self.endpointConfirmation = endpointConfirmation
         self.keywordDetection = keywordDetection
         self.recognition = recognition
@@ -177,7 +173,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         self.keywordTestAudio = keywordTestAudio
         self.residentListening = residentListening
         self.captureOpen = !residentListening
-        communication = configuration.communication
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: configuration.agentID, name: "Speech Perception",
@@ -232,7 +227,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         lifecycle = .paused
         await refreshIsland()
         if microphoneInput != nil { await closeCapture() }
-        await publishSpeech(SpeechActivity(.utterancesCleared))
+        await endVADCapture()
         pendingSound = nil
         soundPublisher?.cancel()
         soundEstimator.reset()
@@ -253,6 +248,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         guard lifecycle == .running, !isUtteranceActive() else { return false }
         playbackAdmission = UUID()
         recognitionSuspended = true
+        await endVADCapture()
         await refreshIsland()
         traceListening("playback.acquired")
         return true
@@ -304,7 +300,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
         await stopInput()
-        await publishSpeech(SpeechActivity(.utterancesCleared))
+        await endVADCapture()
         soundPublisher?.cancel()
         await soundPublisher?.value
         pendingSound = nil
@@ -313,45 +309,13 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         segmenter = nil
         activeInput = nil
         await island.stop()
-        await publishSpeech(SpeechActivity(.ended))
         continuation.finish()
     }
 
-    /// A microphone epoch is independent of the resident policy Agent's lifetime. The route reports what the capture
-    /// can do; the listening mode decides whether it is used.
-    func setCaptureDuplex(_ supported: Bool) async {
-        captureSupportsFullDuplex = supported
+    /// The native route decides whether capture can stay open during playback.
+    func setCaptureDuplex(_ supported: Bool) {
         microphoneAdmissionOpenedAt = nil
-        applyDuplexPolicy()
-        await publishSpeech(SpeechActivity(.duplexSupport, fullDuplex: supported))
-    }
-    /// Full duplex needs both the `full` mode and a capture that confirmed echo cancellation.
-    private func applyDuplexPolicy() {
-        let enabled = listeningMode == .full && captureSupportsFullDuplex == true
-        listeningPolicy.fullDuplex = enabled
-        if enabled {
-            recognitionSuspended = false
-        } else {
-            retireKeywordProbe()
-            if residentListening { recognitionSuspended = !captureOpen || !listeningPolicy.enabled }
-        }
-    }
-    func applyReplyActivity(_ active: Bool, replyID: UUID? = nil) {
-        replyActive = active
-        let target = active ? replyID : nil
-        if activeReplyID != target {
-            activeReplyID = target
-            retireKeywordProbe()
-        }
-    }
-    /// Adopts the mode the Assistant published. Whether `full` is allowed is the Assistant's decision; without a
-    /// capture that confirmed echo cancellation the duplex policy stays half.
-    func applyListeningMode(_ mode: ListeningMode) async {
-        guard mode != listeningMode else { return }
-        retireKeywordProbe()
-        listeningMode = mode
-        applyDuplexPolicy()
-        await refreshIsland()
+        listeningPolicy.fullDuplex = supported
     }
     public func openCapture(sessionID: String) async throws {
         guard residentListening, lifecycle == .running, listeningPolicy.enabled else {
@@ -373,7 +337,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await recognitionTurn?.cancel()
         await segmenter?.cancel()
         await stopInput()
-        await publishSpeech(SpeechActivity(.utterancesCleared))
+        await endVADCapture()
         soundPublisher?.cancel()
         await soundPublisher?.value
         soundPublisher = nil
@@ -500,39 +464,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         if case .observation(let message) = input.payload,
-            [ListeningModeSignal.contract, ReplyActivitySignal.contract].contains(message.contract)
-        {
-            guard residentListening, input.sessionID == interactionSessionID else {
-                throw CommunicationError.scopeClosed
-            }
-            guard input.metadata.origin == .agent, input.metadata.incarnation != nil,
-                communication.subscriptions.contains(where: {
-                    $0.channel == input.metadata.topic && $0.protocol == message.contract
-                        && $0.sources.contains(input.metadata.source)
-                })
-            else { throw CommunicationError.unauthorized }
-            guard !input.metadata.expired else { throw CommunicationError.expired }
-            guard input.metadata.contract == message.contract, input.metadata.version == 1 else {
-                throw CommunicationError.invalidPayload
-            }
-            try input.validate(message)
-            try await prepareSignal(input)
-            if let mode = input.payload.listeningMode {
-                await applyListeningMode(mode)
-            } else if let reply = message.content(as: ReplyActivitySignal.self) {
-                if let playback = reply.playback { playbackSnapshot = playback }
-                applyReplyActivity(reply.active, replyID: reply.replyID)
-                if continuationProbe != reply.continuation {
-                    continuationProbe = reply.continuation
-                    continuationReported = false
-                    await publishContinuationIfReady()
-                }
-            } else {
-                throw CommunicationError.invalidPayload
-            }
-            return
-        }
-        if case .observation(let message) = input.payload,
             [ListeningIntent.contract, SpeechCaptureEnded.contract].contains(message.contract)
         {
             guard !input.metadata.expired else { throw CommunicationError.expired }
@@ -655,7 +586,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         keywordDetection: (enabled: Bool, threshold: Float) = (false, SpeechKeyword.defaultThreshold)
     ) {
         resetKeywordProbe()
-        keywordInterruptEnabled = generation != nil && keywordDetection.enabled
+        keywordDetectionEnabled = generation != nil && keywordDetection.enabled
         keywordThreshold = keywordDetection.threshold
         nativeCaptureGeneration = generation
         speechFrameSequence = 0
@@ -674,6 +605,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     }
     private func prepareRecognitionTurn() {
         currentTurn = nil
+        publishedRecognitionFinal = false
         recognitionTurn = SpeechRecognitionTurn(recognition: recognition, sessionID: sessionID) { [weak self] text in
             guard let self else { throw CancellationError() }
             try await self.preview(text)
@@ -684,7 +616,16 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             throw CancellationError()
         }
         try presentTranscript(text, input: parent)
-        try await communicate(.transcript(text, final: false), parent: parent)
+        if parent.turn != nil, let vadGeneration {
+            do {
+                try await communicate(
+                    SpeechRecognition(.partial, text: text, generation: vadGeneration).message(),
+                    parent: parent, recordEvidence: false)
+            } catch {
+                Logger(subsystem: "dev.mobileharness", category: "SpeechRecognition").error(
+                    "Partial transcript not published: \(String(describing: error), privacy: .public)")
+            }
+        }
     }
     private func presentTranscript(_ text: String, input: AgentInput) throws {
         try Task.checkCancellation()
@@ -759,10 +700,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 throw CancellationError()
             }
             segmenter = VoiceActivitySegmenter(session: session, endpointConfirmation: endpointConfirmation)
-            if let epoch = nativeInputEpoch {
-                await publishSpeech(SpeechActivity(.captureStarted, generation: epoch.uuidString))
-            }
         }
+        if mode == .speechAndSoundSource, !recognitionSuspended, vadGeneration == nil { await beginVADCapture() }
+        let playback = await microphoneInput?.playbackSnapshot() ?? .init()
         let samples = audio.samples
         try Task.checkCancellation()
         if mode == .soundSourceOnly { activeInput = input }
@@ -822,7 +762,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                     let start = audio.capturedAt.advanced(by: .seconds(frame.timestamp - audio.timestamp))
                     try await processFrame(
                         frame, input: input, segmenter: segmenter, recognitionTurn: recognitionTurn,
-                        playing: playbackSnapshot.state(at: start).playing, capturedAt: start)
+                        playing: playback.isPlaying(at: start, tail: .milliseconds(200)),
+                        useShortEndpoint: playback.isPlaying(at: start), capturedAt: start)
                 }
             }
         }
@@ -830,16 +771,16 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     private func processFrame(
         _ frame: AudioFrame, input acceptedInput: AgentInput, segmenter: VoiceActivitySegmenter,
-        recognitionTurn: SpeechRecognitionTurn, playing: Bool, capturedAt: ContinuousClock.Instant
+        recognitionTurn: SpeechRecognitionTurn, playing: Bool, useShortEndpoint: Bool,
+        capturedAt: ContinuousClock.Instant
     ) async throws {
         activeInput = acceptedInput.assigning(turn: currentTurn)
-        let activity = replyActive
         try Task.checkCancellation()
         let onset = SpeechOnsetPolicy(
             windows: detectionSettings.windows, threshold: detectionSettings.threshold, playing: playing)
         let result = try await segmenter.process(
             frame, threshold: onset.threshold, onsetWindows: onset.onsetWindows,
-            useShortEndpoint: activity,
+            useShortEndpoint: useShortEndpoint,
             onsetThreshold: onset.onsetThreshold)
         try Task.checkCancellation()
         let beganTurn =
@@ -854,9 +795,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             currentTurn = AgentTurn(id: UUID().uuidString, ordinal: turnOrdinal)
             traceOnset(onset, playing: playing, probability: result.probability, level: frame.rmsDecibels)
         }
-        await publishOnset(windows: result.windows, confirmed: beganTurn ? currentTurn?.id : nil)
-        await recordContinuationWindows(result.windows, capturedAt: capturedAt)
-        await updateKeywordProbe(result.windows)
+        await reportVAD(result.windows, capturedAt: capturedAt, confirmed: beganTurn ? currentTurn?.id : nil)
+        await updateKeywordProbe(result.windows, capturedAt: capturedAt)
         let input = acceptedInput.assigning(turn: currentTurn)
         activeInput = input
         if beganTurn { try presentTranscript("", input: input) }
@@ -906,10 +846,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         try emit(.toolCall(Self.transcript.call(["text": String(text.suffix(320))])), input: input)
         try emit(.toolCall(Self.finishTranscript.call([:])), input: input)
         try emit(.control("agent.finished"), input: input)
-        if !text.isEmpty {
-            try await communicate(.transcript(text, final: true), parent: input)
-        } else if let turn = input.turn {
-            await publishSpeech(SpeechActivity(.utteranceEnded, utterance: turn.id))
+        if input.turn != nil {
+            try await communicate(
+                SpeechRecognition(
+                    .final, text: text, generation: vadGeneration, oldestWindowBeforeOnset: oldestWindowBeforeOnset
+                ).message(), parent: input)
+            publishedRecognitionFinal = true
         }
         try await resetListening(after: input, requireFreshOnset: noTextEndpoint)
         try await transition(to: text.isEmpty ? .empty : .listening, input: input, present: !recognitionSuspended)
@@ -923,19 +865,22 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                 taskScope: input.taskScope))
     }
 
-    func speechPublicationFailed(turn: AgentTurn?) async {
-        // Without a turn the output pump itself ended, so no Signal can be published; its failure is reported there.
-        if let turn { await publishSpeech(SpeechActivity(.utteranceEnded, utterance: turn.id)) }
-    }
-
     /// A failed utterance does not close the resident Agent, microphone or output stream.
     private func recoverRecognition(_ error: any Error) async {
         resetKeywordProbe()
-        if let epoch = nativeInputEpoch {
-            await publishSpeech(SpeechActivity(.captureStopped, generation: epoch.uuidString))
+        let failedInput = activeInput?.assigning(turn: currentTurn)
+        if let failedInput, failedInput.turn != nil, !publishedRecognitionFinal {
+            let detail = String(decoding: String(describing: error).utf8.prefix(496), as: UTF8.self)
+            do {
+                try await communicate(
+                    SpeechRecognition(
+                        .final, text: "", generation: vadGeneration, failure: detail,
+                        oldestWindowBeforeOnset: oldestWindowBeforeOnset
+                    ).message(),
+                    parent: failedInput)
+            } catch { reportError(error, input: failedInput) }
         }
-        let failedInput = activeInput
-        if let turn = currentTurn { await publishSpeech(SpeechActivity(.utteranceEnded, utterance: turn.id)) }
+        await endVADCapture()
         let failedSession = sessionID
         let failedGeneration = nativeCaptureGeneration
         let failedRecognition = recognitionTurn
@@ -1003,9 +948,14 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         keywordSawSpeech = false
     }
 
-    private func updateKeywordProbe(_ windows: [VoiceSegmentation.Window]) async {
-        guard lifecycle == .running, captureOpen, let keywordSpotting, interactionSessionID != nil else { return }
+    private func updateKeywordProbe(
+        _ windows: [VoiceSegmentation.Window], capturedAt: ContinuousClock.Instant
+    ) async {
+        guard lifecycle == .running, captureOpen, keywordDetectionEnabled, listeningPolicy.fullDuplex,
+            let keywordSpotting, let keywordLexicon, let generation = vadGeneration, interactionSessionID != nil
+        else { return }
         for window in windows {
+            let time = SpeechSignalClock.offset(at: capturedAt + .nanoseconds(window.offset * 62_500))
             let voiced = window.onsetCandidate || window.speaking
             if !voiced {
                 if keywordSawSpeech {
@@ -1018,146 +968,166 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             }
             if !keywordSawSpeech {
                 keywordSawSpeech = true
-                if keywordRetirement == nil, listeningMode == .full, listeningPolicy.fullDuplex, let activeReplyID {
+                if keywordRetirement == nil {
                     keywordProbe = SpeechKeywordProbe(
-                        capability: keywordSpotting, replyID: activeReplyID, captureID: listeningAdmissionEpoch,
-                        threshold: keywordThreshold
-                    ) { [weak self] id in
-                        await self?.receiveKeywordMatch(id)
+                        capability: keywordSpotting, generation: generation, onset: time,
+                        keywords: keywordLexicon.keywords(threshold: keywordThreshold)
+                    ) { [weak self] id, label, time in
+                        await self?.receiveKeywordMatch(id, label: label, at: time)
                     }
-                    if !keywordPreRoll.isEmpty, keywordProbe?.submit(keywordPreRoll) == false {
+                    if !keywordPreRoll.isEmpty,
+                        keywordProbe?.submit(
+                            keywordPreRoll, capturedAt: time - .nanoseconds(keywordPreRoll.count * 62_500)) == false
+                    {
                         retireKeywordProbe()
                     }
                 }
                 keywordPreRoll.removeAll(keepingCapacity: true)
             }
-            if keywordProbe?.submit(window.pcm) == false { retireKeywordProbe() }
+            if keywordProbe?.submit(window.pcm, capturedAt: time) == false { retireKeywordProbe() }
         }
         await publishKeywordIfReady()
     }
 
-    private func receiveKeywordMatch(_ id: UUID) async {
+    private func receiveKeywordMatch(_ id: UUID, label: String, at time: Duration) async {
         guard keywordProbe?.id == id else { return }
-        keywordProbe?.matched = true
+        keywordProbe?.match = (label, time)
         await publishKeywordIfReady()
     }
 
     private func publishKeywordIfReady() async {
-        guard lifecycle == .running, captureOpen, var probe = keywordProbe, probe.matched, !probe.delivered,
-            probe.captureID == listeningAdmissionEpoch, activeReplyID == probe.replyID,
-            listeningMode == .full, listeningPolicy.fullDuplex,
-            let turn = currentTurn, let interactionSessionID
+        guard lifecycle == .running, captureOpen, var probe = keywordProbe, let match = probe.match, !probe.delivered,
+            probe.generation == vadGeneration, let turn = currentTurn, let interactionSessionID,
+            let phrase = keywordLexicon?.phrase(for: match.label)
         else { return }
         probe.delivered = true
         keywordProbe = probe
-        let log = Logger(subsystem: "dev.mobileharness", category: "SpeechKeyword")
-        guard keywordInterruptEnabled else {
-            log.info("Observed confirmed keyword; fast interrupt is disabled")
-            return
-        }
-        let signal = AssistantInterrupt(target: .reply(probe.replyID), speechTurn: turn.id)
+        let observation = SpeechKeywordMatch(
+            generation: probe.generation, utterance: turn.id, label: match.label,
+            keyword: phrase, onset: probe.onset, matchedAt: match.at)
         let parent = AgentInput(
-            id: signal.id.uuidString, sessionID: interactionSessionID, payload: .event("speech.keyword"), turn: turn)
-        do {
-            try await communicate(signal.message(), parent: parent)
-        } catch {
-            log.error("Keyword interrupt not published: \(String(describing: error), privacy: .public)")
+            id: UUID().uuidString, sessionID: interactionSessionID, payload: .event("speech.keyword"), turn: turn)
+        do { try await communicate(observation.message(), parent: parent) } catch {
+            Logger(subsystem: "dev.mobileharness", category: "SpeechKeyword").error(
+                "Keyword match not published: \(String(describing: error), privacy: .public)")
         }
     }
 
-    // MARK: - Speech activity Signals
+    // MARK: - Voice activity
 
-    /// Publishes a speech fact for whoever subscribes; nothing waits for or learns about subscribers. A failure is
-    /// logged, never retried: the fact is stale by the time a retry could run.
-    func publishSpeech(_ activity: SpeechActivity) async {
-        switch activity.kind {
-        case .captureStarted where activity.generation != continuationCapture:
-            continuationCapture = activity.generation
-            recentVADWindows.removeAll(keepingCapacity: true)
-            continuationReported = false
-        case .captureStopped where activity.generation == continuationCapture:
-            continuationCapture = nil
-            recentVADWindows.removeAll(keepingCapacity: true)
-            continuationReported = false
-        default: break
-        }
-        if [.captureStarted, .captureStopped, .utterancesCleared, .ended].contains(activity.kind) {
-            onsetCandidatePublished = false
-            resetKeywordProbe()
-            await keywordRetirement?.value
-        }
+    func beginVADCapture() async {
+        guard mode == .speechAndSoundSource, vadGeneration == nil else { return }
+        let generation = UUID().uuidString
+        vadGeneration = generation
+        vadWindowSequence = 0
+        publishedVADWindowSequence = 0
+        onsetRevision = 0
+        recentVADWindows.removeAll(keepingCapacity: true)
+        await publishSpeech(SpeechActivity(.captureStarted, generation: generation))
+    }
+
+    func endVADCapture() async {
+        guard let generation = vadGeneration else { return }
+        vadGeneration = nil
+        onsetCandidatePublished = false
+        resetKeywordProbe()
+        await publishSpeech(SpeechActivity(.captureStopped, generation: generation))
+        await keywordRetirement?.value
+    }
+
+    private func publishSpeech(_ activity: SpeechActivity) async {
         guard let interactionSessionID else { return }
-        let payload = InputPayload.event("speech.activity")
-        let id = UUID().uuidString
         let parent = AgentInput(
-            id: id, sessionID: interactionSessionID, payload: payload,
-            metadata: InputMetadata(payload: payload, source: descriptor.id.rawValue, origin: .agent, rootID: id))
-        do { try await communicate(activity.message(), parent: parent) } catch {
+            id: UUID().uuidString, sessionID: interactionSessionID, payload: .event("speech.activity"))
+        do {
+            try await communicate(activity.message(), parent: parent, recordEvidence: activity.kind != .vadProgress)
+        } catch {
             Logger(subsystem: "dev.mobileharness", category: "SpeechActivity").error(
                 "\(activity.kind.rawValue, privacy: .public) not published: \(String(describing: error), privacy: .public)"
             )
         }
     }
 
-    private func recordContinuationWindows(
-        _ windows: [VoiceSegmentation.Window], capturedAt: ContinuousClock.Instant
+    private func reportVAD(
+        _ windows: [VoiceSegmentation.Window], capturedAt: ContinuousClock.Instant, confirmed utterance: String?
     ) async {
-        guard continuationCapture != nil else { return }
-        for window in windows where window.sampleCount == 512 {
-            let start = capturedAt + .seconds(Double(window.offset) / 16_000)
+        guard let generation = vadGeneration else { return }
+        let confirmation = utterance == nil ? nil : windows.firstIndex(where: \.speaking) ?? windows.indices.last
+        for (index, window) in windows.enumerated() {
+            guard vadGeneration == generation else { return }
+            await publishOnset(candidate: window.onsetCandidate, confirmed: index == confirmation ? utterance : nil)
+            guard vadGeneration == generation else { return }
+            guard window.sampleCount == 512 else { continue }
+            let start = capturedAt + .nanoseconds(window.offset * 62_500)
             recentVADWindows.append(SpeechSignalClock.offset(at: start))
+            if recentVADWindows.count > SpeechActivity.progressWindowCount { recentVADWindows.removeFirst() }
+            vadWindowSequence += 1
+            if vadWindowSequence - publishedVADWindowSequence >= 4 { await publishVADProgress() }
         }
-        let excess = recentVADWindows.count - SpeechContinuationProbe.windowCount
-        if excess > 0 { recentVADWindows.removeFirst(excess) }
-        await publishContinuationIfReady()
     }
 
-    private func publishContinuationIfReady() async {
-        guard !continuationReported, let probe = continuationProbe, let generation = continuationCapture,
-            recentVADWindows.count == SpeechContinuationProbe.windowCount,
-            let first = recentVADWindows.first, first >= probe.since
-        else { return }
-        continuationReported = true
-        await publishSpeech(SpeechActivity(.continuationReady, generation: generation, continuation: probe))
+    private func publishVADProgress() async {
+        guard let generation = vadGeneration, vadWindowSequence > publishedVADWindowSequence else { return }
+        publishedVADWindowSequence = vadWindowSequence
+        let oldest = recentVADWindows.count == SpeechActivity.progressWindowCount ? recentVADWindows.first : nil
+        await publishSpeech(
+            SpeechActivity(
+                .vadProgress, generation: generation, sequence: vadWindowSequence, oldestWindow: oldest,
+                onsetRevision: onsetRevision))
     }
 
-    /// Publishes onset-candidate transitions only, not per-window facts; a confirmed utterance replaces them.
-    private func publishOnset(windows: [VoiceSegmentation.Window], confirmed utterance: String?) async {
-        for window in windows where window.onsetCandidate && !onsetCandidatePublished {
+    private func publishOnset(candidate: Bool, confirmed utterance: String?) async {
+        guard let generation = vadGeneration else { return }
+        if !onsetCandidatePublished, utterance != nil || candidate {
+            let preceding = recentVADWindows.count == SpeechActivity.progressWindowCount ? recentVADWindows.first : nil
+            oldestWindowBeforeOnset = preceding
+            await publishVADProgress()
+            guard vadGeneration == generation else { return }
             onsetCandidatePublished = true
-            await publishSpeech(SpeechActivity(.onsetStarted))
+            onsetRevision += 1
+            await publishSpeech(
+                SpeechActivity(
+                    .onsetStarted, generation: generation, onsetRevision: onsetRevision,
+                    oldestWindowBeforeOnset: preceding))
         }
         if let utterance {
             onsetCandidatePublished = false
-            await publishSpeech(SpeechActivity(.onsetConfirmed, utterance: utterance))
-        } else if onsetCandidatePublished, windows.last.map({ !$0.onsetCandidate }) == true {
+            onsetRevision += 1
+            await publishSpeech(
+                SpeechActivity(
+                    .onsetConfirmed, generation: generation, utterance: utterance, onsetRevision: onsetRevision,
+                    oldestWindowBeforeOnset: oldestWindowBeforeOnset))
+        } else if onsetCandidatePublished, !candidate {
             onsetCandidatePublished = false
-            await publishSpeech(SpeechActivity(.onsetCleared))
+            onsetRevision += 1
+            await publishSpeech(SpeechActivity(.onsetCleared, generation: generation, onsetRevision: onsetRevision))
         }
     }
 
     // MARK: - Communication output
 
-    func communicate(_ message: AgentMessage, parent: AgentInput) async throws {
+    func communicate(_ message: AgentMessage, parent: AgentInput, recordEvidence: Bool = true) async throws {
         var parent = parent
-        if let interactionSessionID, message.event == "final" {
+        if let interactionSessionID, message.contract == SpeechRecognition.contract {
             parent = AgentInput(
                 id: parent.id, sessionID: interactionSessionID, payload: parent.payload,
                 metadata: parent.metadata, turn: parent.turn, taskScope: parent.taskScope)
         }
         let causalParent = parent
         let action = try CommunicationAction(message: message)
-        let evidence = try JSONEncoder().encode(
-            SignalEvidence(
-                AgentInput(
-                    id: action.id, sessionID: causalParent.sessionID, payload: .observation(message),
-                    metadata: causalParent.metadata, turn: causalParent.turn, taskScope: causalParent.taskScope)))
-        try await contextRepository.update {
-            try $0.append(
-                .init(
-                    id: action.id, taskID: causalParent.taskScope?.id ?? causalParent.id,
-                    kind: "communication.output", data: evidence),
-                retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
+        if recordEvidence {
+            let evidence = try JSONEncoder().encode(
+                SignalEvidence(
+                    AgentInput(
+                        id: action.id, sessionID: causalParent.sessionID, payload: .observation(message),
+                        metadata: causalParent.metadata, turn: causalParent.turn, taskScope: causalParent.taskScope)))
+            try await contextRepository.update {
+                try $0.append(
+                    .init(
+                        id: action.id, taskID: causalParent.taskScope?.id ?? causalParent.id,
+                        kind: "communication.output", data: evidence),
+                    retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
+            }
         }
         try emit(.communication(action), input: parent)
     }
