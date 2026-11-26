@@ -13,12 +13,6 @@ public struct TextSegmentationPolicy: Sendable {
         firstHanziLimit = nil
         firstOtherLimit = nil
     }
-
-    public func segments(in text: String) throws -> [String] {
-        var buffer = SentenceFunctionBuffer(policy: self)
-        let parts = try buffer.append(text) + buffer.finish()
-        return parts.joined() == text && !parts.isEmpty ? parts : [text]
-    }
     public init(
         hanziLimit: Int, otherLimit: Int, firstHanziLimit: Int? = nil, firstOtherLimit: Int? = nil
     ) throws {

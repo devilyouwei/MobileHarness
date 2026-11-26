@@ -106,10 +106,13 @@ Assistant 当前模板契约：
 | --- | --- | --- |
 | `executionObservations` | 当前执行观察数据 | `data` |
 | `historicalExecution` | 历史动作证据 | `name`、`state`、`arguments`、`result`、`error` |
+| `replyInterruptedMarker` | 已截断历史正文与工具附件共用的 JSON 标记，两种语言的字段和值一致 | 无 |
 | `toolFailure` | 真实执行错误及输出 | `error`、`output` |
 | `taskHistory` | 已结算任务摘要的历史数据前缀 | 无 |
 
 Assistant 系统提示依次为：`Instructions.md`（角色，含回复语言）、输入协议、输出协议、`# AGENT CONTROLS`、`# STATE VARIABLES`、可用 Skill、可委派 Agent、有效 Action 目录、已加载 Skill 指令（先讲可用 Action，再讲用法）。Swift 从索引、当前授权及本轮 Skill 快照取值，并按本轮有效 Action 生成目录。独立 system 消息 `# STATE` 由 `StateContext.json` 提供，包含 CURRENT STATE、图片、同伴问题与事件、AGENT STATE，`Assistant/Prompts.json` 提供 Writer 追问、近期事件与请求中的执行证据模板。Memory 模板 `title.system`、`title.excerpt` 和 `title.user` 供标题事务读取。
+
+Assistant 的输入协议 `instructions` 注入同一 `replyInterruptedMarker`。解释区分成功 Action 的已保留正文和 Action Result 提供的返回值或异常。
 
 ## 新增与修改 Agent 的开发标准
 

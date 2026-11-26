@@ -168,6 +168,22 @@ func homeCaptionsKeepFixedDisjointRoleRegions(viewportHeight: CGFloat) {
     #expect(state.visibleDecisions.isEmpty)
 }
 
+@Test @MainActor func keywordInterruptLogUsesSignalOutcomeForFiltering() {
+    let state = RuntimeLogState()
+    for (id, status) in [("keyword-ok", "interrupted"), ("keyword-failed", "interrupt_failed")] {
+        state.record(
+            .decision(
+                .init(
+                    id: id, source: "assistant", inputText: "stop", duration: .milliseconds(20), route: .keyword,
+                    modelResult: nil, adoptedResult: .interrupt, signalStatus: status, requests: [])))
+    }
+    #expect(state.visibleDecisions.count == 2)
+    state.selectedFilter = .succeeded
+    #expect(state.visibleDecisions.map(\.id) == ["keyword-ok"])
+    state.selectedFilter = .failed
+    #expect(state.visibleDecisions.map(\.id) == ["keyword-failed"])
+}
+
 @Test @MainActor func runtimeLogDecisionRetentionSortingAndFiltering() {
     let state = RuntimeLogState()
     for index in 0..<101 {

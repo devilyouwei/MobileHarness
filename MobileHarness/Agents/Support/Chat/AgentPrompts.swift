@@ -101,7 +101,7 @@ public final class AgentPrompts: @unchecked Sendable {
     public static func load(named role: String) throws -> PromptTemplates {
         let templates = try roleTemplates(named: role)
         let required: Set<String> = [
-            "executionObservations", "historicalExecution",
+            "executionObservations", "historicalExecution", "replyInterruptedMarker",
             "toolFailure",
         ]
         guard required.isSubset(of: templates.names) else { throw PromptTemplateError.invalidDocument }

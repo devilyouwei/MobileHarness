@@ -33,3 +33,37 @@ Swift 专项通过 41 项集成目标测试，涵盖冷启动 PCM 连续性与�
 ## 2026-11-26 真机安装
 
 签名的 MobileHarness 0.1.0（2026112604）通过严格签名、94 项 Agent／Skill 资源、Live Activity 与双语资源检查。已原位覆盖安装到 iPhone 17 Pro，安装回执序列为 8144，独立设备应用清单确认该构建号。系统因锁屏拒绝启动请求。此记录覆盖构建和安装，真机语音交互仍待验收。
+
+## 快停竞态与 Decision 日志
+
+2026-11-26。Swift 专项通过 34 项 Assistant／跨轨道结算测试和 14 项执行日志测试。两种先后顺序下均只进入一次清理，清理期间的新输入保留，已失效的决策在模型调用前跳过。模型已开始时，关键词获胜会取消旧分类。关键词快停日志显示命中内容、检测耗时和清理结果，成功与失败筛选已验证。
+
+`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。变更 Swift 文件严格格式、8 项 Python 工程工具回归、plist 校验及 `git diff --check` 通过。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过，最终代码的 `MobileHarnessSimulator` 复编译通过。构建产物通过 94 项 Agent／Skill 资源、Live Activity 和中英文本地化资源检查。本次未进行真机语音验收。
+
+### 2026-11-26 真机更新
+
+含关键词快停日志和打断竞态处理的 MobileHarness 0.1.0（2026112608）通过 iPhoneOS Debug 构建、严格签名及上述三项打包资源检查。已在 iPhone 17 Pro 上从 2026112607 原位更新，安装回执序列为 8176，设备应用清单确认了新构建号，系统启动请求成功。真机语音打断与 Decision 面板交互尚未验收。
+
+## 独立短词的尾随 blank
+
+2026-11-26。4 项 ModelKit 解码与特征测试和 4 项 SpeechPerception 关键词探测测试通过。确定性解码回归验证独立短词在第 1 帧 blank 尚未命中、第 2 帧命中，并覆盖长口令共享前缀及独立短词位于后缀的情形。使用实际 Zipformer Core ML 制品在 Mac 上各回放一条合成口令，「停下」和 `stop` 均命中预期标签。该回放验证模型及解码链路，正式快停的真机延迟、误停和漏停尚未测量。
+
+正式探测仍只在首次原始命中时检查尾部静音，未达到 160 ms 即由 ASR Decision 补判。因此真机需核对更早的原始命中对快停命中率的影响。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过，App 的 Agent／Skill、Live Activity 和中英文本地化资源检查通过。`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。变更 Swift 文件通过严格格式检查，`git diff --check` 通过。
+
+### 2026-11-26 双 blank 真机更新
+
+包含独立短词 2 帧 blank 门限的 MobileHarness 0.1.0（2026112609）通过 iPhoneOS Debug 构建、严格签名及三项打包资源检查。iPhone 17 Pro 从 2026112608 原位更新，安装回执序列为 8184，设备应用清单确认新构建号，系统启动成功。实际停播延迟、误停与漏停仍待真机语音验收。
+
+## 快停检测与推理耗时
+
+2026-11-26。58 项 Swift 专项测试通过，涵盖 ModelKit、SpeechPerception、Assistant 和 RuntimeLog。回归验证命中的模型身份和推理耗时穿过探测、语音契约和打断日志，日志总耗时取检测完成时刻与起声之差。消息回归覆盖旧载荷和非法负耗时。Mac 上使用实际 Zipformer Core ML 制品分别回放合成的「停下」与 `stop`，均返回预期标签、模型身份和正的累计推理耗时。
+
+`./scripts/build-ios.sh` 的 5 个模拟器目标和应用资源检查通过。独立读取构建产物的中英文字符串，确认两条计时标签均已打包。`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。8 项 Python 工程工具测试、变更 Swift 文件严格格式、字符串目录 JSON、plist 与 `git diff --check` 均通过。真机日志显示和停播行为尚未验收。
+
+### 2026-11-26 双计时真机更新
+
+包含关键词模型名、检测总耗时和推理耗时的 MobileHarness 0.1.0（2026112610）通过 iPhoneOS Debug 构建、严格签名、三项打包资源及中英文计时标签检查。iPhone 17 Pro 从 2026112609 原位更新，安装回执序列为 8192，设备应用清单确认新构建号，系统启动成功。真机上实际触发快停和读取日志尚待验收。

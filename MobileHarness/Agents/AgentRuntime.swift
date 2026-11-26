@@ -374,7 +374,7 @@ import StorageFiles
             }
             let main = try AssistantAgent(
                 stateContext: stateContext, speechOutput: speechOutput, inputDecision: inputDecision, fullDuplex: true,
-                decisionLog: decisionLog,
+                decisionLog: decisionLog, keywordLog: { log?.record(.decision($0)) },
                 inputQueueStatus: { ready, deciding in await inputQueueStatus(ready, deciding) },
                 uiHome: home, uiSessionID: applicationControlSessionID, speechSessionID: interactionSessionID,
                 presentsReply: true, chatProvider: chatProvider, conversations: conversations,

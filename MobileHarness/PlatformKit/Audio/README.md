@@ -36,8 +36,6 @@ NativePlaybackGraph 私有actor拥有输出引擎、播放器、格式、mixer t
 
 最多三个已调度PCM buffer、一个串行提交；单包非空、最多262144样本、有限数值、8…192kHz、mono。消费端保持同一次流的采样率，真实dataPlayedBack回调释放容量并确认排空。onStarted仅在首块提交且player启动成功后回调，不代表声音已到达用户。
 
-`PlaybackPCM` 可携带单包完成回执。`AppleAudioIO` 在 `dataPlayedBack` 回调通过当前播放 token 与在途包身份核验时交付一次单调时刻。取消先失效 token，再停止原生播放器，停止后的回调无法生成排空证据。
-
 stopPlayback同步失效token并唤醒等待，单个清理任务加入原生停止；waitForPlaybackStop、根stop及下一次播放加入清理。旧取消不能停止新播放，未完成原生调用返回前不伪造停机。
 
 playClip拒绝捕获／播放冲突，复用同一播放端口；主因和清理错误分别保留，释放不触碰替代会话。引擎内部可复用健康连接，不提供无人使用的独立预热／播放游标API。

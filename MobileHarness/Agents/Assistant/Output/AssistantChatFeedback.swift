@@ -87,6 +87,12 @@ extension AssistantChatWorker {
         else {
             throw CommunicationError.unauthorized
         }
+        if case .executionFeedback(.actionFinished(let result)) = input.payload,
+            result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID,
+            pending.calls.contains(where: { !$0.tool && $0.id == result.callID && $0.path == result.path.description })
+        {
+            recordReplyActionCompletion(result)
+        }
         if !persisted { try await persistFeedback(input) }
         guard var current = pendingRounds[key] else { return true }
         switch input.payload {

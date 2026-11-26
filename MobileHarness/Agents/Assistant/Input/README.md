@@ -2,6 +2,8 @@
 
 Assistant owns input admission, batch text, quiet wake and interruption policy. Prompt resources are under [Resources/Agents/Assistant/Input](../../Resources/Agents/Assistant/Input).
 
+The localized input protocol shows the reply interruption marker from Assistant's prompt resources. It describes retained history text as fragments of successful Actions and Action Results as the source of returned values and execution errors.
+
 | File | Responsibility |
 | --- | --- |
 | [AssistantChatInput.swift](AssistantChatInput.swift) | Authenticated speech and control intake, input admission, keyword policy, queue drain and reply-turn start. |
@@ -15,7 +17,7 @@ Assistant owns input admission, batch text, quiet wake and interruption policy. 
 
 The interruption prompt renders the frozen reply and latest user input into a localized sentence, followed by a question about whether the user intends to interrupt. Replies without generated text use an empty string. ModelKit binds the sentence and question to the provider's boolean readout. Quiet wake uses its own templates with the same Settings-selected provider.
 
-AssistantDecisionQueue retains at most 32 unsettled jobs, including the current job. Overflow rejects classification while the ordinary input stays queued. New admission cancels the current classification and replaces the waiting candidate. Superseded jobs record their disposition and the newest candidate receives inference. A result already submitted for interruption retains its existing target checks. Session close removes matching work; pause and stop join the queue.
+AssistantDecisionQueue retains at most 32 unsettled jobs, including the current job. Overflow rejects classification while the ordinary input stays queued. New admission cancels the current classification and replaces the waiting candidate. Assistant checks the reply identity and interruption barrier before submitting a job and again before the job starts inference. An accepted interruption retires the active classification for that reply. Superseded jobs keep request evidence and ordinary input admission. If inference completed before its result became obsolete, the log retains the boolean and reports that the interrupt was skipped. Session close removes matching work, and pause and stop join the queue.
 
 AssistantInputDecision owns at most one inference worker and one waiting attempt per local or cloud lane. A replacement waits for complete ModelKit cleanup within its deadline. Attempt IDs fence cancellation, timeout and late results. Model switching and root shutdown join the retained worker.
 
@@ -29,7 +31,7 @@ SpeechPerception publishes three facts through Gateway within the interaction se
 | `user.input.speech.v1` | Subscribe to final ASR results. Nonempty text enters ordinary admission or quiet wake. Empty and failed results settle the utterance. |
 | `perception.speech.keyword.v1` | Check keyword label, capture generation, utterance and arrival relative to the current reply. |
 
-Channels preserve their own event order. The Assistant retains up to 128 terminal utterance receipts. When final ASR arrives first, it closes that utterance's keyword eligibility and enters normal admission immediately. Late onset confirmation for that utterance cannot reopen the wait. When a keyword is accepted first, its utterance remains open until final ASR settles. Its text enters the queue once and skips the interruption Decision.
+Channels preserve their own event order. The Assistant retains up to 128 terminal utterance receipts. Final ASR enters normal admission immediately. A keyword from that utterance can still win against the same active reply while a Decision is pending. A settled utterance stays settled when the keyword arrives. If the keyword is accepted first, the utterance stays open until final ASR settles. Its text enters the queue once and skips the interruption Decision.
 
 ### Post-interruption wait
 
@@ -61,4 +63,4 @@ A host write entering quiet joins interruption cleanup. A model write settles in
 
 ## 流式关键词快停
 
-Assistant 从 [InterruptionKeywords.json](../../Resources/Agents/Assistant/Input/InterruptionKeywords.json) 加载允许打断的标签集合。有效命中必须属于当前语音会话，起声时间也须落在当前回复开始之后。空闲、过期、终稿已收及重复命中都由 Assistant 处理。接纳快停后，同一会话的打断流程会在继续接收起声和终稿的同时执行清理。忙碌时，没有接纳快停的终稿进入现有 Decision 补判。来自 ApplicationControl 的 `agent.interruption.v1` 保持独立。
+Assistant 从 [InterruptionKeywords.json](../../Resources/Agents/Assistant/Input/InterruptionKeywords.json) 加载允许打断的标签集合。有效命中必须属于当前语音会话，起声时间也须落在当前回复开始之后。关键词和模型共用同一个打断接纳屏障。清理完成或失败后，Assistant 将关键词、模型身份、起声到检测完成的总耗时、ModelKit 累计推理耗时和打断结果投影到 Decision 日志。来自 ApplicationControl 的 `agent.interruption.v1` 也走统一打断接纳入口。

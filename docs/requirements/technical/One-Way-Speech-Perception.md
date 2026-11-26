@@ -27,7 +27,7 @@ Perception Agent 向 Cognition Agent 发布观察事实。单向关系由生产�
 | ASR | `user.input.speech.v1`／`user.input.speech` | `partial` 和 `final`。终态包含完整文本、空结果或失败。Assistant 只订阅终态。 |
 | Zipformer | `perception.speech.keyword.v1`／`perception.speech.keyword` | `keywordMatched`，带关键词标识和文字、语句 ID、采集代、起声和命中时间。 |
 
-- 三条协议使用同一个交互会话和采集身份，各自保持频道顺序。当前已接纳快停时，同轮终稿入队并跳过 Decision。终稿先到时立即关闭快停资格并按正常输入流程办理，迟到命中及迟到起声确认归原语句。空转写和失败由 ASR 协议结算。
+- 三条协议使用同一个交互会话和采集身份，各自保持频道顺序。当前已接纳快停时，同轮终稿入队并跳过 Decision。终稿先到时结算原语句并按正常输入流程办理。匹配同一活动回复的关键词仍可参与[打断竞态](#快停与模型打断的竞态及执行日志)，迟到起声确认不能重开已结算语句。空转写和失败由 ASR 协议结算。
 - Zipformer 在配置启用且采集支持全双工的起声候选上探测。Assistant 拥有打断词表和目标校验，空闲、过期、重复命中归 Assistant 处理。ASR 补判使用现有 Decision 模型，移除 ASR 文本的停止词快捷路径。
 - 保持应用控制的 `agent.interruption.v1`。从该频道撤掉 SpeechPerception，撤掉 Assistant 向 SpeechPerception 的两条反向订阅。沿用 Gateway 已有的权限和投递。
 
@@ -73,3 +73,15 @@ SpeechPerception 的 Zipformer 词表使用 `Resources/Agents/SpeechPerception/Z
 - 运行 `./scripts/check.sh` 和 `./scripts/build-ios.sh`。分别记录 Swift 回归、模拟器构建和真机语音效果。真机比较快停延迟 P95、空闲 Zipformer 推理次数以及批次对放行延迟的影响。
 
 实现验证记录见 [语音感知单向通信验证](../../validation/One-Way-Speech-Perception.md)。
+
+## 快停与模型打断的竞态及执行日志
+
+Assistant 对每个当前回复只接纳一次打断。第一个有效的关键词快停或模型打断先占用既有清理屏障，另一条路径放弃旧目标。ASR 终稿到达不代表打断已经接纳，若同采集代的有效关键词此时才到达，仍可在模型判定期间接纳，已经结算的 ASR 语句不重新开启。
+
+文本输入仍普通入队。Assistant 在提交 Decision 和该决策任务启动模型前核对会话、回复身份与清理屏障。打断接纳后取消同一回复正在进行的分类；已到达的模型布尔结果可以留在日志，迟到或失效的结果不再打断。模型尚未执行或已被取消的失效分类按中性状态展示。既有采集代、续说窗口和清理确认继续管理新轮派发。
+
+Decision 标签用独立来源显示关键词快停和已有模型 Decision。关键词行显示命中的原文、检测耗时与实际打断清理结果，使用独立身份且不填充模型结果或模型请求。成功／失败筛选使用关键词的清理终态。涉及 Assistant 输入与 Decision 队列、执行结算、UI RuntimeLog 与中英文标签。回归覆盖两条路径的先后次序、清理中输入保留、关键词状态筛选及过期分类被跳过。
+
+实现验证见[快停竞态与 Decision 日志](../../validation/One-Way-Speech-Perception.md#快停竞态与-decision-日志)。
+
+模型身份、检测总耗时和推理耗时的契约见 [Zipformer 快停检测与推理耗时](Zipformer-Interrupt.md#快停检测与推理耗时)。

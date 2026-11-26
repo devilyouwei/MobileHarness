@@ -72,31 +72,6 @@ private func sampleFrame() throws -> ModelKit.AudioFrame {
         format: ModelKit.AudioFormat(sampleRate: 16_000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
 }
 
-@Test func speechUnitReceiptsRequireContiguousCompletionAtCutoff() async throws {
-    let text = "First complete. Second unfinished. Third queued."
-    let input = AgentInput(id: "reply", sessionID: "session", payload: .text("hello"))
-    let store = AudioCache()
-    let synthesis = AssistantSpeechOutput()
-    try await synthesis.configure(synthesis: SynthesisFixture(probe: VoiceProbe()), store: store)
-    let progress = try AssistantSpeechProgress(text)
-    let id = try await synthesis.prepare(text: text, input: input, tracking: progress)
-    let owner = AudioCache.Owner(source: "assistant", session: input.sessionID, input: input.id)
-    let stream = try await store.checkout(id, owner: owner)
-    let first = try #require(try await stream.nextPlaybackFrame())
-    let second = try #require(try await stream.nextPlaybackFrame())
-    let third = try #require(try await stream.nextPlaybackFrame())
-    #expect(try await stream.nextPlaybackFrame() == nil)
-    let cutoff = ContinuousClock.now
-    #expect(progress.completedUnits(at: cutoff) == 0)
-    first.played?(cutoff)
-    third.played?(cutoff)
-    second.played?(cutoff.advanced(by: .milliseconds(1)))
-    #expect(progress.completedUnits(at: cutoff) == 1)
-    #expect(progress.completedUnits(at: cutoff.advanced(by: .milliseconds(1))) == 3)
-    try await store.release(id, owner: owner)
-    await synthesis.stop()
-}
-
 private func preparedSpeech(
     text: String, input: AgentInput, probe: VoiceProbe, producesAudio: Bool = true
 ) async throws -> (AssistantSpeechOutput, AudioCache, SpeechPlayback, any FunctionInput) {
@@ -2030,6 +2005,11 @@ func speechPerceptionPublishesActivityAndFinalText() async throws {
     let keyword = SpeechKeywordMatch(
         generation: "g", utterance: "u", label: "en-stop", keyword: "stop", onset: .zero, matchedAt: .milliseconds(64))
     #expect(try contracts.validatedSize(keyword.message()) > 0)
+    let invalidKeyword = SpeechKeywordMatch(
+        generation: "g", utterance: "u", label: "en-stop", keyword: "stop", onset: .zero, matchedAt: .milliseconds(64),
+        detection: .init(
+            modelID: "fixture", modelName: nil, inferenceDuration: .milliseconds(-1), completedAt: .milliseconds(70)))
+    #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalidKeyword.message()) }
     #expect(throws: CommunicationError.invalidPayload) {
         try contracts.validatedSize(SpeechActivity(.onsetConfirmed, generation: "g", onsetRevision: 1).message())
     }
@@ -2065,7 +2045,7 @@ func perceptionPublishesKeywordFromIdleCaptureWhenEnabled(enabled: Bool) async t
     try await speech.openCapture(sessionID: session)
     await speech.setCaptureDuplex(true)
     await speech.bindMicrophoneGeneration("capture", keywordDetection: (enabled, 0.25))
-    let origin = ContinuousClock.now
+    let origin = ContinuousClock.now - .milliseconds(256)
     for index in 0..<8 {
         try await speech.processMicrophone(
             MicrophoneFrame(
@@ -2082,6 +2062,12 @@ func perceptionPublishesKeywordFromIdleCaptureWhenEnabled(enabled: Bool) async t
         #expect(match.keyword == "停下" && match.label == "zh-stop")
         #expect(match.onset == SpeechSignalClock.offset(at: origin))
         #expect(match.matchedAt == SpeechSignalClock.offset(at: origin + .milliseconds(256)))
+        let detection = try #require(match.detection)
+        #expect(detection.modelID == MatchingKeywordModel.metadata.model.modelID)
+        #expect(detection.modelName == MatchingKeywordModel.metadata.model.displayName)
+        #expect(detection.inferenceDuration == MatchingKeywordModel.metadata.inferenceDuration)
+        #expect(detection.completedAt >= match.matchedAt)
+        #expect(try JSONDecoder().decode(SpeechKeywordMatch.self, from: JSONEncoder().encode(match)) == match)
     } else {
         #expect(await keyword.received == 0)
         #expect(observations.withLock { $0.isEmpty })

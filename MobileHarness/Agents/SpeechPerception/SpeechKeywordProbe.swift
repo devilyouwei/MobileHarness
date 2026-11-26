@@ -50,7 +50,11 @@ struct SpeechKeywordProbe {
     let id = UUID()
     let generation: String
     let onset: Duration
-    var match: (label: String, at: Duration)?
+    struct Hit: Sendable {
+        let result: KeywordSpottingMatch
+        let audioEnd: Duration
+    }
+    var match: Hit?
     var delivered = false
     private struct Packet: Sendable {
         let samples: [Float]
@@ -61,7 +65,7 @@ struct SpeechKeywordProbe {
 
     init(
         capability: any KeywordSpottingCapability, generation: String, onset: Duration, keywords: [SpeechKeyword],
-        onMatch: @escaping @Sendable (UUID, String, Duration) async -> Void
+        onMatch: @escaping @Sendable (UUID, Hit) async -> Void
     ) {
         self.generation = generation
         self.onset = onset
@@ -80,9 +84,13 @@ struct SpeechKeywordProbe {
                         let samples = packet.samples
                         try Task.checkCancellation()
                         tail = Array((tail + samples).suffix(2560))
-                        if let label = try await session.accept(samples) {
+                        if let result = try await session.accept(samples) {
                             if Self.hasSilentTail(tail), !Task.isCancelled {
-                                await onMatch(id, label, packet.capturedAt + .nanoseconds(samples.count * 62_500))
+                                await onMatch(
+                                    id,
+                                    Hit(
+                                        result: result,
+                                        audioEnd: packet.capturedAt + .nanoseconds(samples.count * 62_500)))
                             } else if !Task.isCancelled {
                                 Self.log.debug("Keyword hit rejected by the silent tail gate")
                             }
@@ -178,7 +186,7 @@ actor SpeechKeywordTest {
             quietSamples = min(9600, quietSamples + samples.count)
         }
         tail = Array((tail + samples).suffix(2560))
-        let label = try await session.accept(packet)
+        let label = try await session.accept(packet)?.label
         try Task.checkCancellation()
         guard !finished else { return Observation() }
         receivedSamples += samples.count

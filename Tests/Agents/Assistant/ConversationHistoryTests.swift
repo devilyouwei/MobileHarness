@@ -13,6 +13,35 @@ import Testing
 @testable import Agents
 @testable import ModelKitOpenAI
 
+@Test(.actionCatalog, arguments: ["en", "zh-Hans"])
+func interruptedReplyPromptAndHistoryUseTheSameLocalizedMarker(language: String) throws {
+    try AgentPrompts.$language.withValue(language) {
+        let templates = try AgentPrompts.load(named: "Assistant")
+        let marker = try templates.render("replyInterruptedMarker")
+        let decoded = try JSONDecoder().decode([String: Bool].self, from: Data(marker.utf8))
+        #expect(decoded == ["replyInterrupted": true])
+
+        let instructions = try AgentPrompts.assistantInput()
+        #expect(instructions.contains("`\(marker)`"))
+        if language == "zh-Hans" {
+            #expect(instructions.contains("正文只保留已成功完成的 Action 片段，按入轨顺序排列"))
+            #expect(instructions.contains("Action Result 提供具体动作的返回值或执行异常"))
+        } else {
+            #expect(instructions.contains("successfully completed Actions, in submission order"))
+            #expect(instructions.contains("Action Results report return values or execution errors"))
+        }
+
+        var request = AssistantModelRequest(id: "round", input: "input", requestJSON: "[]")
+        request.response = "Retained text."
+        let ordinary = try AssistantHistoryProjection.messages(for: request, templates: templates)
+        #expect(ordinary.last?.content == request.response)
+        request.replyTruncation = .init(roundID: request.id, completedCallIDs: ["action"])
+        request.generatedResponse = "Retained text. Unexecuted tail."
+        let interrupted = try AssistantHistoryProjection.messages(for: request, templates: templates)
+        #expect(interrupted.last?.content == request.response + "\n" + marker)
+    }
+}
+
 private actor LiveTitleChatProbe: ChatCapability {
     let provider: OpenAIChat
     var request: ChatRequest?

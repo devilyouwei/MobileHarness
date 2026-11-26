@@ -178,32 +178,54 @@ import Foundation
                         )
                         .foregroundStyle(
                             decision.isFailure ? .orange : .primary)
-                        Text(
-                            appCopy.text("Model result") + " · "
-                                + (decision.booleanResult.map { $0 ? "true" : "false" } ?? decision.modelResult?
-                                    .rawValue ?? appCopy.text("No valid result"))
-                        ).foregroundStyle(.secondary)
+                        if decision.route == .keyword {
+                            Text(appCopy.text("Matched keyword") + " · " + decision.inputText).foregroundStyle(
+                                .secondary)
+                        } else {
+                            Text(
+                                appCopy.text("Model result") + " · "
+                                    + (decision.booleanResult.map { $0 ? "true" : "false" } ?? decision.modelResult?
+                                        .rawValue ?? appCopy.text("No valid result"))
+                            ).foregroundStyle(.secondary)
+                            DisclosureGroup {
+                                Text(
+                                    decision.requests.isEmpty
+                                        ? "No model request was sent"
+                                        : decision.requests.joined(separator: "\n\n")
+                                )
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("User input").font(.caption).foregroundStyle(.secondary)
+                                    Text(decision.inputText).font(.subheadline).lineLimit(2)
+                                }
+                            }
+                        }
                         if let reason = decision.reason {
                             Text(reason).foregroundStyle(.secondary)
                         }
-                        DisclosureGroup {
-                            Text(
-                                decision.requests.isEmpty
-                                    ? "No model request was sent"
-                                    : decision.requests.joined(separator: "\n\n")
-                            )
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("User input").font(.caption).foregroundStyle(.secondary)
-                                Text(decision.inputText).font(.subheadline).lineLimit(2)
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(decision.time, style: .time)
+                                if decision.route == .keyword {
+                                    Text(
+                                        appCopy.text(
+                                            decision.inferenceDuration == nil
+                                                ? "Keyword detection time" : "Total detection time")
+                                            + " " + decision.duration.formatted(.units(allowed: [.milliseconds])))
+                                } else {
+                                    Text(
+                                        "Decision duration "
+                                            + decision.duration.formatted(.units(allowed: [.milliseconds])))
+                                }
                             }
-                        }
-                        HStack {
-                            Text(decision.time, style: .time)
-                            Text("Decision duration " + decision.duration.formatted(.units(allowed: [.milliseconds])))
+                            if let inferenceDuration = decision.inferenceDuration {
+                                Text(
+                                    appCopy.text("Inference time") + " "
+                                        + inferenceDuration.formatted(.units(allowed: [.milliseconds])))
+                            }
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "templates": {
-    "context": "当前你正在说“{{assistantReply}}”，此时用户对你说“{{userInput}}”，",
-    "question": "请问：用户说这句话是否包含打断你的意图？"
+    "context": "当前你正在说“{{assistantReply}}”\n此时用户对你说“{{userInput}}”\n",
+    "question": "请判断：用户说这句话是否包含了打断你的意图？"
   }
 }

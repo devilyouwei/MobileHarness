@@ -30,16 +30,16 @@ public struct AssistantDecisionMetadata: Codable, Sendable {
     }
 }
 
-/// Proven playback boundary for the last completed reply Action at interruption admission.
+/// Completed reply Action evidence for a settled interruption.
 public struct AssistantReplyTruncation: Codable, Equatable, Sendable {
     public let roundID: String
-    public let callID: String
-    public let playedUnits: Int
+    public let callID: String?
+    public let completedCallIDs: [String]?
 
-    public init(roundID: String, callID: String, playedUnits: Int) {
+    public init(roundID: String, completedCallIDs: [String]) {
         self.roundID = roundID
-        self.callID = callID
-        self.playedUnits = playedUnits
+        self.callID = completedCallIDs.last
+        self.completedCallIDs = completedCallIDs
     }
 }
 

@@ -68,3 +68,11 @@ Assistant 的提示词有重复表述、顺序混乱、同一主题分散在多�
 ## 暂缓
 
 Action 声明增加返回值描述（`returns`）、枚举值渲染，作为后续独立变更。
+
+## 2026-11-26 双语打断历史提示
+
+将历史回复的 `replyInterrupted` 标记移入 Assistant 的双语 `Prompts.json`，用同一资源渲染历史正文和已入队的工具附件。Assistant 的双语 `InputProtocol` 在读取历史的规则中引用该标记，并说明被标记的正文只保留成功完成的 Action 片段，Action Result 提供动作的返回值或执行异常。标记由宿主呈现，键名与值在两种语言中一致。
+
+涉及 `AssistantHistoryProjection`、打断结算里的工具附件更新和 `AgentPrompts.assistantInput`。标记继续由持久化的截断事实驱动，落库字段与共享 XML 输出协议沿用现有契约。补充双语资源与实际请求投影回归，同步资源索引和 Assistant 输入、工作流设计。
+
+验证见[打断历史的双语提示](../../validation/Full-Duplex-Playback-Admission.md#打断历史的双语提示)。

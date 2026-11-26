@@ -68,3 +68,17 @@ Actions 继续管理本机采集和诊断状态。SpeechPerception 使用现有 
 跨角色的协议和实施边界见 [统一执行反馈与续说等待](Action-Execution-Lifecycle.md)。全双工语音会话从 Assistant 接纳打断时开始观察 64 个实际处理的 VAD 窗口，和当前会话的 Action 取消与清理并行。候选和在途语句持续跟踪，清理期间接纳同会话已确认语句的终稿。旧回复的输出结束与清理完成属于放行条件，无需等清理后再开始计数。
 
 快停口令的 ASR 终稿照常入队。同一轮内连说的后半句随终稿一并交付。接纳前已经出现的候选与之后到达的候选使用同一生命周期，等待候选清除，或确认起声并等待 ASR 终稿入队或空轮结束。采集更换后重新累计窗口，保留已确认的 Action 清理结果。显式暂停、停止或关闭语音会话时退休观察。快停接纳时立即记录语句 ID，防止同一句终稿重复触发 Decision。
+
+## 独立短词的尾随 blank
+
+在 `MobileHarness/ModelKit/Speech/KWS/ZipformerKeywordDecoder.swift` 中，把独立短词「停下」与 `stop` 的命中条件从连续 4 帧尾随 blank 调整为 2 帧。与 [sherpa-onnx 的解码条件](https://github.com/k2-fsa/sherpa-onnx/blob/master/sherpa-onnx/csrc/transducer-keyword-decoder.cc#L149) 配合上游默认参数 `1` 的实际帧数一致。独立短词仍须从首个词元匹配，较长口令仍需 1 帧 blank。SpeechPerception 正式快停仍检查 160 ms PCM 尾部静音，设置诊断仍报告首次命中和静音门限结果。模型分块、置信度、接口及下游打断流程沿用既有契约。
+
+同步 ModelKit KWS 的技术说明，在 `Tests/ModelKit/Speech/ZipformerTests.swift` 验证 1 帧尚未命中、2 帧命中以及与长词的前缀和后缀边界。实际收益由真机口令结束至停播的延迟及误停、漏停数据验收。
+
+## 快停检测与推理耗时
+
+`KeywordSpottingCapability.swift` 的流式会话返回带元数据的命中。`ZipformerKeywordSpotter.swift` 复用 `InferenceModelIdentity`，由实际会话累加各次编码与关键词解码的单调时钟耗时，涵盖 encoder、decoder、joiner 和 beam search，排除特征提取、等待音频、会话准备及预热。注册、模型菜单和命中从同一个 Zipformer 身份取得名称。
+
+`SpeechKeywordProbe.swift` 保留模型元数据和命中所用 PCM 的末端时间。`SpeechPerceptionAgent.swift` 在完成静音与语句确认并准备发布时记录检测完成时刻，通过 `SpeechKeywordMessage.swift` 的可选观测元数据传递模型身份、累计推理耗时和检测完成时刻。Assistant 将起声到检测完成的实际间隔及推理耗时投影到 `DecisionLogItem`，沿用现有模型名称标题格式和中英文标签。旧消息仍可读取原有的 PCM 时长，缺少的推理耗时不构造。保持打断接纳、词表和判定门限。
+
+更新 ModelKit、SpeechPerception、通信、Assistant 输入、RuntimeLog 与总体设计。验证覆盖真实模型命中元数据、探测传递、消息校验、打断日志投影和本地化构建。

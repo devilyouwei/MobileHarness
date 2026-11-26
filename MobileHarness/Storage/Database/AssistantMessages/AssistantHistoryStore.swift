@@ -765,20 +765,39 @@ public actor AssistantHistoryStore {
     }
 
     public func recordReplyTruncation(
-        _ marker: AssistantReplyTruncation, response: String, inputID: String, requestID: String
-    ) async throws {
+        _ marker: AssistantReplyTruncation, fragments: [Range<Int>], inputID: String, requestID: String
+    ) async throws -> String? {
+        var truncated: String?
         try await updateTurn(inputID) { turn in
             guard var requests = turn.modelRequests,
                 let index = requests.firstIndex(where: { $0.id == requestID && $0.awaitingDispatch != true }),
                 requests[index].state != .generating
             else { throw AssistantHistoryError.invalidRecord }
+            let original = requests[index].generatedResponse ?? requests[index].response
+            let bytes = Array(original.utf8)
+            var retained: [UInt8] = []
+            var seen: Set<Range<Int>> = []
+            var previousEnd = 0
+            for fragment in fragments where seen.insert(fragment).inserted {
+                guard fragment.lowerBound >= previousEnd, fragment.upperBound <= bytes.count else {
+                    throw AssistantHistoryError.invalidRecord
+                }
+                retained += bytes[fragment]
+                previousEnd = fragment.upperBound
+            }
+            guard let response = String(bytes: retained, encoding: .utf8) else {
+                throw AssistantHistoryError.invalidRecord
+            }
             if let existing = requests[index].replyTruncation {
                 guard existing == marker, requests[index].response == response else {
                     throw AssistantHistoryError.conflict
                 }
+                truncated = response
                 return false
             }
-            requests[index].generatedResponse = requests[index].response
+            guard response != original else { return false }
+            truncated = response
+            requests[index].generatedResponse = original
             requests[index].response = response
             requests[index].replyTruncation = marker
             turn.modelRequests = requests
@@ -786,6 +805,7 @@ public actor AssistantHistoryStore {
             return true
         }
         try await checkpoint(inputID: inputID)
+        return truncated
     }
 
     public func finish(

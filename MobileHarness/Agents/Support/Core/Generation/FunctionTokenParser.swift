@@ -3,12 +3,21 @@ import Foundation
 /// Parses the Function Token protocol: natural text and a restricted XML syntax.
 /// Independent of model tokenizer boundaries. One instance per generation; errors are terminal.
 public struct FunctionTokenParser: Sendable {
+    struct LocatedToken {
+        let token: FunctionToken
+        let source: Range<Int>
+        // One original UTF-8 range per decoded scalar, including expanded entities.
+        var textSources: [Range<Int>] = []
+    }
+
     private var utf8: [UInt8] = []
     private var expectedBytes = 0
     private var tag: String?
     private var quote: Unicode.Scalar?
     private var entity: String?
+    private var entityStart = 0
     private var text = ""
+    private var textSources: [Range<Int>] = []
     private var waitDepth = 0
     private var waitCount = 0
     private var totalBytes = 0
@@ -19,15 +28,19 @@ public struct FunctionTokenParser: Sendable {
     public mutating func append(_ fragment: String) throws -> [FunctionToken] { try append(Data(fragment.utf8)) }
 
     public mutating func append(_ bytes: Data) throws -> [FunctionToken] {
+        try appendLocated(bytes).map(\.token)
+    }
+
+    mutating func appendLocated(_ bytes: Data) throws -> [LocatedToken] {
         guard !closed else { throw GenerationError.closed }
         do {
             guard bytes.count <= 65_536 - totalBytes else { throw GenerationError.limitExceeded }
-            totalBytes += bytes.count
-            var result: [FunctionToken] = []
+            var result: [LocatedToken] = []
             for byte in bytes {
+                totalBytes += 1
                 if utf8.isEmpty {
                     if byte < 128 {
-                        try consume(Unicode.Scalar(byte), into: &result)
+                        try consume(Unicode.Scalar(byte), start: totalBytes - 1, into: &result)
                         continue
                     }
                     switch byte {
@@ -45,7 +58,7 @@ public struct FunctionTokenParser: Sendable {
                     else {
                         throw GenerationError.invalidUTF8
                     }
-                    try consume(scalar, into: &result)
+                    try consume(scalar, start: totalBytes - expectedBytes, into: &result)
                     utf8.removeAll(keepingCapacity: true)
                 }
             }
@@ -58,24 +71,30 @@ public struct FunctionTokenParser: Sendable {
     }
 
     public mutating func finish() throws -> [FunctionToken] {
+        try finishLocated().map(\.token)
+    }
+
+    mutating func finishLocated() throws -> [LocatedToken] {
         guard !closed else { throw GenerationError.closed }
         closed = true
         guard utf8.isEmpty, tag == nil, entity == nil, waitDepth == 0 else {
             throw GenerationError.incompleteDocument
         }
-        var result: [FunctionToken] = []
+        var result: [LocatedToken] = []
         flushText(into: &result)
         return result
     }
 
-    private mutating func flushText(into result: inout [FunctionToken]) {
-        if !text.isEmpty {
-            result.append(.text(text))
+    private mutating func flushText(into result: inout [LocatedToken]) {
+        if let first = textSources.first, let last = textSources.last {
+            result.append(
+                .init(token: .text(text), source: first.lowerBound..<last.upperBound, textSources: textSources))
             text = ""
+            textSources.removeAll()
         }
     }
 
-    private mutating func consume(_ scalar: Unicode.Scalar, into result: inout [FunctionToken]) throws {
+    private mutating func consume(_ scalar: Unicode.Scalar, start: Int, into result: inout [LocatedToken]) throws {
         guard Self.validScalar(scalar) else { throw GenerationError.malformedMarkup }
         if tag != nil {
             tag!.unicodeScalars.append(scalar)
@@ -87,13 +106,15 @@ public struct FunctionTokenParser: Sendable {
             } else if scalar == ">" {
                 let complete = tag!
                 tag = nil
-                try parseTag(complete, into: &result)
+                result.append(
+                    .init(token: try parseTag(complete), source: (totalBytes - complete.utf8.count)..<totalBytes))
             }
             return
         }
         if entity != nil {
             if scalar == ";" {
                 text += try Self.decodeEntity(entity!)
+                textSources.append(entityStart..<totalBytes)
                 entity = nil
             } else {
                 guard scalar != "<", scalar != "&", !Character(scalar).isWhitespace else {
@@ -107,12 +128,14 @@ public struct FunctionTokenParser: Sendable {
             tag = "<"
         } else if scalar == "&" {
             entity = ""
+            entityStart = start
         } else {
             text.unicodeScalars.append(scalar)
+            textSources.append(start..<totalBytes)
         }
     }
 
-    private mutating func parseTag(_ value: String, into result: inout [FunctionToken]) throws {
+    private mutating func parseTag(_ value: String) throws -> FunctionToken {
         tokenCount += 1
         guard tokenCount <= 1024 else { throw GenerationError.limitExceeded }
         let content = String(value.dropFirst().dropLast())
@@ -120,14 +143,12 @@ public struct FunctionTokenParser: Sendable {
             guard waitCount < 32, waitDepth < 8 else { throw GenerationError.limitExceeded }
             waitCount += 1
             waitDepth += 1
-            result.append(.scheduling(.beginWait))
-            return
+            return .scheduling(.beginWait)
         }
         if content == "/wait" {
             guard waitDepth > 0 else { throw GenerationError.malformedMarkup }
             waitDepth -= 1
-            result.append(.scheduling(.endWait))
-            return
+            return .scheduling(.endWait)
         }
         guard content.hasSuffix("/") else { throw GenerationError.malformedMarkup }
         let chars = Array(content.dropLast())
@@ -164,7 +185,7 @@ public struct FunctionTokenParser: Sendable {
             guard params.count <= 32 else { throw GenerationError.limitExceeded }
             index += 1
         }
-        result.append(.action(name: alias, parameters: params))
+        return .action(name: alias, parameters: params)
     }
 
     private static func decodeAttribute(_ value: String) throws -> String {

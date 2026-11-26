@@ -92,7 +92,7 @@ struct ZipformerKeywordDecoder {
         guard let best = next.max(by: { $0.score < $1.score }), best.blanks > 0 else { return nil }
         for match in matchingSuffixes(best.prefix) {
             guard let keyword = keywords[match],
-                !keyword.standalone || (best.emittedTokens == match.count && best.blanks >= 4)
+                !keyword.standalone || (best.emittedTokens == match.count && best.blanks >= 2)
             else { continue }
             let mean = best.probabilities.suffix(match.count).reduce(0, +) / Float(match.count)
             if mean >= keyword.threshold { return keyword.label }

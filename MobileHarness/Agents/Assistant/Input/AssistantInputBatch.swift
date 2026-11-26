@@ -131,7 +131,11 @@ struct AssistantInputBatch {
 
 extension AgentPrompts {
     static func assistantInput() throws -> String {
-        try text("Assistant/Input/InputProtocol", "instructions")
+        try text(
+            "Assistant/Input/InputProtocol", "instructions",
+            [
+                "replyInterruptedMarker": text("Assistant/Prompts", "replyInterruptedMarker")
+            ])
     }
 
     /// These strings also parse recorded input envelopes and must retain their canonical spelling.

@@ -23,7 +23,28 @@ public protocol KeywordSpottingCapability: Sendable {
 }
 
 public protocol KeywordSpottingSession: Sendable {
-    /// Accepts bounded 16 kHz mono PCM. The first matched label seals the stream.
-    func accept(_ samples: [Float]) async throws -> String?
+    /// Accepts bounded 16 kHz mono PCM. The first match seals the stream.
+    func accept(_ samples: [Float]) async throws -> KeywordSpottingMatch?
     func cancel() async
+}
+
+public struct KeywordSpottingMatch: Sendable, Equatable {
+    public struct Metadata: Sendable, Equatable {
+        public let model: InferenceModelIdentity
+        /// Cumulative inference work for this stream through the match.
+        public let inferenceDuration: Duration
+
+        public init(model: InferenceModelIdentity, inferenceDuration: Duration) {
+            self.model = model
+            self.inferenceDuration = inferenceDuration
+        }
+    }
+
+    public let label: String
+    public let metadata: Metadata
+
+    public init(label: String, metadata: Metadata) {
+        self.label = label
+        self.metadata = metadata
+    }
 }

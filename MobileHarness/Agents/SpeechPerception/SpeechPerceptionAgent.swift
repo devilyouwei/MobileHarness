@@ -972,8 +972,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
                     keywordProbe = SpeechKeywordProbe(
                         capability: keywordSpotting, generation: generation, onset: time,
                         keywords: keywordLexicon.keywords(threshold: keywordThreshold)
-                    ) { [weak self] id, label, time in
-                        await self?.receiveKeywordMatch(id, label: label, at: time)
+                    ) { [weak self] id, hit in
+                        await self?.receiveKeywordMatch(id, hit: hit)
                     }
                     if !keywordPreRoll.isEmpty,
                         keywordProbe?.submit(
@@ -989,22 +989,26 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         await publishKeywordIfReady()
     }
 
-    private func receiveKeywordMatch(_ id: UUID, label: String, at time: Duration) async {
+    private func receiveKeywordMatch(_ id: UUID, hit: SpeechKeywordProbe.Hit) async {
         guard keywordProbe?.id == id else { return }
-        keywordProbe?.match = (label, time)
+        keywordProbe?.match = hit
         await publishKeywordIfReady()
     }
 
     private func publishKeywordIfReady() async {
         guard lifecycle == .running, captureOpen, var probe = keywordProbe, let match = probe.match, !probe.delivered,
             probe.generation == vadGeneration, let turn = currentTurn, let interactionSessionID,
-            let phrase = keywordLexicon?.phrase(for: match.label)
+            let phrase = keywordLexicon?.phrase(for: match.result.label)
         else { return }
         probe.delivered = true
         keywordProbe = probe
+        let metadata = match.result.metadata
         let observation = SpeechKeywordMatch(
-            generation: probe.generation, utterance: turn.id, label: match.label,
-            keyword: phrase, onset: probe.onset, matchedAt: match.at)
+            generation: probe.generation, utterance: turn.id, label: match.result.label,
+            keyword: phrase, onset: probe.onset, matchedAt: match.audioEnd,
+            detection: .init(
+                modelID: metadata.model.modelID, modelName: metadata.model.displayName,
+                inferenceDuration: metadata.inferenceDuration, completedAt: SpeechSignalClock.offset(at: .now)))
         let parent = AgentInput(
             id: UUID().uuidString, sessionID: interactionSessionID, payload: .event("speech.keyword"), turn: turn)
         do { try await communicate(observation.message(), parent: parent) } catch {

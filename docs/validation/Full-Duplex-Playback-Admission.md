@@ -101,7 +101,7 @@
 
 ## 打断后按播报进度截断回复
 
-日期 2026-11-26。基线 `46950bb6`。详见[截断需求](../requirements/technical/Full-Duplex-Playback-Admission.md#打断后截断最后一个已完成的回复-action-文本)。
+日期 2026-11-26。基线 `46950bb6`。本节记录原有语音截断实现的验证与安装，[现行范围](../requirements/technical/Full-Duplex-Playback-Admission.md#打断后按已完成的-action-重建回复)另行验证。
 
 - 最终 Swift 专项 5 项通过，覆盖 PCM 回执、截止时刻、未播、部分播完、完整播完、迟到回执、生成尚未解析完、SQLite 重读和下一次模型请求正文与标记。语音合成、原生播放回执和聊天模型使用确定性替身。
 - `./scripts/check.sh` 在边界检查退出，报告 `Agents/AgentContainer.swift` 的 State Value codec 以及 15 个 Xcode 本地化资源归属问题。这些问题已在[语音单向通信验证](One-Way-Speech-Perception.md#构建与静态检查)中记录。另行运行的变更 Swift 文件严格格式、8 项 Python 工程工具回归、plist 与 diff 检查通过。
@@ -111,3 +111,22 @@
 - 真机语音打断、实际音频与文本边界、真实模型对标记的理解留待独立验收。
 
 2026-11-26，签名版 MobileHarness 0.1.0（2026112605）通过真机构建、严格签名及 App 资源检查，在 iPhone 17 Pro 上从 2026112604 原位更新。安装回执序列为 8152，独立应用清单确认已安装构建号 2026112605。
+
+## 打断后按已完成的 Action 重建回复
+
+日期 2026-11-26，基线 `3d6714fb`。跨轨道回归使用确定性的完成 Signal，覆盖原始入轨顺序、反序回执、失败和取消夹在成功动作间、清理期间成功、零成功动作、重复文本片段、SQLite 重读及下一次模型请求。Function Token 解析回归核对转义和多字节文本的原始范围。
+
+- 定向 Swift 回归 25 项通过。普通 Swift 阶段的 IntegrationTests 运行 1,276 项，报告 16 条失败，其中 4 条来自 Action 取消与 Tool 回传，另 12 条来自四种停词输入。停词与跨轨道结算专项复跑通过。
+- `./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。变更文件严格格式、8 项 Python 工程工具回归和 `git diff --check` 通过。
+- `./scripts/build-ios.sh` 的五个 Simulator scheme、94 项 Agent／Skill 资源、Live Activity 和中英双语资源校验通过。
+- 签名版 MobileHarness 0.1.0（2026112606）通过真机构建、严格签名和资源校验，在 iPhone 17 Pro 上从 2026112605 原位更新。安装回执序列为 8160，独立设备清单确认构建号。真机交互和真实模型效果待验收。
+
+## 打断历史的双语提示
+
+2026-11-26。Swift 专项 37 项通过。双语回归核对中英文输入规则与已截断历史使用同一资源标记，普通历史沿用原正文，并覆盖截断落库后下一次模型请求。
+
+`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。变更 Swift 文件的严格格式、8 项 Python 工具检查、plist 检查和 `git diff --check` 通过。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过，App 的 Agent／Skill、Live Activity 和中英文资源校验通过。
+
+签名版 MobileHarness 0.1.0（2026112607）通过真机构建、严格签名和资源检查，在 iPhone 17 Pro 上从 2026112606 原位更新。安装回执序列为 8168，独立设备清单确认构建号。

@@ -17,13 +17,9 @@
     public struct PlaybackPCM: Sendable {
         public let samples: [Float]
         public let sampleRate: Int
-        let played: (@Sendable (ContinuousClock.Instant) -> Void)?
-        public init(
-            samples: [Float], sampleRate: Int, played: (@Sendable (ContinuousClock.Instant) -> Void)? = nil
-        ) {
+        public init(samples: [Float], sampleRate: Int) {
             self.samples = samples
             self.sampleRate = sampleRate
-            self.played = played
         }
     }
 
@@ -733,11 +729,10 @@
         private func schedule(_ pcm: PlaybackPCM, token: String) async throws {
 
             let id = UUID().uuidString
-            let receipt = pcm.played
             scheduled.insert(id)
             do {
                 try await playback.schedule(pcm, token: token) { @Sendable [weak self] in
-                    Task { @MainActor in self?.played(id, token: token, receipt: receipt) }
+                    Task { @MainActor in self?.played(id, token: token) }
                 }
             } catch {
                 scheduled.remove(id)
@@ -745,11 +740,8 @@
                 throw error
             }
         }
-        private func played(
-            _ id: String, token: String, receipt: (@Sendable (ContinuousClock.Instant) -> Void)?
-        ) {
+        private func played(_ id: String, token: String) {
             guard playbackToken == token, scheduled.remove(id) != nil else { return }
-            receipt?(.now)
             let space = spaceWaiter
             spaceWaiter = nil
             space?.resume()

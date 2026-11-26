@@ -157,7 +157,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id: String
         let sessionID: String
         let replyInputID: String
-        let truncation: ReplyTruncation?
+        var replyActions: ReplyActions?
         var generationJoined = false
         var cleanupConfirmed = false
         var settling = false
@@ -200,61 +200,47 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     let fullDuplex: Bool
     let inputDecision: AssistantInputDecision?
     let decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)?
+    let keywordLog: (@MainActor @Sendable (DecisionLogItem) -> Void)?
     struct DecisionTurn {
         let id: UUID
         let inputID: String
         let sessionID: String
         let startedAt = SpeechSignalClock.offset(at: .now)
         var assistant: String = ""
-        private var speech: [(requestID: String, roundID: String, callID: String, progress: AssistantSpeechProgress)] =
-            []
-        private var speechRequestParsed = false
+        var replyActions: ReplyActions?
+    }
+    struct ReplyActions {
+        let requestID: String
+        // The ordered output reader submits these to the scheduler in this order.
+        private var actions: [(id: String, path: ActionPath, source: Range<Int>)] = []
+        private var completed: Set<String> = []
 
-        init(id: UUID, inputID: String, sessionID: String) {
-            self.id = id
-            self.inputID = inputID
-            self.sessionID = sessionID
+        init(requestID: String) { self.requestID = requestID }
+
+        mutating func append(id: String, path: ActionPath, source: Range<Int>) {
+            actions.append((id, path, source))
         }
 
-        mutating func beginSpeechRequest() {
-            speech.removeAll()
-            speechRequestParsed = false
+        mutating func confirm(_ result: ActionResult) {
+            guard result.roundID == requestID, result.status == .succeeded, result.effect == .contractCompleted,
+                let id = result.callID, actions.contains(where: { $0.id == id && $0.path == result.path })
+            else { return }
+            completed.insert(id)
         }
 
-        mutating func finishSpeechRequest(_ requestID: String) {
-            if speech.last?.requestID == requestID { speechRequestParsed = true }
-        }
-
-        mutating func recordSpeech(
-            _ progress: AssistantSpeechProgress, requestID: String, roundID: String, callID: String
-        ) {
-            speech.append((requestID, roundID, callID, progress))
-        }
-
-        func truncatedReply(at cutoff: ContinuousClock.Instant) -> ReplyTruncation? {
-            guard let latest = speech.last else { return nil }
-            var response = ""
-            for (index, item) in speech.enumerated() {
-                let units = item.progress.completedUnits(at: cutoff)
-                response += item.progress.units.prefix(units).joined()
-                if units < item.progress.units.count {
-                    return .init(
-                        requestID: latest.requestID, response: response,
-                        marker: .init(
-                            roundID: latest.roundID, callID: latest.callID,
-                            playedUnits: index == speech.count - 1 ? units : 0))
-                }
-            }
-            guard !speechRequestParsed else { return nil }
-            return .init(
-                requestID: latest.requestID, response: response,
-                marker: .init(roundID: latest.roundID, callID: latest.callID, playedUnits: latest.progress.units.count))
+        var completedActions: [(id: String, source: Range<Int>)] {
+            actions.compactMap { completed.contains($0.id) ? ($0.id, $0.source) : nil }
         }
     }
-    struct ReplyTruncation {
-        let requestID: String
-        let response: String
-        let marker: AssistantReplyTruncation
+    func recordReplyActionCompletion(_ result: ActionResult) {
+        if activeInterruption?.replyInputID == result.inputID,
+            activeInterruption?.sessionID == result.owner.sessionID,
+            activeInterruption?.cleanupConfirmed == false
+        {
+            activeInterruption?.replyActions?.confirm(result)
+        } else if decisionTurn?.inputID == result.inputID, decisionTurn?.sessionID == result.owner.sessionID {
+            decisionTurn?.replyActions?.confirm(result)
+        }
     }
     var decisionTurn: DecisionTurn?
     let decisionQueue = AssistantDecisionQueue()
@@ -476,10 +462,21 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         else { return }
         activeInterruption?.settling = true
         do {
-            if let truncation = current.truncation {
-                try await conversations.recordReplyTruncation(
-                    truncation.marker, response: truncation.response,
-                    inputID: current.replyInputID, requestID: truncation.requestID)
+            if let reply = current.replyActions {
+                let actions = reply.completedActions
+                let truncated = try await conversations.recordReplyTruncation(
+                    .init(roundID: reply.requestID, completedCallIDs: actions.map(\.id)),
+                    fragments: actions.map(\.source), inputID: current.replyInputID, requestID: reply.requestID)
+                let key = reply.requestID + ".tools"
+                if let truncated, let queued = semanticAttachments[key]?.first, queued.role == .assistant {
+                    let templates = try AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
+                        try AgentPrompts.load(named: State.configurationName)
+                    }
+                    semanticAttachments[key]?[0] = .init(
+                        role: .assistant,
+                        content: try AssistantHistoryProjection.interruptedText(truncated, templates: templates),
+                        toolCalls: queued.toolCalls)
+                }
             }
             try await markInterruptedAfterCleanup(current.replyInputID)
         } catch {
@@ -500,6 +497,11 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     func bindInputInterruption(_ callback: @escaping @Sendable (String, String) async throws -> Void) {
         inputInterruption = callback
     }
+
+    func canRunInterruptDecision(target: UUID, sessionID: String) -> Bool {
+        lifecycle == .running && !executionCancellationBarrier && !hostCancellationInProgress
+            && decisionTurn?.id == target && decisionTurn?.sessionID == sessionID
+    }
     /// All interruption producers use this entry; execution cleanup is injected by the session owner.
     public func requestInterrupt(
         _ signal: AssistantInterrupt, sessionID: String, source: String = "runtime"
@@ -508,7 +510,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
 
     func admitInterrupt(
-        _ signal: AssistantInterrupt, sessionID: String, source: String, keyword: SpeechKeywordMatch?
+        _ signal: AssistantInterrupt, sessionID: String, source: String, keyword: (AgentInput, SpeechKeywordMatch)?
     ) async throws -> AssistantInterruptResult {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         let key = "\(source)|\(sessionID)|\(signal.id)"
@@ -522,16 +524,16 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             target = turn.id
         case .reply(let id): target = id
         }
+        guard !executionCancellationBarrier, !hostCancellationInProgress else { return .targetExpired }
         let active = await hasActiveReply(sessionID: sessionID)
         guard active, let turn = decisionTurn, turn.sessionID == sessionID, turn.id == target,
             !executionCancellationBarrier, !hostCancellationInProgress
         else { return .targetExpired }
         guard let inputInterruption else { throw CommunicationError.unavailableTarget }
-        if let keyword {
+        if let (_, keyword) = keyword {
             guard lifecycle == .running, listening?.isListening != false,
                 !retiredSpeechGenerations.contains(keyword.generation),
                 speechCaptureGeneration == nil || speechCaptureGeneration == keyword.generation,
-                !speechTerminals.contains(keyword.utterance),
                 !keywordInterruptedTurns.contains(keyword.utterance),
                 keyword.onset >= turn.startedAt
             else { return .targetExpired }
@@ -543,7 +545,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id = signal.id.uuidString
         let admittedAt = ContinuousClock.now
         activeInterruption = ActiveInterruption(
-            id: id, sessionID: sessionID, replyInputID: victim, truncation: turn.truncatedReply(at: admittedAt))
+            id: id, sessionID: sessionID, replyInputID: victim, replyActions: turn.replyActions)
         interruptionCleanupWatchdog?.cancel()
         interruptionCleanupWatchdog = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(10)) } catch { return }
@@ -564,29 +566,46 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             interruptionUtterances = speechUtterances
             resetContinuationProgress()
         }
-        if let keyword {
-            keywordInterruptedTurns.append(keyword.utterance)
-            if keywordInterruptedTurns.count > 128 { keywordInterruptedTurns.removeFirst() }
+        async let stopDecision: Void = decisionQueue.cancelClassification(target: target, sessionID: sessionID)
+        if let (input, keyword) = keyword {
+            if !speechTerminals.contains(keyword.utterance) {
+                keywordInterruptedTurns.append(keyword.utterance)
+                if keywordInterruptedTurns.count > 128 { keywordInterruptedTurns.removeFirst() }
+            }
             keywordCleanup = (
                 id,
                 Task { [weak self] in
                     guard let self else { return }
-                    await self.completeKeywordInterruption(inputInterruption, sessionID: sessionID, id: id)
+                    await self.completeKeywordInterruption(
+                        inputInterruption, input: input, match: keyword, id: id)
                 }
             )
         } else {
             try await confirmInterruption(inputInterruption, sessionID: sessionID, id: id)
         }
+        await stopDecision
         return .interrupted
     }
 
     private func completeKeywordInterruption(
-        _ inputInterruption: @Sendable (String, String) async throws -> Void, sessionID: String, id: String
+        _ inputInterruption: @Sendable (String, String) async throws -> Void,
+        input: AgentInput, match: SpeechKeywordMatch, id: String
     ) async {
         defer { if keywordCleanup?.id == id { keywordCleanup = nil } }
-        do { try await confirmInterruption(inputInterruption, sessionID: sessionID, id: id) } catch {
-            // The shared path reports failures and leaves the dispatch barrier in place.
+        var failure: String?
+        do { try await confirmInterruption(inputInterruption, sessionID: input.sessionID, id: id) } catch {
+            failure = String(describing: error)
         }
+        guard lifecycle != .stopped, !Task.isCancelled else { return }
+        let detection = match.detection
+        await keywordLog?(
+            .init(
+                id: input.id + ".keyword", source: descriptor.id.rawValue, inputText: match.keyword,
+                duration: (detection?.completedAt ?? match.matchedAt) - match.onset, route: .keyword, modelResult: nil,
+                adoptedResult: failure == nil ? .interrupt : .enqueue,
+                signalStatus: failure == nil ? "interrupted" : "interrupt_failed", reason: failure, requests: [],
+                modelName: detection?.modelName ?? detection?.modelID, modelID: detection?.modelID,
+                inferenceDuration: detection?.inferenceDuration))
     }
 
     private func confirmInterruption(
@@ -805,6 +824,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         speechOutput: (any AssistantSpeechProducing)? = nil,
         inputDecision: AssistantInputDecision? = nil, fullDuplex: Bool = false,
         decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)? = nil,
+        keywordLog: (@MainActor @Sendable (DecisionLogItem) -> Void)? = nil,
         inputQueueStatus: @escaping @Sendable (Int, Int) async -> Void = { _, _ in },
         uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil, speechSessionID: String? = nil,
         capacity: Int = 32, presentsReply: Bool = false,
@@ -828,6 +848,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         self.fullDuplex = fullDuplex
         self.inputDecision = inputDecision
         self.decisionLog = decisionLog
+        self.keywordLog = keywordLog
         self.speechOutput = speechOutput
         self.uiHome = uiHome
         self.uiSessionID = uiSessionID

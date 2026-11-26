@@ -159,9 +159,11 @@ extension AssistantChatWorker {
             }
         }
         let arrivedAt = ContinuousClock.now
-        let turnAtArrival = decisionTurn
-        let replyAtArrival = !executionCancellationBarrier && hasReplyWork(sessionID: input.sessionID)
-        let playbackAtArrival = inputDecision == nil ? nil : await speechOutput?.isPlaying(sessionID: input.sessionID)
+        let turnAtArrival = executionCancellationBarrier ? nil : decisionTurn
+        let replyAtArrival = turnAtArrival != nil && hasReplyWork(sessionID: input.sessionID)
+        let playbackAtArrival =
+            inputDecision == nil || turnAtArrival == nil
+            ? nil : await speechOutput?.isPlaying(sessionID: input.sessionID)
         if case .observation(let message) = input.payload, message.contract == ContainerFailureEvent.contract {
             throw CommunicationError.unauthorized
         }
@@ -226,6 +228,7 @@ extension AssistantChatWorker {
                     guard let index = roundCalls.firstIndex(where: { $0.id == id && !$0.tool }),
                         roundCalls[index].path == result.path.description
                     else { throw CommunicationError.unauthorized }
+                    recordReplyActionCompletion(result)
                     try await persistFeedback(input)
                     if try await acceptPendingFeedback(input, persisted: true) { return }
                     if receiptRound == roundID, roundCalls.indices.contains(index), roundCalls[index].id == id {
@@ -240,6 +243,7 @@ extension AssistantChatWorker {
                     }
                 } else {
                     // Cleanup can outlive the generation. Retain the terminal as execution evidence.
+                    recordReplyActionCompletion(result)
                     try await persistFeedback(input)
                 }
             } else {
@@ -588,18 +592,23 @@ extension AssistantChatWorker {
         admitted = true
         if isUser { blockedSessions.remove(input.sessionID) }
         if isUser { replyInputs.insert(input.id) }
-        if isUser, let inputDecision, let snapshot {
+        if isUser, let inputDecision, let snapshot, let target = turn?.id,
+            canRunInterruptDecision(target: target, sessionID: input.sessionID)
+        {
             do {
                 try await decisionQueue.submit(
                     .init(
-                        snapshot: snapshot, target: turn?.id,
+                        snapshot: snapshot, target: target,
                         interrupt: { [weak self] signal, session in
                             guard let self else { throw CommunicationError.unavailableTarget }
                             return try await self.requestInterrupt(signal, sessionID: session, source: "decision")
                         },
                         complete: { [weak self] snapshot, result, duration in
                             await self?.completeInputDecision(snapshot, outcome: result, duration: duration)
-                        }, updated: { [weak self] in await self?.publishInputQueue() }), using: inputDecision)
+                        }, updated: { [weak self] in await self?.publishInputQueue() },
+                        canClassify: { [weak self] in
+                            await self?.canRunInterruptDecision(target: target, sessionID: input.sessionID) ?? false
+                        }), using: inputDecision)
             } catch {
                 let failure = InputDecisionOutcome(
                     route: .failed, modelResult: nil,
@@ -626,7 +635,7 @@ extension AssistantChatWorker {
         else { return }
         _ = try await admitInterrupt(
             .init(target: .reply(reply.id)), sessionID: input.sessionID, source: "keyword",
-            keyword: match)
+            keyword: (input, match))
     }
 
     func interactionViews(sessionID: String) async throws -> [AgentTaskView] {

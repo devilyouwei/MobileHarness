@@ -61,6 +61,7 @@ Apple's transcriber/detector share analyzer state; normal detector activity call
 joiner, streaming filterbanks and bounded keyword sessions. The host supplies
 phrases and PCM through `KeywordSpottingCapability`. Opening a session only
 uses a ready graph; an absent or loading model returns nil.
+The first hit carries the provider's model identity and cumulative inference time.
 
 ## End-of-turn confirmation
 

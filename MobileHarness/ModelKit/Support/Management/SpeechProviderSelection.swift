@@ -2,6 +2,7 @@ import Foundation
 import ModelKit
 import ModelKitKokoro
 import ModelKitRuntime
+import ModelKitZipformer
 
 /// A user-selectable implementation. Nil artifact means the implementation ships with the app or the OS.
 public struct SpeechModelOption: Sendable {
@@ -30,7 +31,10 @@ public struct SpeechModelOption: Sendable {
         .init(.enhancement, "off", "Off"),
         .init(.enhancement, "deepfilternet3", "DeepFilterNet3", artifact: "deepfilternet3"),
         .init(.keywordSpotting, "off", "Off"),
-        .init(.keywordSpotting, "zipformer-kws", "Zipformer Keyword Spotting", artifact: "zipformer-kws"),
+        .init(
+            .keywordSpotting, ZipformerKeywordSpotter.modelIdentity.modelID,
+            ZipformerKeywordSpotter.modelIdentity.displayName ?? ZipformerKeywordSpotter.modelIdentity.modelID,
+            artifact: "zipformer-kws"),
         .init(.recognition, "apple-recognition", "Apple speech recognition"),
         .init(.recognition, "nemotron-local", "Nemotron", artifact: "nemotron"),
         .init(.synthesis, "apple-synthesis", "Apple system voices"),

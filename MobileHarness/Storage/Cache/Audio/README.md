@@ -33,8 +33,6 @@ flowchart LR
 
 Append rejects capacity overflow; it has no producer backpressure wait. One `next` waiter is allowed. Finish drains queued PCM then returns nil; failure/cancellation drops queued bytes and wakes the reader with the original error. Playback and inference deadlines belong to their owners. The standalone `AudioStream` initializer defaults to 1 MiB, while the shared store explicitly supplies 8 MiB.
 
-The producer can attach an opaque completion callback to a PCM frame. `nextPlaybackFrame` gives the reader that callback together with the PCM. Storage carries it through the existing bounded queue. The native player owns callback delivery.
-
 Single-checkout handles, bounded PCM, owner-scoped cleanup and error retention.
 
 ## Related design

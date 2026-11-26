@@ -166,7 +166,7 @@ Shared driver queue and provider lifecycle limits are documented in [Chat](../Su
 
 The Assistant owns the Boolean `state.listening` gate. When its model enters `quiet`, the active round updates its private state and cancels its input's audio handles, then settles normally. Host entry uses the session interruption path. The Assistant keeps the optional wake condition in its private State for the current quiet episode. See [input and mode handling](Input/README.md#listening-and-quiet).
 
-Nonempty final ASR and local user text enter ordinary admission. A final that arrived while the same session had reply work or playback is eligible for interruption Decision. An accepted keyword interruption suppresses Decision for its utterance. ASR arriving first closes eligibility for a later keyword. Idle and wake admissions skip the interrupt Decision. Peer reports and execution feedback retain their own admission paths.
+Nonempty final ASR and local user text enter ordinary admission. A final that arrived while the same session had reply work or playback is eligible for interruption Decision. Keyword detection and model Decision compete for the same reply identity. The first accepted interruption retires the other path for that reply. An ASR final settles its utterance and may trigger Decision while a keyword is still eligible. Idle and wake admissions skip the interrupt Decision. Peer reports and execution feedback retain their own admission paths.
 
 AssistantInputDecision sends a localized sentence quoting the reply captured at admission and the latest user input, followed by one question asking whether the user intends to interrupt. The reply is empty before natural-language output is admitted to playback. ModelKit implements provider encoding and the boolean readout through `noul`.
 
@@ -218,7 +218,7 @@ Worker, speech producer and output scopes outlive pages. Interrupt/pause joins c
 
 AssistantSpeechOutput registers native playback against a reply input before scheduling and tracks the active handle within its session. Cancellation and native completion retire this handle. PlatformKit owns playback intervals for capture policy.
 
-Assistant also collects native completion for individual speech units. An accepted interrupt freezes the current request's fully played text and settles it with a history marker after cleanup. See [output](Output/README.md) and [workflow](Workflow/README.md).
+After accepted interruption and cleanup, Assistant reconstructs the current reply from the Actions with successful terminal feedback across all tracks. It preserves submission order and writes the assembled text and completion evidence to history. See [output](Output/README.md) and [workflow](Workflow/README.md).
 
 ## Unified interruption control
 
@@ -251,3 +251,5 @@ flowchart LR
 Decision模型切换支持D3 Edge、Vela 3 Fast/3.1 Fast及Laya Multilingual；上下文和noul请求不随模型变化。根模块删除上述任一制品前，停止并加入该ID的Decision调用；模型名称仅用于日志呈现。
 
 Assistant 写入 ModelKit 在 dispatch 边界报告的模型身份，并在生成清理后为同一次请求补写执行元数据。Decision 解析本地注册的原生与 Chat 能力，运行日志读取模型会话身份，分类总耗时仍由 Agent 测量。
+
+关键词快停日志使用 SpeechPerception 命中观察的检测总耗时及 ModelKit 提供的模型身份和推理耗时。接纳及停播清理仍通过统一入口，日志在清理结果可用后写入。

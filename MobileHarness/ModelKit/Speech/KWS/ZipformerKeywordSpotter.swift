@@ -4,6 +4,8 @@ import Foundation
 import ModelKitCoreML
 
 public struct ZipformerKeywordSpotter: KeywordSpottingCapability {
+    public static let modelIdentity = InferenceModelIdentity(
+        modelID: "zipformer-kws", displayName: "Zipformer Keyword Spotting")
     private let resource: ModelResource<ZipformerGraphs>
     private let context: ModelContext
 
@@ -127,6 +129,7 @@ private actor ZipformerSession: KeywordSpottingSession {
     private var decoder: ZipformerKeywordDecoder
     private var frames: [[Float]] = []
     private var caches: [CoreMLTensor]
+    private var inferenceDuration: Duration = .zero
     private var busy = false
     private var matched = false
     private var closed = false
@@ -156,7 +159,7 @@ private actor ZipformerSession: KeywordSpottingSession {
         Task { await release() }
     }
 
-    func accept(_ samples: [Float]) async throws -> String? {
+    func accept(_ samples: [Float]) async throws -> KeywordSpottingMatch? {
         guard !closed, !matched else { throw CapabilityError.sessionClosed }
         guard !busy else { throw CapabilityError.inputBusy }
         guard (1...4096).contains(samples.count), samples.allSatisfy(\.isFinite) else {
@@ -172,9 +175,14 @@ private actor ZipformerSession: KeywordSpottingSession {
         while frames.count >= 29 {
             try Task.checkCancellation()
             guard !closed else { throw CancellationError() }
-            if let hit = try await decodeWindow() {
+            let started = ContinuousClock.now
+            let label = try await decodeWindow()
+            inferenceDuration += started.duration(to: .now)
+            if let label {
                 matched = true
-                return hit
+                return .init(
+                    label: label,
+                    metadata: .init(model: ZipformerKeywordSpotter.modelIdentity, inferenceDuration: inferenceDuration))
             }
             frames.removeFirst(16)
         }

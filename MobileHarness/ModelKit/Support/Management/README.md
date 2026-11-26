@@ -183,5 +183,7 @@ Chat and native Decision registrations declare a stable selectable ID, supported
 Zipformer registers as `keywordSpotting` under the speech defaults. Its
 artifact has an independent install receipt and maintenance fence. Foreground
 preparation observes the catalog state; only an installed artifact is warmed.
+The provider identity supplies the registration ID, selection title and the
+identity returned with a keyword match.
 
 ModelManager supports ordinary unload and cancelling unload by concrete registration ID. It reserves the registration before awaiting work and releases the fence only after the resource is drained. Required artifact checks run against the configured installation state.

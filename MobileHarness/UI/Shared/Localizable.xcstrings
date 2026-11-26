@@ -10416,13 +10416,85 @@
         }
       }
     },
+    "Keyword interrupt": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关键词快停"
+          }
+        }
+      }
+    },
+    "Matched keyword": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命中的关键词"
+          }
+        }
+      }
+    },
+    "Keyword detection time": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关键词检测耗时"
+          }
+        }
+      }
+    },
+    "Total detection time": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检测总耗时"
+          }
+        }
+      }
+    },
+    "Inference time": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推理耗时"
+          }
+        }
+      }
+    },
+    "interrupt_superseded": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原回复已被打断或结束"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reply already interrupted or ended"
+          }
+        }
+      }
+    },
     "Superseded Decision": {
       "extractionState": "manual",
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已被新输入替代"
+            "value": "已失效的决策"
           }
         }
       }

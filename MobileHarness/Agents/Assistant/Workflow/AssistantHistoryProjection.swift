@@ -6,6 +6,10 @@ import StorageCore
 
 /// Assistant-owned selection and reconstruction of durable conversation evidence.
 public enum AssistantHistoryProjection {
+    static func interruptedText(_ response: String, templates: PromptTemplates) throws -> String {
+        response + "\n" + (try templates.render("replyInterruptedMarker"))
+    }
+
     public static func request(
         system: String, user: String, conversation: AssistantConversation, nativeHistory: Bool = true,
         templates: PromptTemplates
@@ -48,8 +52,7 @@ public enum AssistantHistoryProjection {
         let input = invocation.input
         let reply =
             invocation.replyTruncation == nil
-            ? invocation.response
-            : invocation.response + "\n{\"replyInterruptedDuringPlayback\":true}"
+            ? invocation.response : try interruptedText(invocation.response, templates: templates)
         if !nativeHistory {
             let evidence = try invocation.toolCalls.map { call in
                 try templates.render(

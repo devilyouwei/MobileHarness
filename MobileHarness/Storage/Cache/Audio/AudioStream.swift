@@ -22,32 +22,23 @@ extension AudioCacheError {
 
 /// Shared PCM adapter over a bounded, single-reader Storage stream.
 public final class AudioStream: Sendable {
-    public struct PlaybackFrame: Sendable {
-        public let audio: AudioFrame
-        public let played: (@Sendable (ContinuousClock.Instant) -> Void)?
-    }
-
     public let id: String
-    private let stream: BoundedMemoryStream<PlaybackFrame>
+    private let stream: BoundedMemoryStream<AudioFrame>
 
     private let failures: StorageFailureReporter
     public init(id: String, maximumBytes: Int = 1_048_576, failures: StorageFailureReporter = .init()) {
         self.failures = failures
         self.id = id
         stream = BoundedMemoryStream(maximumBytes: maximumBytes, maximumItems: 2048, waitTimeout: nil) {
-            $0.audio.data.count
+            $0.data.count
         }
     }
 
     public var bufferedBytes: Int { get async { await stream.bufferedBytes } }
 
-    public func append(
-        _ frame: AudioFrame, played: (@Sendable (ContinuousClock.Instant) -> Void)? = nil
-    ) async throws {
+    public func append(_ frame: AudioFrame) async throws {
         do {
-            do { try await stream.append(.init(audio: frame, played: played)) } catch {
-                throw AudioCacheError.translating(error)
-            }
+            do { try await stream.append(frame) } catch { throw AudioCacheError.translating(error) }
         } catch {
             failures.report("cache.audio.stream", "append", error)
             throw error
@@ -55,10 +46,6 @@ public final class AudioStream: Sendable {
     }
 
     public func next() async throws -> AudioFrame? {
-        try await nextPlaybackFrame()?.audio
-    }
-
-    public func nextPlaybackFrame() async throws -> PlaybackFrame? {
         do {
             do { return try await stream.next() } catch { throw AudioCacheError.translating(error) }
         } catch {

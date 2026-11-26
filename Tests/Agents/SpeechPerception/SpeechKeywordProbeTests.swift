@@ -6,6 +6,8 @@ import Testing
 @testable import Agents
 
 actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSession {
+    static let metadata = KeywordSpottingMatch.Metadata(
+        model: .init(modelID: "fixture-kws", displayName: "Keyword Fixture"), inferenceDuration: .milliseconds(12))
     var received = 0
     var cancelled = false
     private(set) var thresholds: [Float] = []
@@ -22,9 +24,10 @@ actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSession {
         return keywords.isEmpty ? nil : self
     }
 
-    func accept(_ samples: [Float]) throws -> String? {
+    func accept(_ samples: [Float]) throws -> KeywordSpottingMatch? {
         received += samples.count
-        return received >= minimumSamples ? label : nil
+        guard received >= minimumSamples, let label else { return nil }
+        return .init(label: label, metadata: Self.metadata)
     }
 
     func cancel() { cancelled = true }
@@ -67,10 +70,10 @@ actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSession {
     for silent in [false, true] {
         let capability = MatchingKeywordModel()
         let capture = UUID().uuidString
-        let events = AsyncStream.makeStream(of: (UUID, String, Duration).self)
+        let events = AsyncStream.makeStream(of: (UUID, SpeechKeywordProbe.Hit).self)
         let probe = SpeechKeywordProbe(capability: capability, generation: capture, onset: .zero, keywords: keywords) {
-            id, label, time in
-            events.continuation.yield((id, label, time))
+            id, hit in
+            events.continuation.yield((id, hit))
             events.continuation.finish()
         }
         #expect(probe.generation == capture)
@@ -80,7 +83,10 @@ actor MatchingKeywordModel: KeywordSpottingCapability, KeywordSpottingSession {
         var iterator = events.stream.makeAsyncIterator()
         let match = await iterator.next()
         #expect(match?.0 == (silent ? probe.id : nil))
-        if silent { #expect(match?.1 == "zh-stop" && match?.2 == .milliseconds(160)) }
+        if silent {
+            #expect(match?.1.result.label == "zh-stop" && match?.1.audioEnd == .milliseconds(160))
+            #expect(match?.1.result.metadata == MatchingKeywordModel.metadata)
+        }
         #expect(await capability.cancelled)
         #expect(await capability.thresholds == Array(repeating: Float(0.20), count: keywords.count))
     }

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "templates": {
-    "context": "You are saying “{{assistantReply}}” when the user says to you “{{userInput}}”.",
-    "question": "Does the user intend to interrupt you by saying this?"
+    "context": "You are saying “{{assistantReply}}” when the user says to you “{{userInput}}”\n",
+    "question": "Does the user intend to interrupt you?"
   }
 }

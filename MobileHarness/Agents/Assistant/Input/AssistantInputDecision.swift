@@ -424,6 +424,7 @@ public actor AssistantInputDecision {
         _ model: any DecisionCapability, request: NoulRequest,
         capture: @Sendable (InferenceMetadata) -> Void, record: @Sendable (String) -> Void
     ) async throws -> Bool {
+        try Task.checkCancellation()
         record("noul\n\nState:\n" + request.text + "\n\nQuestion:\n" + request.instructions)
         let session = try await model.noul(request)
         capture(session.metadata)
@@ -551,6 +552,7 @@ actor AssistantDecisionQueue {
         let interrupt: @Sendable (AssistantInterrupt, String) async throws -> AssistantInterruptResult
         let complete: @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) async -> Void
         let updated: @Sendable () async -> Void
+        var canClassify: @Sendable () async -> Bool = { true }
     }
     private var pending: [Job] = []
     private var worker: Task<Void, Never>?
@@ -573,7 +575,10 @@ actor AssistantDecisionQueue {
                 if pending.count > 1 {
                     result = AssistantInputDecision.supersededOutcome()
                 } else {
-                    let task = Task { await model.classify(job.snapshot) }
+                    let task = Task {
+                        guard await job.canClassify(), !Task.isCancelled else { return Self.retiredDecision() }
+                        return await model.classify(job.snapshot)
+                    }
                     classification = task
                     classifyingInputID = job.snapshot.input.id
                     result = await task.value
@@ -581,6 +586,7 @@ actor AssistantDecisionQueue {
                     classifyingInputID = nil
                 }
                 let duration = started.duration(to: .now)
+                let canInterrupt = await job.canClassify()
                 guard !Task.isCancelled else { return }
                 guard pending.first?.snapshot.input.id == job.snapshot.input.id else { continue }
                 if pending.count > 1 {
@@ -588,9 +594,13 @@ actor AssistantDecisionQueue {
                     result = AssistantInputDecision.supersededOutcome(
                         requests: result.requests, modelName: result.modelName)
                     result.inference = evidence
+                } else if !canInterrupt, result.modelResult == nil {
+                    result = Self.retiredDecision(from: result)
                 }
                 if result.modelResult == true {
-                    if let target = job.target {
+                    if !canInterrupt {
+                        result.signalStatus = AssistantInterruptResult.targetExpired.rawValue
+                    } else if let target = job.target {
                         do {
                             result.signalStatus = try await job.interrupt(
                                 AssistantInterrupt(target: .reply(target)), job.snapshot.input.sessionID
@@ -602,7 +612,7 @@ actor AssistantDecisionQueue {
                     } else {
                         result.signalStatus = "no_target"
                     }
-                } else if result.modelResult == nil, result.signalStatus != "superseded" {
+                } else if result.modelResult == nil, result.route != .superseded {
                     result.signalStatus = "decision_failed"
                 }
                 await job.complete(job.snapshot, result, duration)
@@ -610,6 +620,19 @@ actor AssistantDecisionQueue {
                 await job.updated()
             }
         }
+    }
+
+    func cancelClassification(target: UUID, sessionID: String) {
+        guard let job = pending.first, job.snapshot.input.id == classifyingInputID,
+            job.target == target, job.snapshot.input.sessionID == sessionID
+        else { return }
+        classification?.cancel()
+    }
+
+    private static func retiredDecision(from outcome: InputDecisionOutcome? = nil) -> InputDecisionOutcome {
+        .init(
+            route: .superseded, modelResult: nil, signalStatus: "interrupt_superseded",
+            requests: outcome?.requests ?? [], modelName: outcome?.modelName, inference: outcome?.inference)
     }
 
     func remove(sessionID: String) {

@@ -357,10 +357,16 @@ private func generationTrace() throws -> GenerationTrace {
 }
 
 @Test(.actionCatalog) func waitGenerationPreservesNestedBoundariesAcrossEveryByteSplit() throws {
-    let source = "前。<wait>甲<wait><express emotion='smile'/>乙</wait>丙</wait>后。"
+    let source = "前 &amp; 👨‍👩‍👧。<wait>甲<wait><express emotion='smile'/>乙</wait>丙</wait>后。"
     let bytes = Data(source.utf8)
     var whole = try generator()
-    let expected = try whole.append(bytes) + whole.finish()
+    let located = try whole.appendLocated(bytes) + whole.finishLocated()
+    let expected = located.map(\.event)
+    let ranges = located.compactMap(\.source)
+    #expect(
+        ranges.map { String(decoding: bytes[$0], as: UTF8.self) } == [
+            "前 &amp; 👨‍👩‍👧。", "前 &amp; 👨‍👩‍👧。", "甲", "甲", "<express emotion='smile'/>", "乙", "乙", "丙", "丙", "后。", "后。",
+        ])
     #expect(
         expected.filter { if case .scheduling = $0 { true } else { false } } == [
             .scheduling(.beginWait), .scheduling(.beginWait), .scheduling(.endWait), .scheduling(.endWait),
@@ -373,9 +379,10 @@ private func generationTrace() throws -> GenerationTrace {
     for split in 0...bytes.count {
         var incremental = try generator()
         let actual =
-            try incremental.append(bytes.prefix(split)) + incremental.append(bytes.dropFirst(split))
-            + incremental.finish()
-        #expect(normalizeToolIDs(actual) == normalizeToolIDs(expected))
+            try incremental.appendLocated(bytes.prefix(split)) + incremental.appendLocated(bytes.dropFirst(split))
+            + incremental.finishLocated()
+        #expect(normalizeToolIDs(actual.map(\.event)) == normalizeToolIDs(expected))
+        #expect(actual.compactMap(\.source) == ranges)
     }
     var trace = try generationTrace()
     try trace.append(source)

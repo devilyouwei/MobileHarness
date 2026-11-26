@@ -9,7 +9,9 @@ import UI
 
 extension AssistantChatWorker {
     @discardableResult
-    func emitAction(_ call: ActionCall, for input: AgentInput, modelGenerated: Bool = false) throws -> Bool {
+    func emitAction(
+        _ call: ActionCall, for input: AgentInput, modelGenerated: Bool = false, source: Range<Int>? = nil
+    ) throws -> Bool {
         guard roundID != nil, activeInput?.id == input.id else { return emit(.actionCall(call), for: input) }
         guard roundCalls.count < 120 else { throw GenerationError.limitExceeded }
         let id = UUID().uuidString
@@ -17,7 +19,11 @@ extension AssistantChatWorker {
         try roundCoordinator?.register(id: id)
         roundCalls.append(
             .init(id: id, path: call.actionPath.description, tool: false, native: nil, modelGenerated: modelGenerated))
-        return emit(.actionCall(call), for: input, callID: id)
+        let accepted = emit(.actionCall(call), for: input, callID: id)
+        if accepted, let source, decisionTurn?.inputID == input.id, decisionTurn?.replyActions?.requestID == roundID {
+            decisionTurn?.replyActions?.append(id: id, path: call.actionPath, source: source)
+        }
+        return accepted
     }
 
     func modelEvidence(_ event: ChatEvent, input: AgentInput) async throws {
@@ -166,13 +172,15 @@ extension AssistantChatWorker {
         var emittedCalls = 0
         for try await delta in fragments {
             try Task.checkCancellation()
+            if !delta.isEmpty, decisionTurn?.inputID == input.id, decisionTurn?.replyActions == nil {
+                decisionTurn?.replyActions = ReplyActions(requestID: requestID)
+            }
             try await recordGenerationEvidence { try await conversations.append(delta, to: input.id) }
             text += delta
-            try await emitFunctions(generator.append(delta), for: input, count: &emittedCalls, requestID: requestID)
+            try await emitLocatedFunctions(generator.appendLocated(Data(delta.utf8)), for: input, count: &emittedCalls)
         }
         try Task.checkCancellation()
-        try await emitFunctions(generator.finish(), for: input, count: &emittedCalls, requestID: requestID)
-        if decisionTurn?.inputID == input.id { decisionTurn?.finishSpeechRequest(requestID) }
+        try await emitLocatedFunctions(generator.finishLocated(), for: input, count: &emittedCalls)
         return text
     }
 
@@ -318,10 +326,15 @@ extension AssistantChatWorker {
             + (try AgentPrompts.text("Shared/ExecutionFeedback", "notExecuted")) + correction + loading
     }
 
-    func emitFunctions(
-        _ calls: [GenerationEvent], for input: AgentInput, count: inout Int, requestID: String? = nil
+    func emitFunctions(_ calls: [GenerationEvent], for input: AgentInput, count: inout Int) async throws {
+        try await emitLocatedFunctions(calls.map { .init($0) }, for: input, count: &count)
+    }
+
+    private func emitLocatedFunctions(
+        _ calls: [AgentGenerator.LocatedEvent], for input: AgentInput, count: inout Int
     ) async throws {
-        for event in calls {
+        for located in calls {
+            let event = located.event
             if case .rejected(let rejection) = event {
                 try Task.checkCancellation()
                 try reserveGeneratedCall(count: &count)
@@ -386,36 +399,28 @@ extension AssistantChatWorker {
             if call.actionPath == ActionPath(domain: "Speech", module: "Playback", function: "speak"),
                 let text = call.parameters["text"]
             {
-                try await emitPlayback(text, for: input, modelGenerated: modelGenerated, requestID: requestID)
+                try await emitPlayback(text, for: input, modelGenerated: modelGenerated, source: located.source)
                 continue
             }
             if call.actionPath == Self.caption.path, listening?.isListening == false { continue }
-            guard try emitAction(call, for: input, modelGenerated: modelGenerated) else { throw HarnessError.queueFull }
+            guard try emitAction(call, for: input, modelGenerated: modelGenerated, source: located.source) else {
+                throw HarnessError.queueFull
+            }
             try await recordSkillUse(path: call.actionPath.description, callType: "action", input: input)
         }
     }
 
     func emitPlayback(
-        _ text: String, for input: AgentInput, modelGenerated: Bool = false, requestID: String? = nil
+        _ text: String, for input: AgentInput, modelGenerated: Bool = false, source: Range<Int>? = nil
     ) async throws {
         guard listening?.isListening != false else { return }
         guard let speechOutput else { throw CapabilityError.unavailable("Speech output not configured") }
-        let progress: AssistantSpeechProgress?
-        if requestID != nil, roundID != nil, decisionTurn?.inputID == input.id {
-            try AssistantSpeechOutput.validate(text: text)
-            progress = try AssistantSpeechProgress(text)
-        } else {
-            progress = nil
-        }
-        let audioID = try await speechOutput.prepare(text: text, input: input, tracking: progress)
+        let audioID = try await speechOutput.prepare(text: text, input: input)
         do {
             try Task.checkCancellation()
             let call = try Self.playback.call(["audioID": audioID])
-            guard try emitAction(call, for: input, modelGenerated: modelGenerated) else { throw HarnessError.queueFull }
-            if let progress, let requestID, let roundID, let emitted = roundCalls.last,
-                decisionTurn?.inputID == input.id
-            {
-                decisionTurn?.recordSpeech(progress, requestID: requestID, roundID: roundID, callID: emitted.id)
+            guard try emitAction(call, for: input, modelGenerated: modelGenerated, source: source) else {
+                throw HarnessError.queueFull
             }
             captureDecisionText(text, input: input)
         } catch {

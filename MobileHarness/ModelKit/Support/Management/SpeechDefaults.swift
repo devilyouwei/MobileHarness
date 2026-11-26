@@ -23,7 +23,8 @@ extension DefaultModelAssembly {
             }, defaults: [.enhancement])
         try await manager.register(
             ModelRegistration(
-                id: ModelID("zipformer-kws"), capabilities: [.keywordSpotting], artifactID: "zipformer-kws"
+                id: ModelID(ZipformerKeywordSpotter.modelIdentity.modelID), capabilities: [.keywordSpotting],
+                artifactID: "zipformer-kws"
             ) { context in
                 ProvidedCapabilities(
                     keywordSpotting: try ZipformerKeywordSpotter(

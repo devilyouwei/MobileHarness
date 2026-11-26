@@ -29,7 +29,8 @@ import Testing
 }
 
 @Test(arguments: [
-    ([4, 5, 0, 0, 0, 0], "stop"),
+    ([4, 5, 0], nil),
+    ([4, 5, 0, 0], "stop"),
     ([4, 5, 0, 6, 0], "stop-talking"),
     ([7, 4, 5, 0, 0, 0, 0], nil),
 ])
@@ -101,13 +102,17 @@ func zipformerPublishedArtifactSmoke() async throws {
     let file = try AVAudioFile(forReading: URL(fileURLWithPath: audio))
     #expect(file.processingFormat.sampleRate == 16000)
     let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 512))
-    var label: String?
-    while file.framePosition < file.length, label == nil {
+    var match: KeywordSpottingMatch?
+    while file.framePosition < file.length, match == nil {
         try file.read(into: buffer)
         let channel = try #require(buffer.floatChannelData?.pointee)
-        label = try await session.accept(Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))))
+        match = try await session.accept(Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))))
     }
-    for _ in 0..<16 where label == nil { label = try await session.accept(Array(repeating: 0, count: 512)) }
+    for _ in 0..<16 where match == nil { match = try await session.accept(Array(repeating: 0, count: 512)) }
     await session.cancel()
-    #expect(label == (expected.isEmpty ? nil : expected))
+    #expect(match?.label == (expected.isEmpty ? nil : expected))
+    if let match {
+        #expect(match.metadata.model == ZipformerKeywordSpotter.modelIdentity)
+        #expect(match.metadata.inferenceDuration > .zero)
+    }
 }
