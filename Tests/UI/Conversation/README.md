@@ -6,3 +6,4 @@
 
 - [CaptionPresentationTests.swift](CaptionPresentationTests.swift)
 - [ConversationHistoryPresentationTests.swift](ConversationHistoryPresentationTests.swift)
+- [EyeGazePresentationTests.swift](EyeGazePresentationTests.swift) 验证 iOS 原生视线连续更新及脸宽变化。

@@ -84,6 +84,7 @@ Completed scope: [NexArm motor teaching and regression](../../completed/NexArm-R
 - [Container reflexivity](Container-Reflexivity.md): local state ownership, internal recursive reads and Skill-selected disclosure.
 
 - [Camera preview orientation](Camera-Preview-Orientation.md): separate gravity-based capture from interface-based preview, crop, skeleton and gaze geometry.
+- [眼睛直接跟随视线目标](Direct-Eye-Gaze.md) 记录视线位置直接提交及真机验收。
 
 Completed scope: [可读预览编号与合并图片输入](../../completed/Readable-Preview-Context.md)：递增短编号、历史兼容及原始 user 消息内的图片附件；原生／设备验收限制见验证记录。
 

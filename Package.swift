@@ -316,6 +316,7 @@ let testSources: [String: [String]] = [
         "Tests/UI/Camera/CameraGalleryTests.swift",
         "Tests/UI/Conversation/CaptionPresentationTests.swift",
         "Tests/UI/Conversation/ConversationHistoryPresentationTests.swift",
+        "Tests/UI/Conversation/EyeGazePresentationTests.swift",
         "Tests/UI/Navigation/NavigationContextTests.swift",
         "Tests/UI/Navigation/PersistentHomeNavigationTests.swift",
         "Tests/UI/Navigation/UIRequestsTests.swift",

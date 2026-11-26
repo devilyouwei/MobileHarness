@@ -2,6 +2,13 @@
 
 本文件是按日期追加的跨模块验证日志。每节中的版本、数字、失败与未执行范围只对应该轮，不作为当前设计；专项模型和硬件样本在 [验证索引](README.md) 所列报告中拥有正文。相同运行的摘要与专项报告不能算作两次独立验收。
 
+## 2026-11-26 — 眼睛直接跟随视线目标
+
+- `./scripts/build-ios.sh` 的五个模拟器 scheme 构建通过，主应用的 Agent/Skill、Live Activity 与中英文资源校验通过。
+- 修改文件的 Swift 严格格式检查、文档路径及 `git diff --check` 通过。`./scripts/check.sh` 在既有 AgentContainer State Value codec 和 Xcode Agent/Skill 中文资源归类检查处退出，后续全量测试未执行。
+- [视线图层回归](../../Tests/UI/Conversation/EyeGazePresentationTests.swift) 在使用同一 UI 源码和资源的独立 Swift 包中编译并链接。Xcode 27.2 无法启动本机 iOS 27.0 模拟器，报告运行时路径不可用，测试断言未执行。
+- 真机 Debug 构建重新编译了 `NativeCompanionSurface.swift`。签名及打包资源校验通过，iPhone 17 Pro 从 `0.1.0 (2026112610)` 原位更新到 `0.1.0 (2026112611)`，安装回执和设备应用清单均确认更新。未进行真实模型推理或真机跟随体验验证。
+
 ## 播放快照通过 Gateway Signal 传递
 
 - 13 项串行 Swift 定向测试、共 31 个用例通过。实际 Gateway 覆盖回复仍活跃时发布原生停播更新、按 PCM 采集时刻保留 200 ms 尾部、尾部后恢复基础门槛。覆盖 32 个区间的序列化、旧载荷兼容及既有打断等待和 ASR 收尾。

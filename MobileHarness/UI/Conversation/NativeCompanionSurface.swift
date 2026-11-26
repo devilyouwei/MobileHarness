@@ -260,11 +260,10 @@ import Foundation
                     to: NSValue(caTransform3D: CATransform3DMakeScale(targetScale, targetScale, 1)),
                     duration: 0.18, at: now)
             }
-            if previous?.gaze != input.gaze || previous == nil {
-                let point = CGPoint(
+            if previous?.gaze != input.gaze || previous?.faceWidth != input.faceWidth {
+                gazeLayer.position = CGPoint(
                     x: min(1, max(-1, input.gaze.width)) * input.faceWidth * 0.14,
                     y: min(1, max(-1, input.gaze.height)) * input.faceWidth * 0.09)
-                animate(gazeLayer, key: "position", to: NSValue(cgPoint: point), duration: 0.32, at: now)
             }
             let opacity: Float = input.phase == .idle || input.phase == .failed ? 0.48 : 1
             if previous?.phase != input.phase || previous == nil {

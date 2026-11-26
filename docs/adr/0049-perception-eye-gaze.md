@@ -2,6 +2,8 @@
 
 > Configuration migration: [ADR 0061](0061-agent-json-v5.md) supersedes the JSON schema, hidden/text alias and all-in-JSON registration portions of this historical decision. Its other runtime contracts remain unchanged.
 
+> Native gaze rendering now follows [the Conversation design](../../MobileHarness/UI/Conversation/README.md#眼睛与光源). The implementation change is tracked in [Direct Eye Gaze](../requirements/technical/Direct-Eye-Gaze.md).
+
 Status: accepted; implementation complete, physical-device experience pending.
 
 ## Decision
