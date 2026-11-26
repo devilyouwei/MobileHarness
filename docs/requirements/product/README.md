@@ -13,6 +13,10 @@
 
 ## 新增交互需求
 
+[Assistant 聊天首页与眼睛形态](Assistant-Chat-and-Face.md)涵盖双方对话记录、键盘输入以及同一会话中的聊天与 Face 切换。
+
+[预置基础小工具](Built-in-Utilities.md)涵盖记事本、闹钟和时钟窗口。页面导航与 AI 主动交互统一遵循[用户导航与 AI 交互边界](../Manual-Navigation-and-Agent-Interaction.md)。
+
 [录制 Assistant 的名字作为唤醒词](Assistant-Name-Wake.md)涵盖在语音设置中录制名字、本地保存 Zipformer 特征模板，以及在 `quiet` 下匹配录音特征并进入全双工。
 
 [Assistant 播报的两级声学抑制](Assistant-Speech-Energy-Suppression.md)涵盖起声确认后按外部语音能量降低播报音量、暂停及续播。

@@ -6,6 +6,7 @@
 
 | 分类 | 当前范围与正文来源 |
 | --- | --- |
+| 首页与交互 | [聊天首页与眼睛形态](requirements/product/Assistant-Chat-and-Face.md)、[预置基础小工具](requirements/product/Built-in-Utilities.md)、[用户导航与 AI 交互边界](requirements/Manual-Navigation-and-Agent-Interaction.md)。 |
 | [统一记录与记忆管理](requirements/Unified-Memory-Plan.md) | 后续大项：MemorySkill 汇集 Writer 记录、聊天记录和综合记忆，评估演进独立 Memory Agent；当前 History 与 Writing Skill 保持现状。 |
 | [技术需求](requirements/technical/README.md) | 四项架构改进中，公开 State 基础与首批 useState 已实现；更多事实、统一错误处理和 App 端到端验收仍待完成；存储接口子项已完成，整份需求保持开放。 |
 | [产品需求](requirements/product/README.md) | “用户”板块的独立相册和日记式记忆，以及多云端模型管理、WebKit HTML 呈现和持续聆听/打断判断。 |

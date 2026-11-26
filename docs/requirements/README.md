@@ -18,6 +18,8 @@
 
 ## 产品需求
 
+[Assistant 聊天首页与眼睛形态](product/Assistant-Chat-and-Face.md)覆盖会话历史、文字输入和 Face 切换。[预置基础小工具](product/Built-in-Utilities.md)覆盖记事本、闹钟和时钟窗口。完整清单见[产品需求索引](product/README.md)。
+
 [用户相册与记忆](product/User-Album-Memory-Plan.md) 包含“用户”板块内的两个独立页面：摄影任务媒体相册，以及周期性增量整理的日记式记忆。两项均待实施。
 
 [闹钟与倒计时](product/Alarms-and-Timers.md)涵盖通过 Assistant 设置闹钟和倒计时，由 iOS 到期提醒。
@@ -26,6 +28,7 @@
 
 | 需求 | 未实现范围 |
 | --- | --- |
+| [用户导航与 AI 交互边界](Manual-Navigation-and-Agent-Interaction.md) | 用户手动导航，AI 通过口述或独立 Window 交互，撤除已有模型导航路径。 |
 | [English and Simplified Chinese](App-Localization.md) | App language, user-facing copy, model prompts and speech language. |
 | [统一记录与记忆管理](Unified-Memory-Plan.md) | 后续以 MemorySkill 统一 Writer 记录、聊天记录和综合记忆，评估独立 Memory Agent；当前 History/Writing 暂不调整。 |
 | [State 公开寄存器与 useState](Resource-State-Plan.md) | 首批 camera/robot/task、作用域与每轮上下文已实施；真实模型/UI/物理验收及后续 Trigger/写入源治理另行跟进。 |
