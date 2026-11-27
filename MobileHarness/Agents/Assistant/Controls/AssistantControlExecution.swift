@@ -42,7 +42,7 @@ extension AssistantChatWorker {
         do {
             let completion = try await self.control(
                 control.operation, arguments: arguments, source: descriptor.id.rawValue,
-                sessionID: input.sessionID, inputID: input.id, decisionID: roundID)
+                sessionID: input.sessionID, inputID: input.id, decisionID: roundID, callID: callID)
             return ToolResult(
                 callID: callID, value: try Self.completionText(completion.agentValue),
                 completion: completion.agentValue)
@@ -57,11 +57,34 @@ extension AssistantChatWorker {
     /// Skill controls return a value. A thrown error or a value continues the decision.
     public func control(
         _ operation: AgentControlOperation, arguments: [String: String], source: String, sessionID: String,
-        inputID: String, decisionID: String?
+        inputID: String, decisionID: String?, callID: String = UUID().uuidString
     ) async throws -> ActionCompletion {
         guard usesSkills, source == descriptor.id.rawValue, lifecycle == .running else {
             throw CommunicationError.unauthorized
         }
+        let startedAt = Date()
+        let outcome: Result<ActionCompletion, any Error>
+        do {
+            outcome = .success(
+                try await runControl(
+                    operation, arguments: arguments, sessionID: sessionID, inputID: inputID, decisionID: decisionID))
+        } catch { outcome = .failure(error) }
+        if let controlLog {
+            await controlLog.record(
+                .agentControl(
+                    .init(
+                        controlAlias: operation.rawValue, callID: callID, source: source, inputID: inputID,
+                        arguments: arguments,
+                        startedAt: startedAt, endedAt: .now, outcome: outcome,
+                        language: AppLanguage(preferredLanguage: language()))))
+        }
+        return try outcome.get()
+    }
+
+    private func runControl(
+        _ operation: AgentControlOperation, arguments: [String: String], sessionID: String, inputID: String,
+        decisionID: String?
+    ) async throws -> ActionCompletion {
         let fixed = decisionID == nil
         let parked = decisionID.flatMap { pendingRounds[$0] }
         let controlInput = parked?.input ?? activeInput

@@ -554,7 +554,7 @@ let package = Package(
             exclude: ["Call/ActionMacro.swift", "Contracts", "Function", "Shell", "README.md"],
             sources: ["Call"]),
         .target(
-            name: "Gateway", dependencies: ["FunctionContracts"],
+            name: "Gateway",
             path: "MobileHarness/Gateway",
             exclude: [
                 "README.md", "Input/README.md",

@@ -6,7 +6,6 @@ public enum CallScope: String, Codable, Sendable {
 
 public enum ActionSchedulingScope: Hashable, Sendable {
     case round(String)
-    case standaloneCall(String)
     case task(String)
     case input(String)
 }
@@ -20,14 +19,10 @@ public struct ExecutionEnvelope: Sendable {
     public let schedulingScope: ActionSchedulingScope
     public let orderingScope: String?
     public let sequence: UInt64
-    private let associatedCallID: String?
+    public let callID: String?
     public var roundID: String? {
         if case .round(let id) = schedulingScope { return id }
         return nil
-    }
-    public var callID: String? {
-        if case .standaloneCall(let id) = schedulingScope { return id }
-        return associatedCallID
     }
     public let context: ActionExecutionContext
     public let correlation: (any Sendable)?
@@ -44,11 +39,7 @@ public struct ExecutionEnvelope: Sendable {
         self.inputID = inputID
         self.schedulingScope = schedulingScope
         self.sequence = sequence
-        if case .standaloneCall = schedulingScope {
-            self.associatedCallID = nil
-        } else {
-            self.associatedCallID = callID
-        }
+        self.callID = callID
         self.context = context
         self.correlation = correlation
     }

@@ -35,7 +35,7 @@ Assistant 收到能量事件即更新会话内当前语句的档位，无需先�
 
 ## Gateway 调节与平滑起停
 
-Assistant 保存当前语句的能量档位，以 `speak` 的开始反馈取得 `executionID`。通过 `ActionCall` 调用可复用的 `Speech.Playback.setVolume(volume, executionID?)`，通过 `ActionControl` 暂停或继续当前实例。仅在自动恢复需要续播时，Assistant 等待该实例的音量 Action 成功回报再单独发送继续。音量函数可由其他工作流调用，接受有限的归一化音量 0…1，未指定执行 ID 时定位同一调用方和会话内的当前播报。音量切换本身不改变暂停状态。每次播放拥有自己的控制器，原生播放确认后回传状态及控制回执。新片段使用自己的执行身份，并应用会话当前语句的能量档位。
+Assistant 保存当前语句的能量档位，以 `speak` 的开始反馈取得 `executionID`。通过独立 Tool 调用可复用的 `Speech.Playback.setVolume(volume, executionID?)`，通过 `ActionControl` 暂停或继续当前实例。自动恢复需要续播时，Assistant 等待该实例的音量 Tool 成功回报，再单独发送继续。音量函数可由其他获授权的工作流调用，接受有限的归一化音量 0…1，未指定执行 ID 时定位同一调用方和会话内的当前播报。音量切换本身不改变暂停状态。每次播放拥有自己的控制器，原生播放确认后回传状态及控制回执。新片段使用自己的执行身份，并应用会话当前语句的能量档位。
 
 中等能量仍可及时降音。高能量持续 6 个 32 ms 窗口后才请求暂停，等待期间保持降音且继续播放。离开高档需连续 5 个窗口，声学结束仍可立即发出恢复请求。PlatformKit 使用约 120 ms 的线性增益过渡，暂停前先淡出到零，恢复时从原位置以零增益起播再淡入。新档位以当前增益为起点，替换正在进行的过渡。语义打断沿用现有即时取消及清理。
 
@@ -47,7 +47,7 @@ Assistant 保存当前语句的能量档位，以 `speak` 的开始反馈取得 
 
 控制契约由[Action 实例生命周期与控制](../technical/Action-Execution-Lifecycle.md#action-实例生命周期与控制)定义。Speech 作为首个支持暂停与继续的执行实例接入。
 
-音量 Action 使用独立的 `SpeechVolume` 执行 Channel。Speech 在 `VoiceSessionCoordinator` 校验执行身份并更新目标增益。Assistant 通过独立 Action 作用域接收结果，不把自动调节计入模型回复的 Action 文本截断。工程回归覆盖独立改音量、暂停期间设置增益后才继续、越权和已结束目标。
+音量 Tool 单独返回结果。Speech 在 `VoiceSessionCoordinator` 校验执行身份、目标和序号，再更新增益。Assistant 直接处理回包，模型回复截断仍依据该轮实际完成的 Action。工程回归覆盖独立改音量、旧回包无法提前触发续播、暂停期间设置增益后才继续、越权和已结束目标。
 
 ## 语音活动事件独立处理
 

@@ -158,6 +158,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id: String
         let sessionID: String
         let replyInputID: String
+        let cause: AssistantReplyTruncation.Cause?
+        let keywordUtterance: SpeechUtteranceIdentity?
         var replyActions: ReplyActions?
         var generationJoined = false
         var cleanupConfirmed = false
@@ -202,6 +204,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     let inputDecision: AssistantInputDecision?
     let decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)?
     let keywordLog: (@MainActor @Sendable (DecisionLogItem) -> Void)?
+    let controlLog: (any RuntimeLogWriting)?
     struct DecisionTurn {
         let id: UUID
         let inputID: String
@@ -246,7 +249,17 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var decisionTurn: DecisionTurn?
     let decisionQueue = AssistantDecisionQueue()
     var interruptReceipts: [String] = []
-    var keywordInterruptedTurns: [String] = []
+    struct SpeechUtteranceIdentity: Equatable {
+        let generation: String
+        let utterance: String
+    }
+    private struct SpeechInterruptionHistory {
+        let utterance: SpeechUtteranceIdentity
+        var inputID: String?
+        var keywordAdmitted = false
+        var keywordConfirmed = false
+    }
+    private var speechInterruptionHistory: [SpeechInterruptionHistory] = []
     let interruptionKeywordLabels: Set<String>
     var speechTerminals: [String] = []
     private var retiredSpeechGenerations: [String] = []
@@ -307,8 +320,56 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     func speechEnded(_ id: String) {
         speechUtterances.remove(id)
         interruptionUtterances.remove(id)
-        keywordInterruptedTurns.removeAll { $0 == id }
         finishInterruptionWaitIfReady()
+    }
+
+    private func speechUtterance(for input: AgentInput) -> SpeechUtteranceIdentity? {
+        guard input.sessionID == speechSessionID, input.metadata.origin == .agent,
+            input.metadata.source == AgentID.speechPerception.rawValue, let turn = input.turn,
+            let recognition = input.payload.speechRecognition, recognition.kind == .final,
+            let generation = recognition.generation
+        else { return nil }
+        return .init(generation: generation, utterance: turn.id)
+    }
+
+    private func updateSpeechInterruptionHistory(
+        _ utterance: SpeechUtteranceIdentity, _ update: (inout SpeechInterruptionHistory) -> Void
+    ) -> SpeechInterruptionHistory {
+        var history =
+            speechInterruptionHistory.firstIndex { $0.utterance == utterance }.map {
+                speechInterruptionHistory.remove(at: $0)
+            } ?? SpeechInterruptionHistory(utterance: utterance)
+        update(&history)
+        speechInterruptionHistory.append(history)
+        if speechInterruptionHistory.count > 128 { speechInterruptionHistory.removeFirst() }
+        return history
+    }
+
+    func attachSpeechInterruption(to input: AgentInput, evidence: inout AssistantInputCoordination) {
+        guard let utterance = speechUtterance(for: input) else { return }
+        let history = updateSpeechInterruptionHistory(utterance) { $0.inputID = input.id }
+        if history.keywordConfirmed {
+            evidence.interrupt = true
+            evidence.route = DecisionLogItem.Route.keyword.rawValue
+        }
+    }
+
+    func hasKeywordInterruption(for input: AgentInput) -> Bool {
+        guard let utterance = speechUtterance(for: input) else { return false }
+        return speechInterruptionHistory.contains { $0.utterance == utterance && $0.keywordAdmitted }
+    }
+
+    private func confirmKeywordHistory(
+        _ utterance: SpeechUtteranceIdentity, cause: AssistantReplyTruncation.Cause
+    ) async throws {
+        let history = updateSpeechInterruptionHistory(utterance) {
+            $0.keywordAdmitted = true
+            $0.keywordConfirmed = true
+        }
+        guard let inputID = history.inputID else { return }
+        coordination[inputID]?.interrupt = true
+        coordination[inputID]?.route = cause.route
+        try await conversations.recordConfirmedInputInterruption(cause, for: inputID)
     }
 
     func speechPublicationFailed(_ input: AgentInput, reason: String) {
@@ -444,10 +505,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         case .low, .medium:
             let volume = energy == .low ? "1" : "0.35"
             let call = try Self.playbackVolume.call(["volume": volume, "executionID": executionID])
-            let callID = UUID().uuidString
-            guard emit(.actionCall(call), for: input, callID: callID, standaloneAction: true)
+            guard emit(.toolCall(call), for: input, independentOfRound: true)
             else { throw HarnessError.queueFull }
-            pendingPlaybackVolume = (callID, executionID)
+            pendingPlaybackVolume = (call.id, executionID)
         }
     }
 
@@ -460,13 +520,13 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         guard emit(.actionControl(control), for: input) else { throw HarnessError.queueFull }
     }
 
-    func settlePlaybackVolume(_ result: ActionResult) throws {
-        guard let pending = pendingPlaybackVolume, pending.callID == result.callID else { return }
+    func settlePlaybackVolume(callID: String, outcome: OutputExecutionResult, envelope: OutputEnvelope) throws {
+        guard let pending = pendingPlaybackVolume, pending.callID == callID else { return }
         pendingPlaybackVolume = nil
-        guard playbackNeedsResume, result.status == .succeeded, result.effect == .contractCompleted,
+        guard playbackNeedsResume, !outcome.isError, outcome.tool?.completion == .completed,
             activePlaybackExecutionID == pending.executionID,
             !executionCancellationBarrier, !hostCancellationInProgress,
-            let turn = decisionTurn, turn.inputID == result.inputID, turn.sessionID == result.owner.sessionID
+            let turn = decisionTurn, turn.inputID == envelope.inputID, turn.sessionID == envelope.sessionID
         else { return }
         let input = AgentInput(id: turn.inputID, sessionID: turn.sessionID, payload: .event("assistant.playback"))
         try emitPlaybackControl(.resume, executionID: pending.executionID, input: input)
@@ -557,16 +617,28 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         else { return }
         activeInterruption?.settling = true
         do {
+            let requestID: String?
             if let reply = current.replyActions {
-                let actions = reply.completedActions
+                requestID = reply.requestID
+            } else {
+                let history = try await conversations.readCurrent()
+                requestID =
+                    history.current.turns.first {
+                        $0.id == current.replyInputID
+                    }?.modelRequests?.last { $0.awaitingDispatch != true }?.id
+            }
+            if let requestID {
+                let actions = current.replyActions?.completedActions ?? []
+                let templates = try AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
+                    try AgentPrompts.load(named: State.configurationName)
+                }
                 let truncated = try await conversations.recordReplyTruncation(
-                    .init(roundID: reply.requestID, completedCallIDs: actions.map(\.id)),
-                    fragments: actions.map(\.source), inputID: current.replyInputID, requestID: reply.requestID)
-                let key = reply.requestID + ".tools"
+                    .init(
+                        roundID: requestID, completedCallIDs: actions.map(\.id), cause: current.cause,
+                        markerText: try templates.render("replyInterruptedMarker")),
+                    fragments: actions.map(\.source), inputID: current.replyInputID, requestID: requestID)
+                let key = requestID + ".tools"
                 if let truncated, let queued = semanticAttachments[key]?.first, queued.role == .assistant {
-                    let templates = try AgentPrompts.$language.withValue(AgentPrompts.normalizedLanguage(language())) {
-                        try AgentPrompts.load(named: State.configurationName)
-                    }
                     semanticAttachments[key]?[0] = .init(
                         role: .assistant,
                         content: try AssistantHistoryProjection.interruptedText(truncated, templates: templates),
@@ -574,6 +646,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
                 }
             }
             try await markInterruptedAfterCleanup(current.replyInputID)
+            if let utterance = current.keywordUtterance, let cause = current.cause {
+                try await confirmKeywordHistory(utterance, cause: cause)
+            }
         } catch {
             if activeInterruption?.id == current.id { activeInterruption?.settling = false }
             throw error
@@ -605,7 +680,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
 
     func admitInterrupt(
-        _ signal: AssistantInterrupt, sessionID: String, source: String, keyword: (AgentInput, SpeechKeywordMatch)?
+        _ signal: AssistantInterrupt, sessionID: String, source: String, keyword: (AgentInput, SpeechKeywordMatch)?,
+        cause: AssistantReplyTruncation.Cause? = nil
     ) async throws -> AssistantInterruptResult {
         guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
         let key = "\(source)|\(sessionID)|\(signal.id)"
@@ -625,14 +701,18 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             !executionCancellationBarrier, !hostCancellationInProgress
         else { return .targetExpired }
         guard let inputInterruption else { throw CommunicationError.unavailableTarget }
-        if let (_, keyword) = keyword {
+        let keywordUtterance = keyword.map {
+            SpeechUtteranceIdentity(generation: $0.1.generation, utterance: $0.1.utterance)
+        }
+        if let (_, keyword) = keyword, let keywordUtterance {
             guard lifecycle == .running, listening?.isListening != false,
                 !retiredSpeechGenerations.contains(keyword.generation),
                 speechCaptureGeneration == nil || speechCaptureGeneration == keyword.generation,
-                !keywordInterruptedTurns.contains(keyword.utterance),
+                !speechInterruptionHistory.contains(where: { $0.utterance == keywordUtterance && $0.keywordAdmitted }),
                 keyword.onset >= turn.startedAt
             else { return .targetExpired }
             try speechStarted(keyword.utterance)
+            _ = updateSpeechInterruptionHistory(keywordUtterance) { $0.keywordAdmitted = true }
         }
         // Install both gates at admission, before crossing any cleanup boundary.
         executionCancellationBarrier = true
@@ -640,7 +720,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let id = signal.id.uuidString
         let admittedAt = ContinuousClock.now
         activeInterruption = ActiveInterruption(
-            id: id, sessionID: sessionID, replyInputID: victim, replyActions: turn.replyActions)
+            id: id, sessionID: sessionID, replyInputID: victim, cause: cause,
+            keywordUtterance: keywordUtterance, replyActions: turn.replyActions)
         interruptionCleanupWatchdog?.cancel()
         interruptionCleanupWatchdog = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(10)) } catch { return }
@@ -663,10 +744,6 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
         async let stopDecision: Void = decisionQueue.cancelClassification(target: target, sessionID: sessionID)
         if let (input, keyword) = keyword {
-            if !speechTerminals.contains(keyword.utterance) {
-                keywordInterruptedTurns.append(keyword.utterance)
-                if keywordInterruptedTurns.count > 128 { keywordInterruptedTurns.removeFirst() }
-            }
             keywordCleanup = (
                 id,
                 Task { [weak self] in
@@ -728,9 +805,14 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     /// already holds a terminal state that must still read as interrupted.
     private func markInterruptedAfterCleanup(_ id: String) async throws {
         let state = try await conversations.readCurrent().current.turns.first { $0.id == id }?.state
-        guard state == .completed else { return }
-        interruptedInputs.remove(id)
-        try await conversations.finish(id, state: .interrupted, reason: "interrupted")
+        if state == .completed {
+            interruptedInputs.remove(id)
+            try await conversations.finish(id, state: .interrupted, reason: "interrupted")
+        } else if state == .interrupted, activeInput?.id != id,
+            !pendingRounds.values.contains(where: { $0.input.id == id })
+        {
+            interruptedInputs.remove(id)
+        }
     }
 
     public func currentReplyID(sessionID: String) async -> UUID? {
@@ -748,8 +830,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         if result.signalStatus == "interrupt_failed" {
             emit(.control("decision.error: \(result.reason ?? "Interruption failed")"), for: input)
         }
-        if var evidence = coordination[input.id] {
-            evidence.interrupt = result.modelResult
+        if var evidence = coordination[input.id], evidence.route != DecisionLogItem.Route.keyword.rawValue {
+            evidence.interrupt = result.modelResult.map { _ in result.signalStatus == "interrupted" }
             evidence.route = result.route.rawValue
             coordination[input.id] = evidence
             do { try await conversations.recordCoordination(evidence, for: input.id) } catch {
@@ -897,10 +979,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         InternalAction(
             domain: "Speech", module: "Playback", function: "speak", channel: "Speech", required: ["audioID"])
     }
-    static var playbackVolume: InternalAction {
-        InternalAction(
-            domain: "Speech", module: "Playback", function: "setVolume", channel: "SpeechVolume",
-            required: ["volume"], optional: ["executionID"])
+    static var playbackVolume: InternalTool {
+        InternalTool(path: "Speech.Playback.setVolume", required: ["volume"], optional: ["executionID"])
     }
     static var caption: InternalAction {
         InternalAction(
@@ -926,6 +1006,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         inputDecision: AssistantInputDecision? = nil, fullDuplex: Bool = false,
         decisionLog: (@MainActor @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) -> Void)? = nil,
         keywordLog: (@MainActor @Sendable (DecisionLogItem) -> Void)? = nil,
+        controlLog: (any RuntimeLogWriting)? = nil,
         inputQueueStatus: @escaping @Sendable (Int, Int) async -> Void = { _, _ in },
         uiHome: UIHomeContainer? = nil, uiSessionID: String? = nil, speechSessionID: String? = nil,
         capacity: Int = 32, presentsReply: Bool = false,
@@ -950,6 +1031,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         self.inputDecision = inputDecision
         self.decisionLog = decisionLog
         self.keywordLog = keywordLog
+        self.controlLog = controlLog
         self.speechOutput = speechOutput
         self.uiHome = uiHome
         self.uiSessionID = uiSessionID
@@ -1053,10 +1135,13 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     /// Speech and caption grants shared by every chat State; States add their own on top.
     nonisolated static func chatRuntimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(
-            internalActions: [playback, playbackVolume, beginReply, caption, replyWaiting]
+            internalActions: [playback, beginReply, caption, replyWaiting]
                 .filter { grant in
                     !model.internalActions.contains { $0.path == grant.path }
-                })
+                },
+            internalTools: [playbackVolume].filter { grant in
+                !model.internalTools.contains { $0.path == grant.path }
+            })
     }
 
     /// Shared speech/caption latency policy, independent of shared lexical parsing.

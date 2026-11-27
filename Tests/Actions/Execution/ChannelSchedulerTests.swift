@@ -109,7 +109,7 @@ private func actionInvocation(
     }
 }
 
-@Test(.actionCatalog) func actionSchedulingSeparatesRoundAndStandaloneCallWithTheSameID() async throws {
+@Test(.actionCatalog) func actionSchedulingSeparatesRoundAndInputWithTheSameID() async throws {
     let gate = ActionTestGate()
     let scheduler = ChannelScheduler(
         registry: try testActionRegistry(handlers: [sayPath: { _ in await gate.wait() }]),
@@ -119,22 +119,21 @@ private func actionInvocation(
     let round = try ScheduledAction(
         envelope: OutputEnvelope(
             source: .assistant, context: input.context, output: .actionCall(call), roundID: input.id))
-    let standalone = try ScheduledAction(
+    let independentInput = try ScheduledAction(
         envelope: OutputEnvelope(
-            source: .assistant, context: input.context, output: .actionCall(call), callID: input.id,
-            standaloneAction: true))
+            source: .assistant, context: input.context, output: .actionCall(call), callID: input.id))
 
     #expect(round.envelope.roundID == input.id)
-    #expect(standalone.envelope.roundID == nil)
-    #expect(standalone.envelope.callID == input.id)
+    #expect(independentInput.envelope.roundID == nil)
+    #expect(independentInput.envelope.callID == input.id)
     _ = try await scheduler.enqueue(invocation: round)
     await #expect(throws: ActionSchedulingError.inputCapacityExceeded) {
-        _ = try await scheduler.enqueue(invocation: standalone)
+        _ = try await scheduler.enqueue(invocation: independentInput)
     }
     await gate.open()
     try await scheduler.finish(scope: .round(input.id), source: .assistant)
-    _ = try await scheduler.enqueue(invocation: standalone)
-    try await scheduler.finish(scope: .standaloneCall(input.id), source: .assistant)
+    _ = try await scheduler.enqueue(invocation: independentInput)
+    try await scheduler.finish(scope: .input(input.id), source: .assistant)
 }
 
 private enum ActionTestFailure: Error, Equatable { case playback }

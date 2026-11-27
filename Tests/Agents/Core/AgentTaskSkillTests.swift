@@ -1070,12 +1070,14 @@ private func photographyAcceptance(
     #expect(try committed?.registry(fixed: fixedCapabilities).actions.contains { $0.path.domain == "Camera" } == false)
 }
 
-@Test(.actionCatalog) func trustedIdleControlsReuseTaskActionsWithoutStartingConversation() async throws {
+@Test(.actionCatalog) @MainActor func trustedIdleControlsReuseTaskActionsWithoutStartingConversation() async throws {
     let context = try AgentContextRepository(
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let model = SkillModel(mediaID: "preview_1")
-    let agent = try AssistantAgent(stateContext: try publicStateFixture(), chat: model, context: context)
+    let log = RuntimeLogState()
+    let agent = try AssistantAgent(
+        stateContext: try publicStateFixture(), controlLog: log, chat: model, context: context)
     try await agent.start()
     let session = UUID().uuidString
     _ = try await agent.control(
@@ -1097,6 +1099,21 @@ private func photographyAcceptance(
         inputID: UUID().uuidString, decisionID: nil)
     #expect(try await context.snapshot().state.skillState?.tasks.last?.status == "completed")
     #expect(try await context.snapshot().state.skillState?.mode == "default")
+    let readCallID = UUID().uuidString
+    _ = try await agent.control(
+        .stateGet, arguments: ["path": "task"], source: "assistant", sessionID: session, inputID: "read-task",
+        decisionID: nil, callID: readCallID)
+    await #expect(throws: CommunicationError.invalidPayload) {
+        try await agent.control(
+            .stateGet, arguments: ["path": "task", "token": "private"], source: "assistant",
+            sessionID: session, inputID: "invalid-read", decisionID: nil)
+    }
+    #expect(log.visibleActions.map(\.title) == ["skill.load", "state.set", "state.clear", "state.get", "state.get"])
+    #expect(log.visibleActions.allSatisfy { $0.channel == "Control" && $0.source == "assistant" })
+    let read = try #require(log.visibleActions.first { $0.id == readCallID })
+    #expect(read.inputID == "read-task" && read.output != nil && read.execution.endedAt != nil)
+    #expect(log.visibleActions.last?.isFailure == true)
+    #expect(log.visibleActions.last?.parameters["token"] == "[redacted]")
     #expect(await model.requests.isEmpty)
     await agent.stop()
 }

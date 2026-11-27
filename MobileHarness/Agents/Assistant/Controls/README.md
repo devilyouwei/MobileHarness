@@ -21,6 +21,8 @@ The late-bound link also forwards speech publication failures to the Assistant's
 
 A thrown error becomes a `controlFailed` tool result and a value result is business output, so both continue the decision through the existing `requiresReasoning` rule; a void success does not. Cancellation propagates unchanged.
 
+The shared control entry records the terminal status, elapsed time, bounded arguments and result for authenticated calls. The Action tab shows the control alias and `Control` label. Model-generated calls reuse their original call ID. See [RuntimeLog](../../../UI/Components/RuntimeLog/README.md).
+
 ## State writes
 
 The model supplies only a short name; the variable always lives in the Assistant's own table, so Container State and other Agents are unreachable. Declared variables come from `states` in Agent.json (see [Resources/Agents](../../Resources/Agents/README.md)); every other lowercase name is a free note. The model cannot write a `readOnly` variable, and nothing about access appears in the prompt: the write is rejected with `readOnly` and the decision continues. The host writes through `setHostState` (source `host`), which ignores `access` but accepts only declared names and never the `task` variable.

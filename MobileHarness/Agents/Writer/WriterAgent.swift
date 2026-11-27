@@ -1154,7 +1154,7 @@ public actor WriterAgent: Agent {
         let output = OutputEnvelope(
             source: .writer, context: input.context, output: .toolCall(call), sequence: sequence,
             taskScope: input.taskScope)
-        let result = try await consumer.executeDirect(output)
+        let result = try await consumer.callTool(output)
         if result.isCancellationOnly { throw CancellationError() }
         guard !result.isError, let response = result.tool else {
             var details = ["tool": path]
@@ -1369,7 +1369,7 @@ public actor WriterAgent: Agent {
         guard let consumer else { throw WriterFailure.unavailable }
         let call = ToolCall(id: UUID().uuidString, toolPath: "UI.Island." + operation, arguments: parameters)
         sequence += 1
-        let result = try await consumer.executeInternal(
+        let result = try await consumer.callInternalTool(
             .init(
                 source: .writer, context: ProcessingContext(sessionID: sessionID, source: "writer"),
                 output: .toolCall(call), sequence: sequence))

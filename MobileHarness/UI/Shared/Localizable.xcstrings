@@ -11326,6 +11326,16 @@
         }
       }
     },
+    "This reply was interrupted.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这条回复已被打断。"
+          }
+        }
+      }
+    },
     "Title generation failed: %@": {
       "extractionState": "extracted",
       "localizations": {

@@ -207,17 +207,26 @@ private struct RoundHarness {
     let model: RoundModel
     let store: AssistantHistoryStore
     let gateway: OutputGateway
+    let inputGateway: InputGateway
     let scheduler: ChannelScheduler
     let manager: AgentManager
     let log: RoundLog
     func start(_ input: AgentInput) async throws -> Task<Void, any Error> {
         try await agent.start()
+        let consumer = try await gateway.consumer(for: agent)
         try await agent.receive(input)
         return Task {
             try await IndependentOutputWorkflow.consumeGeneration(fixtureOutputs(agent)) { envelope in
                 if case .roundFinished = envelope.output { await log.sealEntered() }
                 do {
-                    let result = try await gateway.execute(envelope)
+                    let result: OutputExecutionResult
+                    if case .toolCall = envelope.output, envelope.roundID != nil,
+                        let worker = agent as? FixtureNativeAgent
+                    {
+                        result = try await worker.executeNativeTool(envelope, using: consumer)
+                    } else {
+                        result = try await gateway.execute(envelope)
+                    }
                     await log.record(envelope, result: result)
                 } catch is CancellationError { try Task.checkCancellation() }
                 if case .control(let value) = envelope.output,
@@ -352,7 +361,8 @@ private func roundHarness(
         tools: try ToolRegistry(modules: [RoundTools(definitions: [tool] + cameraBindings)]), actions: scheduler,
         sink: { _ in })
     return .init(
-        agent: agent, model: model, store: store, gateway: gateway, scheduler: scheduler, manager: manager,
+        agent: agent, model: model, store: store, gateway: gateway, inputGateway: input, scheduler: scheduler,
+        manager: manager,
         log: RoundLog())
 }
 
@@ -365,6 +375,9 @@ func generationRoundActualOutputControlsContinuationForAllThreeRoutes(_ route: S
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("test"))
     let pump = try await harness.start(input)
     try await pump.value
+    var traces = try await harness.inputGateway.observeSignals().makeAsyncIterator()
+    let feedback = try #require(await traces.next()).records
+    #expect(!feedback.contains { $0.contract == ExecutionFeedback.toolResultContract })
     let requests = await harness.model.requests
     try #require(requests.count == (hasValue ? 2 : 1))
     if hasValue {
@@ -2168,6 +2181,52 @@ func assistantToolLaneSealsWhileActionAdmissionIsSuspended() async throws {
     var eventsSeen = toolSealed.stream.makeAsyncIterator()
     try #require(await eventsSeen.next() != nil)
     await gate.release()
+    try await delivery.value
+}
+
+@Test(.timeLimit(.minutes(1)))
+func toolResultsReturnBeforeRoundSealAndIndependentToolDoesNotBlockIt() async throws {
+    let independent = DuplexActionGate()
+    let roundTool = DuplexActionGate()
+    let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let observed = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let round = UUID().uuidString
+    let input = AgentInput(id: "tool-input", sessionID: "tool-session", payload: .text("fixture"))
+    let tool = "Fixture.Tool.run"
+    let events: [(AgentOutput, String?)] = [
+        (.toolCall(.init(id: "independent", toolPath: tool)), nil),
+        (.roundStarted(round), round),
+        (.toolCall(.init(id: "slow", toolPath: tool)), round),
+        (.toolCall(.init(id: "fast", toolPath: tool)), round),
+        (.roundFinished(round), round),
+    ]
+    for (event, roundID) in events {
+        outputs.continuation.yield(.init(source: .assistant, context: input.context, output: event, roundID: roundID))
+    }
+    outputs.continuation.finish()
+    let delivery = Task {
+        defer { observed.continuation.finish() }
+        try await AssistantGenerationTransport.consume(outputs.stream, contracts: AgentContracts.communication) {
+            envelope in
+            switch envelope.output {
+            case .toolCall(let call):
+                if call.id == "independent" { try await independent.execute() }
+                if call.id == "slow" { try await roundTool.execute() }
+                observed.continuation.yield(call.id)
+            case .roundFinished: observed.continuation.yield("sealed")
+            default: break
+            }
+        }
+    }
+    defer { delivery.cancel() }
+    var iterator = observed.stream.makeAsyncIterator()
+    #expect(await iterator.next() == "fast")
+    await roundTool.release()
+    #expect(await iterator.next() == "slow")
+    #expect(await iterator.next() == "sealed")
+    #expect(await !independent.exited)
+    await independent.release()
+    #expect(await iterator.next() == "independent")
     try await delivery.value
 }
 

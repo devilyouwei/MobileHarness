@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 import OSLog
 import UI
@@ -208,7 +209,7 @@ public enum IndependentOutputWorkflow {
         let latestTools = AgentOutputMailbox(capacity: 16)
         let latestCommunications = AgentOutputMailbox(capacity: 16)
         let dynamicSignals = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
-        let callChannel = GatewayExecution.actionCallChannel
+        let callChannel = ActionCallSignal.channel
         let channels = (contracts?.registered.compactMap(\.channel) ?? []) + [callChannel]
         let signalDispatcher = SignalChannelDispatcher<OutputEnvelope>(
             channels: Set(channels), capacities: [callChannel: 256])
@@ -451,7 +452,7 @@ actor AgentIslandPublication {
     ]
     func bind(consumer: GatewayOutputConsumer, source: AgentID) {
         bind { operation, parameters, session in
-            let result = try await consumer.executeInternal(
+            let result = try await consumer.callInternalTool(
                 OutputEnvelope(
                     source: source, context: .init(sessionID: session, source: source.rawValue),
                     output: .toolCall(
@@ -506,7 +507,8 @@ actor AgentIslandPublication {
     }
     private func drain() {
         guard running, sender != nil, pending != nil, worker == nil else { return }
-        worker = Task { await publish() }
+        // An update may be submitted by a request handler. Publication starts its own request chain.
+        worker = Task.detached(priority: Task.currentPriority) { await self.publish() }
     }
     private func publish() async {
         defer {

@@ -104,13 +104,13 @@ protocol ActionPauseControl: Sendable {
 
 沿用现有类型和领域词汇。一次调用用 `callID`，一次实际执行用 `executionID`，一条生命周期控制请求用 `controlID`，一次模型轮次用 `roundID`。控制请求顺序用 `controlSequence`，执行状态的版本用 `stateVersion`。变量名标出对象和角色，例如 Assistant 使用 `activePlaybackExecutionID`，执行层使用 `pendingControl`。方法与协议名称说明执行、控制或反馈职责。
 
-复用现有职责明确的文件。[AgentOutput.swift](../../../MobileHarness/Agents/Support/Core/Output/AgentOutput.swift) 保留 `ActionCall` 和 Agent 反馈消息，[GatewayExecution.swift](../../../MobileHarness/Gateway/GatewayExecution.swift) 管理 Gateway 的执行和控制入口，[ExecutionResult.swift](../../../MobileHarness/Actions/Support/Contracts/ExecutionResult.swift) 保留执行开始和终态类型，[PlaybackActions.swift](../../../MobileHarness/Actions/Speech/Playback/PlaybackActions.swift) 继续拥有播报业务入口。新增的中立控制请求、回执和能力协议归入 Actions Support Contracts 的 `ActionControl.swift`，状态变化类型随执行反馈契约归属。
+复用现有职责明确的文件。[AgentOutput.swift](../../../MobileHarness/Agents/Support/Core/Output/AgentOutput.swift) 保留 `ActionCall` 和 Agent 反馈消息，[ActionExecutionTransport.swift](../../../MobileHarness/Agents/Support/ActionExecutionTransport.swift) 把执行和控制契约接到 Gateway 的通用传输端点，[ExecutionResult.swift](../../../MobileHarness/Actions/Support/Contracts/ExecutionResult.swift) 保留执行开始和终态类型，[PlaybackActions.swift](../../../MobileHarness/Actions/Speech/Playback/PlaybackActions.swift) 继续拥有播报业务入口。新增的中立控制请求、回执和能力协议归入 Actions Support Contracts 的 `ActionControl.swift`，状态变化类型随执行反馈契约归属。
 
 ### Speech 首个接入
 
 - 每次 `Speech.Playback.speak` 登记实例控制器。Assistant 按 `ExecutionStart` 关联当前回复及播报实例，沿用全双工、起声确认和逐窗 VAD 规则。片段切换时可保留同一回复的期望档位，由下一次有效 `speak` 使用自己的 `executionID` 接收调节。
 - `pause` 由 Speech 执行淡出，在播放器确认暂停后回执，保留音频进度和缓冲。`resume` 从原位置确认起播，继续平滑淡入。防抖和约 120 ms 的增益过渡沿用首版配置。
-- `Speech.Playback.setVolume` 是独立的业务 Action，传归一化音量和可选的目标执行 ID。自动抑制由 Assistant 把档位转成音量调用；需要续播时，等音量调用成功后发送独立 `resume`。Action 完成表示目标增益已设置，原生播放器负责过渡。
+- `Speech.Playback.setVolume` 是独立 Tool，传归一化音量和可选的目标执行 ID。Assistant 从抑制档位算出目标音量，需要续播时等待音量调用成功，再发送独立 `resume`。Tool 完成表示目标增益已设置，原生播放器负责过渡。
 - 语义打断沿用轮次取消。暂停中的播报仍要退出、清空和释放原生资源，后续继续指令随实例失效。产品范围及真机标准见[播报两级声学抑制](../product/Assistant-Speech-Energy-Suppression.md)。
 
 ### 实施范围与验收
@@ -118,7 +118,7 @@ protocol ActionPauseControl: Sendable {
 | 现有归属 | 计划变更 |
 | --- | --- |
 | Actions Support Contracts、Shell、Scheduling、Results | 扩展中立控制和反馈类型，管理实例能力登记、控制仲裁、生命周期和回执账本。 |
-| GatewayExecution、Gateway Input、Agents Support、Assistant Output／Workflow | 绑定两条定向 Send 信道，保留反向定向反馈，并补齐执行实例投影。Assistant 跟踪当前播报实例与期望档位。 |
+| Gateway Input、Agents Support、Assistant Output／Workflow | 绑定调用和控制的定向端点，保留反向定向反馈，并补齐执行实例投影。Assistant 跟踪当前播报实例与期望档位。 |
 | Actions Speech、PlatformKit Audio | Speech 实现实例控制器，PlatformKit 提供原生暂停、继续和失败确认。 |
 
 先落共享运行时与原有处理器的注册适配，再接入 Speech。其余 Action 随对应能力的开发逐个扩展。实施后同步相关技术 README 和总体设计。工程回归覆盖原有有限 Action、无控制接口、两条 Send 信道隔离、按实例及轮次分别反馈、跨会话拒绝、重复与迟到、压力下回执、暂停时 `wait`、自然结束／超时／取消竞态、清理和终态唯一。Speech 回归覆盖原地续播、跨片段更换实例、非语音窗、暂停期间语义打断及截断落盘。设备验收独立记录实际淡出、暂停、续播和听感。
@@ -133,7 +133,7 @@ Assistant 的发布通信与定向请求独立提交。ActionControl 走并发�
 
 ### 调用身份与轮次结算简化
 
-Agents 用类型化调度作用域表达模型轮次、独立调用、任务或输入。独立 Action 复用 `callID`，不保存第二份 UUID。Actions 的封口与取消入口明确传调度作用域，调度队列按作用域归属。保留独立的 `inputID`、`roundID`、`callID`、`executionID` 与控制身份。模型历史在边界将 `roundID` 映射为请求 ID，等待提示使用自己的 `replyWaitingID`。
+Agents 用类型化调度作用域表达模型轮次、任务或输入。无轮次的 Tool 通过原调用独立结算。Actions 的 Action 封口与取消入口明确传调度作用域，调度队列按作用域归属。保留独立的 `inputID`、`roundID`、`callID`、`executionID` 与控制身份。模型历史在边界将 `roundID` 映射为请求 ID，等待提示使用自己的 `replyWaitingID`。
 
 Agents 对无执行实例的拒绝返回可缺省执行身份的调用终态；执行端产生的结果继续携带原执行 ID。定向发送超时按未确认投递处理，模型轮次仍用原调用的终态结算；封口后缺少该调用反馈则报错。Assistant 复用每条 Action 终态的校验和结果投影。已经完成传递的轮次按 `roundID` 进入独立结算队列，结算优先于同一调度流程的下一批语义输入，不将原输入重新入队。保留打断、取消、原轮次记录和 `callID + ".result"` 的独立 ReACT 输入。更新 Gateway、Agents、Actions 和总体设计的接口说明。回归检查无实例拒绝、同 ID 不同作用域、Action 控制和轮次/融合输入边界。
 
@@ -150,3 +150,46 @@ Action、Tool 和控制命令分别使用 `action.result.v1`、`tool.result.v1`�
 提交前的全量回归需校对语音片段与 Wait 的交错顺序、角色回包声明、Tool 结果的因果信息和排队 Action 取消后的终态。排队取消用例观察执行快照，等到待验证的状态出现再读取诊断；并发下的定向超时单独复测。
 
 同时订阅 Action 结果和生命周期事件的 Agent 保留两种独立输入。通用通信声明分别推导输入类型，Assistant 的执行会话显式选择统一反馈载荷。用 `AgentArchitectureTests` 验证委派角色收到自己的 Action 结果并完成下一轮。蓝牙替身装配注册最新的内部播报能力，继续验证原有连接和动作效果。
+
+### 将执行适配从 Gateway 移出
+
+本节记录通信边界迁移时的设计。执行终态的当前方案见 [Assistant 与 Writer 的对称执行通信](#assistant-与-writer-的对称执行通信)。
+
+GatewayContainer 只装配通用传输和隔离观察作用域。Gateway target 移除 FunctionContracts 依赖；SignalTransport 校验通用端点和信封。App 的 ModuleRegistration 装配 Actions 执行接收端与 Agents 执行发送端。Actions 共享契约定义调用载荷、回复和执行归属，接收端负责分派 Action、Tool、轮次和控制，验证端点映射后的执行身份。Agents 负责选择协议、授权与结果投影。原有资源、取消、清理及快照走显式注入的执行管理端口。诊断用观察作用域直接使用隔离的传输及拒绝执行的角色适配。
+
+Action 与 Tool 信道各携带调用和轮次变体。共享 Tool 定向调用使用 `tool.call.v1`，与 Action 和 Control 都使用通用类型化请求回复。Writer 与 Assistant 的模型 Tool 从同一次调用取得结果。Assistant 保留分支独立封口与原有 ReACT。Tool 回复是同进程返回值，保留现有长结果行为。通用传输允许注册不为内存引用回复预留序列化字节的协议，请求仍受字节、并发与截止时间预算约束。
+
+实施后同步 Gateway、Actions Shell 与契约、Agents Support、Writer、App Composition 与总体设计。验证传输独立启停、跨端点归属、容量和超时、双信道封口、ActionControl 以及 Writer 的工作区执行、流式写入和历史配对。
+
+### Assistant 原生 Tool 直接结算
+
+本节记录移除模型 Tool 二次回投时的设计。通用执行回包方案见 [Assistant 与 Writer 的对称执行通信](#assistant-与-writer-的对称执行通信)。
+
+Assistant 的模型 Tool 和 Writer 共用调用方直返入口。Assistant 执行会话等待 `tool.call.v1` 的返回值，在 Agents 模块内部交给轮次结果处理，直接路径的成功和执行拒绝均取消第二次信号投递。同一次 Tool 请求保留调用 ID、结果值、失败、取消、已捕获调用快照和原有历史写入。Tool 分支在本地结果处理完成后封口，其他分支的顺序与打断结算沿用现有机制。专项 Agent 显式使用的 Tool 反馈协议与 Assistant 普通 Action 终态仍使用原有定向投递。
+
+更新 Assistant 会话、历史反馈处理、Agents 调用适配和技术 README。回归验证并发 Tool、封口等待、拒绝和失败、打断预收尾、模型观察配对与旧反馈兼容入口。
+
+### Assistant 与 Writer 的对称执行通信
+
+Assistant 与 Writer 共用 Agents 的请求适配和 Actions 执行接收端。请求沿角色 → Agents → Gateway → Actions 传递，执行结果沿 Actions → Gateway → Agents → 原角色返回。保留 `action.call.v1`、`tool.call.v1` 两条调用信道及独立的轮次边界，统一调用确认形状和结果发送接口。Actions 内部将普通 Action 放入现有调度队列，Tool 继续直接执行。两者的执行终态都经同一反向定向 Send 回到 Agents。原 Tool 请求保留取消与超时机制，并在结果被接收后返回确认。
+
+Actions 共享契约定义 `CallResultSignal`，承载调度账本的 `ExecutionResult` 或直接执行的 Tool 值／异常。Agents 的 `ActionExecutionTransport` 把两类结果接到同一 Gateway 接收端，校验 Actions 发送者和执行身份。`InputGateway` 校验角色会话与声明，将普通 Action 结果投影为 `ActionResult` 或 `.actionFinished` 后交给原角色。Tool 结果由 Agents 按执行归属、原输入、可选轮次和执行 ID 匹配等待者，同一原生调用 ID 可在不同输入或轮次使用。Assistant 提交给发起调用的轮次，Writer 按原生 `toolCallID` 交还模型。保留执行身份、接收确认、停止与临时压力处理。重投只传输结果。皆沿用进程内 `Sendable` 类型，Gateway 仅处理通用传输。Agents 本地形成的准入拒绝、设备事后故障和专项工具观察仍按各自的反馈契约处理。
+
+更新 Actions 契约与 Shell、Agents Support、Assistant 和 Writer、Gateway、App Composition 与总体设计对应的接口说明。回归验证真实 Actions 经 Gateway 交付原始终态、跨端点或会话拒绝、背压重投、轮次结算、Assistant 与 Writer 的原生 Tool 回复以及播报控制。
+
+### 无轮次 Tool 直返与执行反馈单向传输
+
+- `ActionCall` 和 `ToolCall` 继续经各自的定向调用信道进入 Actions。Actions 的调用终态沿既有 `execution.call.result.v1` 回传至 Agents。执行开始和控制状态沿独立执行事件契约使用同一结果接收端，控制指令保留定向 Send 及其回执。Agents 在本模块内把原始回包交给发起调用或订阅反馈的角色；现有专项角色的 Tool 工作流保留本地结果处理与诊断。Gateway 只处理通用端点、传输、确认、取消和超时。
+- `AssistantGenerationTransport` 的所有 Tool 共用有界并发准入，单项完成即由 `GatewayOutputConsumer.callTool` 返回。可选 `roundID` 只决定该项是否纳入轮次封口。无轮次调用在输出会话关闭时统一回收，正常运行时不占用输出读取循环，也不阻塞其他轮次封口。
+- `Speech.Playback.setVolume` 和 `Speech.Listening.update` 使用独立 Tool。Assistant 只凭匹配当前播放的成功音量结果发出续播控制；Actions 使用从接收端认证得到的执行所有者和原有序号检查。Speech Perception 仍持有收听策略，通过会话与 revision 校验处理并发的录音状态更新。保留成组字幕和播报的 Action 调度与动作轮次语义。移除独立音量 Action 专用调度范围。
+- 同步总体设计和 Agents、Actions 各所有者的 README。回归验证单项 Tool 即时回包、慢调用期间其他输出与轮次独立完成、原调用方归属、快慢音量更新、暂停恢复依赖和收听策略版本。
+
+### 执行日志显示 Agent 内部 Control
+
+- Assistant 的 `state.set`、`state.clear`、`state.get`、`skill.load`、`skill.unload` 和 `send` 在角色内部执行。`AssistantControlExecution` 从共用执行入口记录已授权调用的真实终态、耗时、参数及返回值或异常，复用模型已有的调用 ID。通过 App 注入的 `RuntimeLogWriting` 投影到 UI，执行与 Gateway 通信契约沿用原设计。
+- `RuntimeLogState` 独立保留最近 100 条 Control 终态，与 Actions 调度快照合并显示。Action 页默认显示 `Control` 标签，支持来源、通道和状态筛选。首页的 Channel 摘要继续使用调度快照。`RuntimeLogView` 的通道标签保留颜色，删去装饰圆点，宽度按文字及少量内边距计算。
+- 同步 Assistant Controls、RuntimeLog 和总体设计。回归覆盖成功、失败、取消、参数及结果投影，验证 Actions 快照刷新后 Control 仍可查询，通道和状态筛选正确。
+
+### 灵动岛发布与来源请求隔离
+
+语音采集状态可在 Actions 请求回调内提交灵动岛更新。Agents Support 的 `AgentIslandPublication` 启动独立发送任务时隔离调用方的任务局部值，避免继承 Gateway 当前请求链。保留发布任务的单工作者、最新待发项、失败重试节奏、取消和停止回收。Gateway 保留对真正嵌套循环的拦截。更新 Agents Support 的发布生命周期说明，使用真实 Gateway 验证更新可独立发往同一端点，并回归真正的循环请求仍被拒绝。

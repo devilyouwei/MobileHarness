@@ -80,7 +80,7 @@ App binds only exact snapshot(path:) into Agents. Assistant projects complete Bu
 
 App explicitly sequences execution preparation: AgentContainer prepares cognitive inputs; ActionsContainer.configureBusiness owns business assembly preparation and returns execution/catalog/host ports; the Agent preparation validates Skill coverage and returns Gateway configuration; App configures Gateway and calls AgentContainer.bindExecution with the resulting facilities. The executionBindings lifecycle node retains this configuration boundary for partial-start rollback and reverse cleanup. Actions owns internal function binding; App owns the cross-module sequence.
 
-ModuleRegistration directly calls GatewayContainer.configureExecution after AgentGatewayAssembly prepares cognitive adapters and result delivery. App returns the resulting capabilities for cognitive binding. AppComposition forwards home visibility to ActionsContainer separately from scene lifecycle; Actions combines visibility with scene admission. Agents stops its own roles/perception, Gateway drains execution, and Actions owns camera/device joins and cleanup.
+ModuleRegistration configures GatewayContainer for transport and passes those ports and the Actions host to AgentGatewayAssembly. Composition registers the Actions request endpoint and the Agents result endpoint on the same transport. The Actions host owns request interpretation and execution. The Agents adapter owns interpretation and local role delivery of terminal results and execution events. AppComposition forwards home visibility to ActionsContainer separately from scene lifecycle. Actions combines visibility with scene admission. Agents stops its own roles/perception, Gateway drains transport, and Actions joins execution and native cleanup.
 
 ServiceFactories supplies ActionsDependencies through the App callback bridge, asks ActionsContainer.makeBusiness for the root and host capabilities, and registers that same root in ApplicationContainer. AppCameraAccess/AppDeviceAccess adapt Actions-owned public protocols to Agent-owned protocols; they never retain the private assembly or concrete execution workflows. Runtime configuration calls ActionsContainer.configureBusiness(request:) after foundations start.
 
@@ -134,7 +134,7 @@ ModelContainer 自行构造模型文件与下载能力；ApplicationContainer �
 
 ServiceFactories.make 接收可选存储根，默认仍为 App Application Support。AppComposition 接收构造服务的闭包与语言偏好对象，首次启动及替换复用同一工厂，ModuleRegistration 图保持唯一；stop 加入正在进行的替换后关闭当前根。隔离 Simulator 验收使用这些接口覆盖实际生产装配，测试不提供另一份生命周期图。
 
-Composition injects module-owned external listener ports without introducing a shared foundation dependency: PlatformKit supplies media/native state, UI supplies requests/presentation facts, and ModelKit supplies artifact revisions. The responsible role or execution service owns the consumer task and cancellation/join. Gateway remains the internal Request/Reply, event and execution root; production handler catalogs are supplied by Agents assembly.
+Composition injects module-owned external listener ports without introducing a shared foundation dependency: PlatformKit supplies media/native state, UI supplies requests/presentation facts, and ModelKit supplies artifact revisions. The responsible role or execution service owns the consumer task and cancellation/join. Gateway is the internal Request/Reply and event transport root. Endpoint owners supply handler catalogs and own execution.
 
 ModelKit 的前台生命周期独立预热已安装的 Zipformer，并监听安装状态。可选预热不加入 Home
 就绪条件。App 将 Actions 的快速打断偏好读取端口绑定至 Agents。新采集读取该选项；

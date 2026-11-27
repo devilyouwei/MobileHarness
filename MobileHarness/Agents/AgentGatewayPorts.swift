@@ -35,7 +35,7 @@ public struct AgentGatewayCapabilities: Sendable {
     public let manager: AgentManager
     public let input: InputGateway
     public let output: OutputGateway
-    public let execution: GatewayExecution
+    public let execution: any ActionExecutionEngine
 }
 public struct AgentObservationSession: Sendable {
     let scope: GatewayObservationSession

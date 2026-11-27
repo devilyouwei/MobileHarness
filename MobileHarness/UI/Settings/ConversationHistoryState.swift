@@ -262,7 +262,19 @@ public struct HistoryRuntimeEffect: Codable, Sendable, Identifiable {
     public let id: String
     public let resultsJSON: String
 }
+public struct HistoryReplyTruncation: Codable, Sendable {
+    public struct Cause: Codable, Sendable {
+        public let inputID: String
+        public let source: String
+        public let capturedAt: String
+        public let route: String
+    }
+    public let cause: Cause?
+    public let markerText: String?
+}
+
 public struct HistoryModelRequest: Codable, Sendable, Identifiable {
+    public var replyTruncation: HistoryReplyTruncation? = nil
     public var producerMetadata: [String: String]? = nil
     public var model: String? = nil
     public var modelID: String? = nil
@@ -333,6 +345,14 @@ public struct HistoryToolCall: Codable, Sendable, Identifiable {
 }
 
 public struct HistoryInputCoordination: Codable, Sendable {
+    public struct Member: Codable, Sendable {
+        public let id: String
+        public let source: String
+        public let capturedAt: String
+        public let interrupt: Bool?
+        public let route: String?
+    }
+
     public let source: String
     public let capturedAt: String
     /// Whether this input interrupted the reply in progress; nil when no valid decision was made.
@@ -340,9 +360,12 @@ public struct HistoryInputCoordination: Codable, Sendable {
     public let route: String?
     public let batchID: String?
     public let memberIDs: [String]?
+    public let members: [Member]?
+    public var interruptingMember: Member? { interrupt == true ? nil : members?.first { $0.interrupt == true } }
+    public var effectiveInterrupt: Bool? { interruptingMember?.interrupt ?? interrupt }
 
     private enum CodingKeys: String, CodingKey {
-        case source, capturedAt, interrupt, decision, route, batchID, memberIDs
+        case source, capturedAt, interrupt, decision, route, batchID, memberIDs, members
     }
 
     public init(from decoder: any Decoder) throws {
@@ -356,6 +379,7 @@ public struct HistoryInputCoordination: Codable, Sendable {
         route = try container.decodeIfPresent(String.self, forKey: .route)
         batchID = try container.decodeIfPresent(String.self, forKey: .batchID)
         memberIDs = try container.decodeIfPresent([String].self, forKey: .memberIDs)
+        members = try container.decodeIfPresent([Member].self, forKey: .members)
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -366,11 +390,13 @@ public struct HistoryInputCoordination: Codable, Sendable {
         try container.encodeIfPresent(route, forKey: .route)
         try container.encodeIfPresent(batchID, forKey: .batchID)
         try container.encodeIfPresent(memberIDs, forKey: .memberIDs)
+        try container.encodeIfPresent(members, forKey: .members)
     }
 }
 
 public struct HistoryTurn: Codable, Sendable, Identifiable {
     public var coordination: HistoryInputCoordination? = nil
+    public var replyTruncation: HistoryReplyTruncation? = nil
     public var requestParametersJSON: String? = nil
     public var responseEventsJSON: String? = nil
     public var logsCleared: Bool? = nil
@@ -406,6 +432,10 @@ public struct HistoryTurn: Codable, Sendable, Identifiable {
     public var modelRequestStartedAt: Date?
     public var firstTokenLatency: Double?
     public var raw: String { response }
+    public var displayedResponse: String {
+        guard let marker = replyTruncation?.markerText else { return raw }
+        return raw.isEmpty ? marker : raw + "\n" + marker
+    }
 }
 
 public struct HistoryConversation: Codable, Sendable, Identifiable {

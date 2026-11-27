@@ -87,7 +87,7 @@
 			CDA70D1F991B16D91946A420 /* MobileHarness/Agents/Assistant/Controls/AssistantControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Controls/AssistantControls.swift; sourceTree = SOURCE_ROOT; };
 			CDA70D1F991B16D91946A421 /* MobileHarness/Agents/Assistant/Controls/AssistantControlExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Controls/AssistantControlExecution.swift; sourceTree = SOURCE_ROOT; };
 			CEB6001397C0A7B4AE7C1D26 /* MobileHarness/Agents/Support/Core/Capability/ControlRegistration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Capability/ControlRegistration.swift; sourceTree = SOURCE_ROOT; };
-			9D5BAC32FA283F503253B4CB /* MobileHarness/Gateway/GatewayExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/GatewayExecution.swift; sourceTree = SOURCE_ROOT; };
+			9D5BAC32FA283F503253B4CB /* MobileHarness/Agents/Support/ActionExecutionTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/ActionExecutionTransport.swift; sourceTree = SOURCE_ROOT; };
 			2FFE8CC6492EB394E069F32E /* MobileHarness/Actions/Camera/Runtime/CameraResourceBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/Runtime/CameraResourceBinding.swift; sourceTree = SOURCE_ROOT; };
 			F265E334E5E5EF4460969B1D /* MobileHarness/Actions/Support/Contracts/ActionControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionControl.swift; sourceTree = SOURCE_ROOT; };
 			527E4459BC57DAEA14CAFDFB /* MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift; sourceTree = SOURCE_ROOT; };
@@ -1728,7 +1728,6 @@
 				62AF08716774B223F1489C13 /* MobileHarness/Gateway/GatewayContainer.swift */,
 				60132F689827D8C7121FCE58 /* MobileHarness/Gateway/GatewayFailure.swift */,
 				1B41C4F2E19D2262E470D99F /* MobileHarness/Gateway/README.md */,
-				9D5BAC32FA283F503253B4CB /* MobileHarness/Gateway/GatewayExecution.swift */,
 			);
 			name = Gateway;
 			sourceTree = "<group>";
@@ -2441,6 +2440,7 @@
 				94343C1B65C636E1A0B1003B /* Core */,
 				DF6C56BFC816AB3397B578A6 /* MobileHarness/Agents/Support/AgentRuntimeLogWorkflow.swift */,
 				177240278F39519CD8B8D2C7 /* MobileHarness/Agents/Support/ActionDispatcher.swift */,
+				9D5BAC32FA283F503253B4CB /* MobileHarness/Agents/Support/ActionExecutionTransport.swift */,
 				B3E2F31887F5D65BF3AF8D99 /* MobileHarness/Agents/Support/AgentConfigurations.swift */,
 				5DB6E669C57E8BA6431706B7 /* MobileHarness/Agents/Support/AgentContainerLifecycle.swift */,
 				2177E8F14F4C1BC60273B0EE /* MobileHarness/Agents/Support/AgentInputMetrics.swift */,

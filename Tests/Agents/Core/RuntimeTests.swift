@@ -93,6 +93,39 @@ private actor Recorder {
     func act() { actions += 1 }
 }
 
+@Test(.actionCatalog) func islandPublicationSendsOutsideTheRequestThatSubmittedIt() async throws {
+    let transport = SignalTransport()
+    let producer = try await transport.register(address: "speechPerception", incarnation: "one") { _ in }
+    let execution = try await transport.register(address: "actions.execution", incarnation: "one") { _ in }
+    let capture = try SignalRequestProtocol<Int, Int>(
+        id: "fixture.capture.v1", maximumRequestBytes: 8, maximumReplyBytes: nil, requestSize: { _ in 8 })
+    let present = try SignalRequestProtocol<Int, Int>(
+        id: "fixture.present.v1", maximumRequestBytes: 8, maximumReplyBytes: nil, requestSize: { _ in 8 })
+    let recorder = Recorder()
+    let island = AgentIslandPublication()
+    await island.bind { operation, _, _ in
+        guard operation == "present" else { return }
+        _ = try await transport.request(source: producer, target: execution, using: present, request: 1)
+        await recorder.act()
+    }
+    await island.start()
+    try await transport.registerRequest(present, endpoint: execution) { $0 }
+    try await transport.registerRequest(capture, endpoint: execution) { value in
+        await island.submit(.init(title: "Listening", primary: .symbol(name: "mic.fill")))
+        return value
+    }
+    _ = try await transport.request(source: producer, target: execution, using: capture, request: 1)
+    let deadline = ContinuousClock.now + .seconds(2)
+    while await recorder.actions == 0, .now < deadline {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await recorder.actions == 1)
+    #expect(await island.lastFailure == nil)
+    await island.stop()
+    await transport.unregister(producer)
+    await transport.unregister(execution)
+}
+
 private struct StatusRoundTripChat: ChatCapability {
     var availability: CapabilityAvailability { .available }
     var supportsToolCalls: Bool { true }
@@ -660,6 +693,34 @@ private actor SignalFeedbackRecorder: Agent {
     } else {
         Issue.record("Expected actual Tool feedback")
     }
+    await gateway.shutdown()
+    await manager.stopAll()
+}
+
+@Test(.actionCatalog, arguments: [false, true])
+func directToolRejectionReturnsOnceWithoutInboxDelivery(hasRound: Bool) async throws {
+    let manager = AgentManager()
+    let agent = try SignalFeedbackRecorder()
+    let session = UUID().uuidString
+    try await manager.register(agent, sessionID: session)
+    await agent.start()
+    let registry = ToolRegistry()
+    try await registry.register("System.Runtime.runtimeInfo") { _ in
+        Issue.record("An unauthorized call must not execute")
+        return "unexpected"
+    }
+    let gateway = await OutputGateway(manager: manager, requests: InputGateway(manager: manager), tools: registry) {
+        _ in
+    }
+    let consumer = try await gateway.consumer(for: agent)
+    let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("runtime"))
+    let call = ToolCall(id: UUID().uuidString, toolPath: "System.Runtime.runtimeInfo", arguments: ["unexpected": "arg"])
+    let result = try await consumer.callTool(
+        .init(
+            source: .assistant, context: input.context, output: .toolCall(call),
+            roundID: hasRound ? UUID().uuidString : nil, callID: hasRound ? call.id : nil))
+    #expect(result.isError && result.failureCode == .permissionDenied)
+    #expect(await agent.inputs.isEmpty)
     await gateway.shutdown()
     await manager.stopAll()
 }

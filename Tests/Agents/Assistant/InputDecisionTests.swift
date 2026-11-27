@@ -497,8 +497,11 @@ func lateDecisionForFinishedReplyDoesNotCancelSuccessor() async throws {
     _ = await pump.result
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [true, false]) @MainActor
-func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool) async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["model", "keyword-first", "asr-first", "late-final"])
+@MainActor
+func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(order: String) async throws {
+    let keywordWins = order != "model"
+    let keywordUtterance = order == "asr-first" ? "command" : "ongoing"
     let main = DeferredBooleanChat(blocksFirst: true)
     let classifier = DeferredBooleanChat(blocksFirst: true, replyValue: true)
     let decision = AssistantInputDecision(
@@ -507,12 +510,17 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
     let log = RuntimeLogState()
     let context = try AgentContextRepository(
         agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let database = try SQLiteRepositories.temporary()
+    let records = try AssistantRecordStore(
+        repository: database.assistantMessages, tasks: database.assistantTasks,
+        conversations: database.assistantConversations, logs: database.logs)
+    let store = AssistantHistoryStore(records: records)
     let agent = try FixtureNativeAgent(
         inputDecision: decision, fullDuplex: true,
         decisionLog: { snapshot, outcome, duration in
             log.record(.decision(outcome.logItem(for: snapshot, duration: duration)))
         }, keywordLog: { log.record(.decision($0)) }, speechSessionID: "s", chat: main,
-        listening: FullKeywordListening(), context: context)
+        conversations: store, listening: FullKeywordListening(), context: context)
     _ = try await bindSpeechRequests(agent)
     let adjustments = Mutex([OutputEnvelope]())
     let volumeCalls = Mutex([OutputEnvelope]())
@@ -520,7 +528,7 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
         for try await envelope in FixtureGenerationOutputs(agent: agent) {
             if case .actionControl = envelope.output {
                 adjustments.withLock { $0.append(envelope) }
-            } else if case .actionCall(let call) = envelope.output, call.actionPath.function == "setVolume" {
+            } else if case .toolCall(let call) = envelope.output, call.toolPath == "Speech.Playback.setVolume" {
                 volumeCalls.withLock { $0.append(envelope) }
             }
         }
@@ -582,23 +590,27 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
                 .energyChanged, generation: "capture", utterance: "ongoing", energy: .medium)))
     for _ in 0..<500 where volumeCalls.withLock({ $0.isEmpty }) { try await Task.sleep(for: .milliseconds(2)) }
     let volume = try #require(volumeCalls.withLock { $0.first })
-    guard case .actionCall(let volumeCall) = volume.output else { throw HarnessError.invalidTransition }
-    let volumeCallID = try #require(volume.callID)
-    #expect(volumeCall.parameters == ["volume": "0.35", "executionID": playbackExecutionID])
-    #expect(volume.roundID == nil && volume.schedulingScope == .standaloneCall(volumeCallID))
-    #expect(adjustments.withLock { $0.count == 1 })
-    let volumeResult = InputPayload.executionFeedback(
-        .actionFinished(
-            .init(
-                executionID: UUID().uuidString,
-                owner: .init(agent: .assistant, incarnation: "fixture", sessionID: "s"), path: volumeCall.actionPath,
-                causality: SignalCausality(envelope: volume), status: .succeeded, effect: .contractCompleted,
-                completion: .completed, callID: volumeCallID)))
+    guard case .toolCall(let volumeCall) = volume.output else { throw HarnessError.invalidTransition }
+    #expect(volumeCall.arguments == ["volume": "0.35", "executionID": playbackExecutionID])
+    #expect(volume.roundID == nil && volume.callID == nil)
     try await agent.receive(
+        speechSignal(SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .low)))
+    for _ in 0..<500 where volumeCalls.withLock({ $0.count < 2 }) { try await Task.sleep(for: .milliseconds(2)) }
+    let latestVolume = try #require(volumeCalls.withLock { $0.last })
+    guard case .toolCall(let latestCall) = latestVolume.output else { throw HarnessError.invalidTransition }
+    #expect(latestCall.arguments["volume"] == "1" && latestCall.id != volumeCall.id)
+    #expect(adjustments.withLock { $0.count == 1 })
+    try await agent.acceptDirectToolReply(
         .init(
-            id: "volume-finished", sessionID: "s", payload: volumeResult,
-            metadata: .init(
-                payload: volumeResult, source: "runtime", origin: .runtime, rootID: "reply", parentID: "reply")))
+            source: volume.source, inputID: volume.inputID, sequence: volume.sequence,
+            tool: .init(callID: volumeCall.id, value: "completed", completion: .completed), failure: nil),
+        envelope: volume)
+    #expect(adjustments.withLock { $0.count == 1 })
+    try await agent.acceptDirectToolReply(
+        .init(
+            source: latestVolume.source, inputID: latestVolume.inputID, sequence: latestVolume.sequence,
+            tool: .init(callID: latestCall.id, value: "completed", completion: .completed), failure: nil),
+        envelope: latestVolume)
     for _ in 0..<500 where adjustments.withLock({ $0.count < 2 }) { try await Task.sleep(for: .milliseconds(2)) }
     let resume = try #require(adjustments.withLock { $0.last })
     if case .actionControl(let control) = resume.output {
@@ -611,7 +623,7 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
     for _ in 0..<500 where adjustments.withLock({ $0.count < 3 }) { try await Task.sleep(for: .milliseconds(2)) }
 
     if keywordWins {
-        try await agent.receive(keywordSignal("ongoing", inferenceDuration: .milliseconds(23)))
+        try await agent.receive(keywordSignal(keywordUtterance, inferenceDuration: .milliseconds(23)))
     } else {
         await classifier.release()
     }
@@ -622,11 +634,19 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
             SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .low))
     )
     try await agent.receive(keywordSignal("ongoing"))
-    let empty = InputPayload.observation(SpeechRecognition(.final, text: "", generation: "capture").message())
+    if order == "late-final" {
+        await cleanup.release()
+        for _ in 0..<500 where !log.decisions.contains(where: { $0.route == .keyword }) {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        try #require(log.decisions.contains { $0.route == .keyword && $0.signalStatus == "interrupted" })
+    }
+    let text = keywordWins && keywordUtterance == "ongoing" ? "Stop now" : ""
+    let finalSpeech = InputPayload.observation(SpeechRecognition(.final, text: text, generation: "capture").message())
     try await agent.receive(
         .init(
-            id: "ongoing-final", sessionID: "s", payload: empty,
-            metadata: .init(payload: empty, source: "speechPerception", origin: .agent, rootID: "ongoing-final"),
+            id: "ongoing-final", sessionID: "s", payload: finalSpeech,
+            metadata: .init(payload: finalSpeech, source: "speechPerception", origin: .agent, rootID: "ongoing-final"),
             turn: .init(id: "ongoing", ordinal: 2)))
     try await agent.receive(.init(id: "follow-up", sessionID: "s", payload: .text("Tell me something else")))
     try await finishVADWindow(agent)
@@ -639,7 +659,7 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
     #expect(await classifier.requests.count == 1)
     #expect(await interrupts.count == 1)
     #expect(adjustments.withLock({ $0.count }) == 3)
-    #expect(volumeCalls.withLock({ $0.count }) == 1)
+    #expect(volumeCalls.withLock({ $0.count }) == 2)
     let keyword = log.decisions.first { $0.route == .keyword }
     let model = log.decisions.first { $0.id == "command-final" }
     if keywordWins {
@@ -654,6 +674,40 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
     }
     let followUp = await main.requests.last?.messages.map(\.content).joined(separator: "\n") ?? ""
     #expect(followUp.contains("Stop the story") && followUp.contains("Tell me something else"))
+    let reopened = AssistantHistoryStore(records: records)
+    let history = try await reopened.readCurrent().current
+    let triggerID = keywordWins && keywordUtterance == "ongoing" ? "ongoing-final" : "command-final"
+    let expectedRoute = keywordWins ? DecisionLogItem.Route.keyword.rawValue : "cloud:decision"
+    let triggerRoute = try database.database.read {
+        try String.fetchOne(
+            $0,
+            sql: """
+                SELECT json_extract(user_input_json, '$.coordination.route')
+                FROM assistant_messages
+                WHERE input_key = ? AND json_extract(user_input_json, '$.coordination.interrupt') = 1
+                UNION ALL
+                SELECT json_extract(member.value, '$.route')
+                FROM assistant_messages, json_each(user_input_json, '$.coordination.members') AS member
+                WHERE input_key = 'command-final' AND json_extract(member.value, '$.id') = ?
+                  AND json_extract(member.value, '$.interrupt') = 1
+                LIMIT 1
+                """, arguments: [triggerID, triggerID])
+    }
+    #expect(triggerRoute == expectedRoute)
+    let page = try await reopened.page(history.id)
+    let ui = try JSONDecoder().decode(HistoryConversation.self, from: JSONEncoder().encode(page))
+    let row = try #require(ConversationHistoryPresentation.turns(ui).first { $0.ownerInputID == "command-final" })
+    #expect(row.coordination?.effectiveInterrupt == true)
+    let detail = try await reopened.message(try #require(row.messageID))
+    let detailUI = try JSONDecoder().decode(HistoryConversation.self, from: JSONEncoder().encode(detail))
+    let presented = try #require(ConversationHistoryPresentation.turns(detailUI).first)
+    #expect(presented.coordination?.effectiveInterrupt == true)
+    if triggerID != "command-final" {
+        #expect(presented.coordination?.interruptingMember?.id == triggerID)
+        #expect(presented.coordination?.interruptingMember?.route == expectedRoute)
+    } else {
+        #expect(presented.coordination?.route == expectedRoute)
+    }
     await agent.stop()
     await decision.stop()
 }
@@ -1318,13 +1372,15 @@ func modelInterruptObservesVADWhilePlaybackActionCleansUp(keyword: Bool) async t
     await agent.stop()
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
-func interruptedReplyPersistsCompletedActionsAcrossTracks(keepCompleted: Bool) async throws {
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true], [false, true])
+func interruptedReplyPersistsCompletedActionsAcrossTracks(keepCompleted: Bool, keyword: Bool) async throws {
     let expression = "<express emotion='happy'/>"
     let omitted = "删掉 &amp; missed."
     let captionText = "保留 &amp; kept."
     let original = expression + omitted + expression + captionText
     let main = DeferredBooleanChat(firstReply: original)
+    let classifier = DeferredBooleanChat(replyValue: true)
+    let decision = AssistantInputDecision(local: UnavailableDecision(), configuration: { (false, { classifier }) })
     let database = try SQLiteRepositories.temporary()
     let records = try AssistantRecordStore(
         repository: database.assistantMessages, tasks: database.assistantTasks,
@@ -1332,7 +1388,9 @@ func interruptedReplyPersistsCompletedActionsAcrossTracks(keepCompleted: Bool) a
     let store = AssistantHistoryStore(records: records)
     let context = try AgentContextRepository(
         agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
-    let agent = try FixtureNativeAgent(fullDuplex: true, chat: main, conversations: store, context: context)
+    let agent = try FixtureNativeAgent(
+        inputDecision: decision, fullDuplex: true, speechSessionID: "s", chat: main,
+        conversations: store, listening: FullKeywordListening(), context: context)
     _ = try await bindSpeechRequests(agent)
     let calls = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
     let pump = Task {
@@ -1393,23 +1451,42 @@ func interruptedReplyPersistsCompletedActionsAcrossTracks(keepCompleted: Bool) a
         try await feedback(.executionFeedback(.roundFinished(.init(id: round, reason: .interrupted))), from: seal)
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
-    #expect(try await agent.requestInterrupt(.init(), sessionID: "s") == .interrupted)
+    let interrupt =
+        keyword
+        ? keywordSignal("stop")
+        : AgentInput(id: "interrupt", sessionID: "s", payload: .text("Stop"))
+    try await agent.receive(interrupt)
+    for _ in 0..<500 {
+        if try await store.readCurrent().current.turns.first?.modelRequests?.last?.replyTruncation != nil { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
     let recovered = try await AssistantHistoryStore(records: records).readCurrent()
     let request = try #require(recovered.current.turns.first?.modelRequests?.last)
     let expected = keepCompleted ? expression + expression + captionText : ""
     #expect(request.response == expected)
     #expect(request.generatedResponse == original)
+    let marker = try #require(request.replyTruncation)
+    #expect(marker.cause?.inputID == interrupt.id)
+    #expect(marker.cause?.route == (keyword ? DecisionLogItem.Route.keyword.rawValue : "cloud:decision"))
+    #expect(marker.markerText == "{\"replyInterrupted\":true}")
+    let page = try await store.page(recovered.current.id)
+    let ui = try JSONDecoder().decode(HistoryConversation.self, from: JSONEncoder().encode(page))
+    let row = try #require(ConversationHistoryPresentation.turns(ui).first { $0.id == request.id })
+    #expect(row.replyTruncation?.cause?.inputID == interrupt.id)
+    let detail = try await store.message(try #require(row.messageID))
+    let detailUI = try JSONDecoder().decode(HistoryConversation.self, from: JSONEncoder().encode(detail))
+    let presented = try #require(ConversationHistoryPresentation.turns(detailUI).first)
+    #expect(presented.displayedResponse == (expected.isEmpty ? "" : expected + "\n") + "{\"replyInterrupted\":true}")
     #expect(
         request.replyTruncation?.completedCallIDs
             == (keepCompleted ? [0, 3, 4, 5].compactMap { actions[$0].callID } : []))
 
-    await main.release()
-    try await agent.receive(.init(id: "next-reply", sessionID: "s", payload: .text("Continue the story")))
-    for _ in 0..<400 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
-    let chatRequest = try #require(await main.requests.last)
-    let projected = try #require(chatRequest.messages.first { $0.role == .assistant }?.content)
+    let templates = try AgentPrompts.load(named: "Assistant")
+    let messages = try AssistantHistoryProjection.messages(for: request, templates: templates)
+    let projected = try #require(messages.first { $0.role == .assistant }?.content)
     #expect(projected == expected + "\n{\"replyInterrupted\":true}")
     await agent.stop()
+    await decision.stop()
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: ["decision", "speechPerception"], [false, true])
@@ -1552,7 +1629,7 @@ func independentDecisionQueueBoundsAndJoinsCancellation() async throws {
         try await queue.submit(
             .init(
                 snapshot: .init(input: input, text: "hello"), target: nil,
-                interrupt: { _, _ in
+                interrupt: { _, _, _ in
                     Issue.record("Unexpected signal")
                     return .noTarget
                 },
@@ -1567,7 +1644,7 @@ func independentDecisionQueueBoundsAndJoinsCancellation() async throws {
         try await queue.submit(
             .init(
                 snapshot: .init(input: extra, text: "hello"), target: nil,
-                interrupt: { _, _ in
+                interrupt: { _, _, _ in
                     Issue.record("Unexpected signal")
                     return .noTarget
                 },
@@ -1605,7 +1682,7 @@ func unavailableInterruptTargetSkipsDecisionBeforeInference() async throws {
     try await queue.submit(
         .init(
             snapshot: .init(input: input, text: "stop"), target: UUID(),
-            interrupt: { _, _ in
+            interrupt: { _, _, _ in
                 Issue.record("An expired reply requested interruption")
                 return .targetExpired
             },
@@ -1700,7 +1777,7 @@ func spokenStopUsesTheDecisionResult(_ transcript: String) async throws {
     try await queue.submit(
         .init(
             snapshot: .init(input: input, text: transcript), target: target,
-            interrupt: { signal, session in
+            interrupt: { signal, session, _ in
                 #expect(signal.target == .reply(target))
                 #expect(session == "voice")
                 return await probe.interrupt()
@@ -1731,7 +1808,7 @@ func latestDecisionCancelsOldRequestWaitsForCleanupAndSkipsIntermediateInput() a
         try await queue.submit(
             .init(
                 snapshot: .init(input: input, text: id), target: UUID(),
-                interrupt: { _, _ in await probe.interrupt() },
+                interrupt: { _, _, _ in await probe.interrupt() },
                 complete: { snapshot, result, _ in await probe.complete(snapshot, result) },
                 updated: {}), using: service)
     }
@@ -1782,7 +1859,7 @@ func latestDecisionRetiresSupersededAttemptAndCancelsClosedSession() async throw
     try await queue.submit(
         .init(
             snapshot: snapshot("closed"), target: UUID(),
-            interrupt: { _, _ in await probe.interrupt() },
+            interrupt: { _, _, _ in await probe.interrupt() },
             complete: { snapshot, result, _ in await probe.complete(snapshot, result) },
             updated: {}), using: service)
     await queue.remove(sessionID: "s")

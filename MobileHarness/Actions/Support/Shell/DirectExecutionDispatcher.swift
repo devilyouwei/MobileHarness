@@ -23,10 +23,13 @@ public actor DirectExecutionDispatcher {
         self.resources = resources
         self.admission = admission
     }
-    public func execute(_ input: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {
+    public func execute(_ request: FunctionInvocation, owner: ExecutionOwner) async throws -> ActionCompletion {
         guard !closed else { throw ActionSchedulingError.shutdown }
         try admission.check()
         guard work.count < 128 else { throw ActionSchedulingError.directCapacityExceeded }
+        let input = FunctionInvocation(
+            call: request.call, context: request.context, executionID: request.executionID, results: request.results,
+            attachment: request.attachment, executionOwner: owner, roundID: request.roundID)
         let id = UUID()
         let executor = executor
         let resources = resources

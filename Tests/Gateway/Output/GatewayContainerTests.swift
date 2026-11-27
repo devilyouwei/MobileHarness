@@ -33,11 +33,32 @@ private let gatewayPath = ActionIdentifier(domain: "Fixture", module: "Execution
 private enum GatewayTestError: Error { case cleanup }
 private struct GatewayFixtureModule: CapabilityModule { let definitions: [ActionFunction] }
 
+private actor ActionFeedbackReceiver: Agent {
+    nonisolated let descriptor = AgentDescriptor(
+        category: .cognition, id: .assistant, name: "Action feedback fixture", inputs: [.executionFeedback], outputs: []
+    )
+    nonisolated let outputs = AsyncStream<OutputEnvelope> { $0.finish() }
+    private(set) var attempts = 0
+    private(set) var inputs: [AgentInput] = []
+    func start() {}
+    func pause() {}
+    func resume() {}
+    func stop() {}
+    func status() -> AgentStatus { .init(lifecycle: .running, queuedInputs: 0, processedInputs: inputs.count) }
+    func receive(_ input: AgentInput) throws {
+        guard case .executionFeedback(.actionFinished) = input.payload else { return }
+        attempts += 1
+        guard attempts > 1 else { throw CommunicationError.capacityExceeded }
+        inputs.append(input)
+    }
+}
+
 @MainActor private struct GatewayHarness {
     let actions: ActionsContainer
     let engine: ActionExecutionCoordinator
     let root: GatewayContainer
     let ports: GatewayCapabilities
+    let execution: ActionExecutionTransport
     init(resources: [ResourceDefinition] = [], handler: @escaping ActionHandler = { _ in }) async throws {
         let actions = ActionsContainer()
         try actions.configure(
@@ -51,7 +72,9 @@ private struct GatewayFixtureModule: CapabilityModule { let definitions: [Action
         let engine = try actions.configureExecution(resources: resources)
         try actions.start()
         let root = GatewayContainer()
-        self.ports = try root.configureExecution(.init(engine: engine))
+        let ports = try root.configure()
+        self.ports = ports
+        self.execution = try await ActionExecutionTransport.connect(ports: ports, engine: engine)
         _ = try await ports.signals.register(address: "producer", incarnation: "generation") { _ in }
         self.actions = actions
         self.engine = engine
@@ -85,6 +108,102 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
     await #expect(throws: GatewayFailure.self) { try await root.start() }
 }
 
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func actionTerminalReturnsThroughGatewayBeforeAgentsAdaptation() async throws {
+    let executions = GatewayCounter()
+    let actions = ActionsContainer()
+    let path = ActionIdentifier(domain: "System", module: "Device", function: "readStatus")
+    try actions.configure(
+        BehaviorAssembly(capabilityModules: [
+            GatewayFixtureModule(definitions: [
+                .init(
+                    path: path, displayName: "Fixture", kind: .finite, completion: "Joined.",
+                    handler: { invocation in
+                        await executions.increment()
+                        if invocation.call.parameters["fail"] == "true" { throw GatewayTestError.cleanup }
+                    })
+            ])
+        ]))
+    let engine = try actions.configureExecution(resources: [])
+    try actions.start()
+    let root = GatewayContainer()
+    let ports = try root.configure()
+    let assembly = AgentGatewayAssembly(
+        signals: ports.signals, admission: ports.admission, configuration: .init(catalog: try actions.catalog()))
+    let agents = try await assembly.bind(ports: ports, observations: root.observations, engine: engine)
+    let agent = ActionFeedbackReceiver()
+    let session = UUID().uuidString
+    try await agents.manager.register(agent, sessionID: session)
+    _ = try await agents.output.consumer(for: agent)
+    try await root.start()
+
+    let incarnation = try await agents.manager.identity(.assistant)
+    let owner = ExecutionOwner(agent: .assistant, incarnation: incarnation, sessionID: session)
+    let context = ActionExecutionContext(source: owner.endpoint, sessionID: session, inputID: UUID().uuidString)
+    let round = UUID().uuidString
+    let call = UUID().uuidString
+    let job = try ScheduledAction(
+        envelope: .init(
+            source: owner.endpoint, sessionID: session, inputID: context.inputID, schedulingScope: .round(round),
+            callID: call, context: context),
+        call: .init(actionPath: path), channel: "main", owner: owner, feedback: .terminal)
+    _ = try await agents.execution.roundBoundary(.init(roundID: round, scope: .start), lane: .action, owner: owner)
+    let executionID = try await agents.execution.enqueue(invocation: job)
+    let settlement = try #require(
+        try await agents.execution.roundBoundary(.init(roundID: round, scope: .end), lane: .action, owner: owner))
+    try await settlement.wait()
+
+    #expect(await executions.count == 1)
+    #expect(await agent.attempts == 2)
+    let inputs = await agent.inputs
+    try #require(inputs.count == 1)
+    if case .executionFeedback(.actionFinished(let result)) = inputs[0].payload {
+        #expect(result.executionID == executionID && result.roundID == round && result.callID == call)
+        #expect(result.owner == owner && result.status == .succeeded)
+        #expect(inputs[0].metadata.parentID == context.inputID && inputs[0].metadata.hops == 1)
+    } else {
+        Issue.record("Expected an adapted Action terminal")
+    }
+    let tool = ToolRequest(id: UUID().uuidString, toolPath: path.description)
+    let failingTool = ToolRequest(id: UUID().uuidString, toolPath: path.description, arguments: ["fail": "true"])
+    let toolInvocation = FunctionInvocation(tool: tool, context: context, roundID: round)
+    _ = try await agents.execution.roundBoundary(.init(roundID: round, scope: .start), lane: .tool, owner: owner)
+    let receipt = try await agents.execution.execute(toolInvocation, owner: owner)
+    #expect(receipt == .completed)
+    await #expect(throws: GatewayTestError.cleanup) {
+        try await agents.execution.execute(.init(tool: failingTool, context: context, roundID: round), owner: owner)
+    }
+    let toolSettlement = try #require(
+        try await agents.execution.roundBoundary(.init(roundID: round, scope: .end), lane: .tool, owner: owner))
+    try await toolSettlement.wait()
+    #expect(await executions.count == 3)
+    #expect(await agent.inputs.count == 1)
+
+    let raw = try #require(await engine.scheduler.resultSnapshot().first?.result)
+    let agentEndpoint = try await ports.signals.endpoint(address: owner.endpoint, incarnation: incarnation)
+    let actionsEndpoint = try await ports.signals.endpoint(address: "actions.execution")
+    let resultEndpoint = try await ports.signals.endpoint(address: "agents.execution.results")
+    let invalidResults: [(SignalEndpoint, String, CommunicationError)] = [
+        (agentEndpoint, session, .unauthorized),
+        (actionsEndpoint, "other-session", .invalidPayload),
+    ]
+    for (source, envelopeSession, error) in invalidResults {
+        await #expect(throws: error) {
+            try await ports.signals.send(
+                source: source, target: resultEndpoint,
+                envelope: .init(
+                    id: executionID, sessionID: envelopeSession, contract: CallResultSignal.contract,
+                    channel: CallResultSignal.channel, payloadBytes: 0),
+                payload: CallResultSignal.action(raw))
+        }
+    }
+    #expect(await agent.attempts == 2)
+    await agents.output.shutdown()
+    await agents.manager.stopAll()
+    try await root.stop()
+    try await actions.stop()
+}
+
 @Test(.actionCatalog) @MainActor func gatewayRoundBoundariesArePerCallLaneAndRejectLateActions() async throws {
     let entered = GatewayTestGate()
     let release = GatewayTestGate()
@@ -101,7 +220,7 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
             source: owner.endpoint, sessionID: owner.sessionID, inputID: context.inputID,
             schedulingScope: .round(round), callID: "call", context: context),
         call: .init(actionPath: gatewayPath), channel: "main", owner: owner)
-    let execution = harness.ports.execution
+    let execution = harness.execution
     await #expect(throws: ActionSchedulingError.invalidSchedule) { _ = try await execution.enqueue(invocation: action) }
     _ = try await execution.roundBoundary(.init(roundID: round, scope: .start), lane: .action, owner: owner)
     _ = try await execution.roundBoundary(.init(roundID: round, scope: .start), lane: .tool, owner: owner)
@@ -132,10 +251,10 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
 @Test(.actionCatalog) @MainActor func gatewayAcceptsOnlyOneConfigurationAndCachedPortsClose() async throws {
     let harness = try await GatewayHarness()
     #expect(throws: GatewayFailure.self) {
-        try harness.root.configureExecution(.init(engine: harness.engine))
+        try harness.root.configure()
     }
     await #expect(throws: GatewayContainerError.self) {
-        try await harness.ports.execution.enqueue(invocation: gatewayJob())
+        try await harness.execution.enqueue(invocation: gatewayJob())
     }
     async let one: Void = harness.root.start()
     async let two: Void = harness.root.start()
@@ -144,17 +263,82 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
     async let closeTwo: Void = harness.root.stop()
     _ = try await (closeOne, closeTwo)
     #expect(harness.root.state == .stopped)
-    await #expect(throws: Error.self) { try await harness.ports.execution.enqueue(invocation: gatewayJob()) }
+    await #expect(throws: Error.self) { try await harness.execution.enqueue(invocation: gatewayJob()) }
     try await harness.actions.stop()
 }
 
-@Test(.actionCatalog) @MainActor func gatewayConfigurationFailureDoesNotPublishPorts() async throws {
+@Test(.actionCatalog) @MainActor func toolCallTransportPreservesLargeResultsAndChecksTheBoundOwner() async throws {
+    let path = ActionIdentifier(domain: "Artifacts", module: "Fixture", function: "read")
+    let size = 4 * 1024 * 1024 + 1
+    let calls = GatewayCounter()
+    let actions = ActionsContainer()
+    try actions.configure(
+        BehaviorAssembly(capabilityModules: [
+            GatewayFixtureModule(definitions: [
+                .init(
+                    path: path, displayName: "Read fixture", kind: .finite, completion: "Read complete.",
+                    completing: { invocation in
+                        await calls.increment()
+                        let deadline = ContinuousClock.now + .seconds(3)
+                        while await calls.count < 2 {
+                            guard .now < deadline else { throw GatewayTestError.cleanup }
+                            try await Task.sleep(for: .milliseconds(10))
+                        }
+                        let prefix = invocation.call.parameters["marker"] ?? ""
+                        return .value(prefix + String(repeating: "a", count: size))
+                    })
+            ])
+        ]))
+    let engine = try actions.configureExecution(resources: [])
+    try actions.start()
+    let root = GatewayContainer()
+    let ports = try root.configure()
+    let execution = try await ActionExecutionTransport.connect(ports: ports, engine: engine)
+    let owner = ExecutionOwner(endpoint: "writer", incarnation: "one", sessionID: "session")
+    _ = try await ports.signals.register(address: owner.endpoint, incarnation: owner.incarnation) { _ in }
+    try await root.start()
+    let tool = ToolRequest(id: UUID().uuidString, toolPath: path.description)
+    let foreign = FunctionInvocation(
+        tool: tool, context: .init(source: owner.endpoint, sessionID: "other", inputID: "input"))
+    await #expect(throws: ActionExecutionError.invalidInvocation) { try await execution.execute(foreign, owner: owner) }
+    #expect(await calls.count == 0)
+    let context = ActionExecutionContext(source: owner.endpoint, sessionID: owner.sessionID, inputID: "input")
+    let firstRound = UUID().uuidString
+    let secondRound = UUID().uuidString
+    for round in [firstRound, secondRound] {
+        _ = try await execution.roundBoundary(.init(roundID: round, scope: .start), lane: .tool, owner: owner)
+    }
+    let firstTool = ToolRequest(id: tool.id, toolPath: tool.toolPath, arguments: ["marker": "1"])
+    let secondTool = ToolRequest(id: tool.id, toolPath: tool.toolPath, arguments: ["marker": "2"])
+    async let first = execution.execute(.init(tool: firstTool, context: context, roundID: firstRound), owner: owner)
+    async let second = execution.execute(.init(tool: secondTool, context: context, roundID: secondRound), owner: owner)
+    if case (.value(let firstValue), .value(let secondValue)) = try await (first, second) {
+        #expect(firstValue.utf8.count == size + 1 && firstValue.hasPrefix("1"))
+        #expect(secondValue.utf8.count == size + 1 && secondValue.hasPrefix("2"))
+    } else {
+        Issue.record("Expected one complete result for each Tool round")
+    }
+    #expect(await calls.count == 2)
+    try await root.stop()
+    try await actions.stop()
+}
+
+@Test(.actionCatalog) @MainActor func failedExecutionBindingLeavesIndependentTransportAvailable() async throws {
     let harness = try await GatewayHarness()
     let root = GatewayContainer()
-    // An engine serves one Signal root; a second binding fails without publishing ports.
-    #expect(throws: GatewayFailure.self) { try root.configureExecution(.init(engine: harness.engine)) }
-    #expect(root.state == .failed && !root.isAvailable)
-    #expect(throws: GatewayFailure.self) { _ = try root.capabilities }
+    let ports = try root.configure()
+    await #expect(throws: ActionSchedulingError.signalsAlreadyBound) {
+        try await ActionExecutionTransport.connect(ports: ports, engine: harness.engine)
+    }
+    await #expect(throws: SignalTransportError.duplicateEndpoint) {
+        try await ActionExecutionTransport.connect(ports: harness.ports, engine: harness.engine)
+    }
+    try await harness.root.start()
+    _ = try await harness.execution.enqueue(invocation: gatewayJob())
+    #expect(root.state == .configured)
+    try await root.start()
+    let endpoint = try await ports.signals.register(address: "independent", incarnation: "one") { _ in }
+    try await ports.signals.send(source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: 1)
     try await root.stop()
     try await harness.stop()
 }
@@ -212,13 +396,13 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
             source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: "data")
     }
     await #expect(throws: GatewayContainerError.self) {
-        try await harness.ports.execution.enqueue(invocation: gatewayJob())
+        try await harness.execution.enqueue(invocation: gatewayJob())
     }
     try await harness.root.setForeground(true)
     try await harness.ports.signals.send(source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: "data")
     let job = try gatewayJob()
-    try await harness.ports.execution.enqueue(invocation: job)
-    try await harness.ports.execution.finish(scope: job.envelope.schedulingScope, source: job.envelope.source)
+    try await harness.execution.enqueue(invocation: job)
+    try await harness.execution.finish(scope: job.envelope.schedulingScope, source: job.envelope.source)
     #expect(await count.count == 1)
     try await harness.stop()
 }
@@ -254,9 +438,8 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
 @Test(.actionCatalog) @MainActor func gatewayObservationScopesAreBoundedIsolatedAndRootOwned() async throws {
     let harness = try await GatewayHarness()
     try await harness.root.start()
-    let configuration = GatewayConfiguration(engine: DetachedActionExecution())
-    let first = try harness.root.observations.open(configuration: configuration)
-    #expect(throws: Error.self) { try harness.root.observations.open(configuration: configuration) }
+    let first = try harness.root.observations.open()
+    #expect(throws: Error.self) { try harness.root.observations.open() }
     #expect(first.capabilities.signals !== harness.ports.signals)
     let endpoint = try await first.capabilities.signals.register(address: "isolated", incarnation: "one") { _ in }
     harness.root.invalidate()
@@ -270,7 +453,7 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
         try await first.capabilities.signals.send(
             source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: "data")
     }
-    let next = try harness.root.observations.open(configuration: configuration)
+    let next = try harness.root.observations.open()
     try await harness.root.stop()
     await #expect(throws: SignalTransportError.closed) {
         _ = try await next.capabilities.signals.register(address: "late", incarnation: "one") { _ in }
@@ -295,11 +478,11 @@ private func gatewaySignal(id: String = UUID().uuidString, cleanup: Bool = false
     try await harness.root.start()
     await harness.ports.signals.unregister(address: "producer", incarnation: "generation")
     await #expect(throws: SignalTransportError.staleEndpoint) {
-        try await harness.ports.execution.enqueue(invocation: gatewayJob())
+        try await harness.execution.enqueue(invocation: gatewayJob())
     }
     _ = try await harness.ports.signals.register(address: "producer", incarnation: "replacement") { _ in }
     await #expect(throws: SignalTransportError.staleEndpoint) {
-        try await harness.ports.execution.enqueue(invocation: gatewayJob())
+        try await harness.execution.enqueue(invocation: gatewayJob())
     }
     #expect(await count.count == 0)
     try await harness.stop()

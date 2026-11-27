@@ -69,6 +69,75 @@ extension AssistantChatWorker {
             throw error
         }
     }
+
+    func executeNativeTool(_ envelope: OutputEnvelope, using consumer: GatewayOutputConsumer) async throws
+        -> OutputExecutionResult
+    {
+        let outcome = try await consumer.callTool(envelope)
+        try await acceptDirectToolReply(outcome, envelope: envelope)
+        return outcome
+    }
+
+    func acceptDirectToolReply(_ outcome: OutputExecutionResult, envelope: OutputEnvelope) async throws {
+        guard case .toolCall(let call) = envelope.output,
+            envelope.source == descriptor.id, outcome.source == envelope.source,
+            outcome.inputID == envelope.inputID, outcome.sequence == envelope.sequence,
+            outcome.tool.map({ $0.callID == call.id }) ?? (outcome.failure != nil)
+        else { throw CommunicationError.unauthorized }
+        guard let round = envelope.roundID else {
+            if call.toolPath == Self.playbackVolume.path {
+                try settlePlaybackVolume(callID: call.id, outcome: outcome, envelope: envelope)
+            }
+            return
+        }
+        guard envelope.callID == call.id else { throw CommunicationError.unauthorized }
+        if hasClosedExecutionRound(round) { return }
+        guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+
+        let result: ToolResult
+        if let reply = outcome.tool {
+            result = reply.agentResult(roundID: round, invocation: outcome.invocation)
+        } else if let failure = outcome.failure {
+            result = .init(
+                callID: call.id, value: failure, isError: true,
+                failureCode: outcome.failureCode?.rawValue ?? "handlerFailed", roundID: round,
+                invocation: outcome.invocation)
+        } else {
+            throw CommunicationError.invalidPayload
+        }
+        try await acceptToolFeedback(result, input: envelope.toolFeedbackInput(result))
+    }
+
+    func acceptToolFeedback(_ result: ToolResult, input: AgentInput) async throws {
+        if try await acceptPendingFeedback(input) { return }
+        if let activeInput, let receiptRound = roundID,
+            let index = roundCalls.firstIndex(where: { $0.id == result.callID && $0.tool })
+        {
+            try validateFeedback(input)
+            guard result.roundID == nil || result.roundID == receiptRound else { throw CommunicationError.unauthorized }
+            try await persistFeedback(input)
+            if try await acceptPendingFeedback(input, persisted: true) { return }
+            do {
+                try await conversations.recordToolOutcome(
+                    result.callID, for: activeInput.id,
+                    state: result.isCancellationOnly ? .cancelled : (result.hasFailure ? .failed : .completed),
+                    output: result.value,
+                    error: result.isError ? result.failureCode : nil)
+            } catch {
+                feedbackFailure = "Native outcome persistence failed"
+                throw error
+            }
+            if try await acceptPendingFeedback(input, persisted: true, toolOutcomeRecorded: true) { return }
+            if roundID == receiptRound, roundCalls.indices.contains(index), roundCalls[index].id == result.callID {
+                try acceptResult(result, at: index)
+            }
+            return
+        }
+        guard let id = result.roundID, ownsExecutionRound(id, input: input), id != roundID || activeInput == nil
+        else { throw CommunicationError.unauthorized }
+        try await persistFeedback(input)
+    }
+
     private func observation(_ result: ActionResult, callID: String, roundID: String) throws -> ToolResult {
         .init(
             callID: callID, value: try Self.completionText(result.completion),
@@ -82,11 +151,6 @@ extension AssistantChatWorker {
             result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID
         else { throw CommunicationError.unauthorized }
 
-        if result.roundID == nil, result.path == Self.playbackVolume.path {
-            try await persistFeedback(input)
-            try settlePlaybackVolume(result)
-            return
-        }
         guard let callID = result.callID else {
             try await persistFeedback(input)
             resultInbox.accept(result)

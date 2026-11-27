@@ -23,6 +23,7 @@ public struct BehaviorProtocolBindings {
         }
         if [
             "Camera.Album.perform", "History.Conversation.readFull", "Speech.Detection.run", "Speech.Listening.prepare",
+            "Speech.Listening.update", "Speech.Playback.setVolume",
         ].contains(
             function.path.description)
         {
@@ -62,9 +63,6 @@ public struct BehaviorProtocolBindings {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }
         let group = function.path.domain + "." + function.path.module
-        if group == "Speech.Playback", function.path.function == "setVolume" {
-            return ActionBinding(function: function, executionPolicy: .scheduled(channel: "SpeechVolume"))
-        }
         if group == "UI.Caption", ["print", "beginReplyTurn"].contains(function.path.function) {
             return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
         }

@@ -3,9 +3,9 @@ import FunctionContracts
 import Gateway
 
 /// Scoped by the producer-bound consumer; child execution tasks inherit the result owner.
-enum AgentToolFeedbackDelivery { @TaskLocal static var internalCompletion = false }
+enum AgentToolFeedbackDelivery { @TaskLocal static var returnsToCaller = false }
 
-/// Native call adapter: native calls execute directly without Channel/wait; feedback crosses InputGateway.
+/// Native calls bypass Channel/wait. The returned outcome stays in Agents after crossing Gateway once.
 struct ToolDispatcher: Sendable {
     let catalog: ActionCatalogSnapshot
     let executor: any ActionExecutionEngine
@@ -46,7 +46,8 @@ struct ToolDispatcher: Sendable {
                         attachment: try Self.executionAttachment(envelope), roundID: envelope.roundID), owner: owner)
                 result = try ToolResponse.response(
                     completion,
-                    policy: envelope.roundID != nil ? .returning : descriptor.directResultPolicy, callID: call.id)
+                    policy: envelope.roundID != nil || AgentToolFeedbackDelivery.returnsToCaller
+                        ? .returning : descriptor.directResultPolicy, callID: call.id)
             } catch {
                 let report = ActionReport.failureReport(for: error)
                 if !report.hasFailures { try Task.checkCancellation() }
@@ -63,17 +64,14 @@ struct ToolDispatcher: Sendable {
         guard let result else { return nil }
         if Task.isCancelled, result.completion?.hasExecutionFailure == true { return result }
         try Task.checkCancellation()
-        if AgentToolFeedbackDelivery.internalCompletion { return result }
+        if AgentToolFeedbackDelivery.returnsToCaller { return result }
         if envelope.roundID == nil, descriptor?.directResultPolicy == .completionOnly { return result }
         let failure: String?
         do {
-            let report = try await input.deliverToolResult(
-                ToolResult(
-                    callID: result.callID, value: result.value, isError: result.isError,
-                    failureCode: result.failureCode?.rawValue, completion: result.completion?.agentValue,
-                    roundID: envelope.roundID, invocation: snapshot),
+            try await input.deliverToolResult(
+                result.agentResult(roundID: envelope.roundID, invocation: snapshot),
                 owner: owner, envelope: envelope)
-            failure = report.flatMap { $0.rejected.isEmpty ? nil : "Result delivery rejected: \($0.rejected)" }
+            failure = nil
         } catch {
             try Task.checkCancellation()
             failure = String(describing: error)

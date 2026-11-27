@@ -29,7 +29,7 @@ struct ActionExecutionLedger {
             source: invocation.envelope.source,
             sessionID: invocation.envelope.sessionID, inputID: invocation.envelope.inputID,
             channel: invocation.channel, semantics: semantics,
-            parameters: Self.logParameters(invocation.call.parameters))
+            parameters: ActionExecutionRecord.logParameters(invocation.call.parameters))
         order.append(invocation.executionID)
         revision += 1
     }
@@ -61,21 +61,6 @@ struct ActionExecutionLedger {
         }
         revision += 1
         return true
-    }
-
-    private static let credentialFields: Set<String> = [
-        "key", "apikey", "token", "accesstoken", "refreshtoken", "authorization", "password",
-        "secret", "clientsecret", "credential", "credentials", "cookie",
-    ]
-
-    private static func logParameters(_ parameters: [String: String]) -> [String: String] {
-        parameters.reduce(into: [:]) { result, entry in
-            let (name, value) = entry
-            let normalized = name.lowercased().filter(\.isLetter)
-            result[name] =
-                credentialFields.contains(normalized)
-                ? "[redacted]" : ActionExecutionRecord.logPreview(value, maximumUTF8Bytes: 2048)
-        }
     }
 
     func snapshot() -> ActionExecutionSnapshot {

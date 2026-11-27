@@ -14,7 +14,7 @@ Direct Send and Request accept concurrent work on the same endpoint and channel.
 
 ## Typed Request / Reply
 
-[SignalRequest.swift](SignalRequest.swift) binds a versioned SignalRequestProtocol<Request,Reply> to an endpoint and real handler. Registration records both types, byte bounds, timeout and measuring closures. Requests reject unknown/duplicate/mismatched schemas before effects, validate with the registered descriptor, and reserve request plus maximum reply bytes through the neutral send path. A handler returns the Reply directly; no source-inbox receipt is synthesized.
+[SignalRequest.swift](SignalRequest.swift) binds a versioned SignalRequestProtocol<Request,Reply> to an endpoint and real handler. Registration records both types, byte bounds, timeout and measuring closures. Requests reject unknown/duplicate/mismatched schemas before effects and validate with the registered descriptor. A measured reply reserves its declared maximum bytes. An in-process value reply can omit that reservation and use the bounded request slot for its lifetime. A handler returns the Reply directly; no source-inbox receipt is synthesized.
 
 Timeout and cancellation cancel and join handler work before releasing capacity. Reply validation and endpoint checks precede return. A task-local bounded request chain rejects cyclic reentry; timeout is positive and at most 120 seconds. The default is 30 seconds. Cooperative cleanup may outlast the deadline; Gateway does not force-kill work.
 

@@ -1,5 +1,4 @@
 import Foundation
-import FunctionContracts
 import Synchronization
 
 /// Shared by cached ports. Closing admission does not assert native completion.
@@ -13,28 +12,9 @@ public final class GatewayAdmission: Sendable {
     public func check() throws { guard isOpen else { throw GatewayContainerError.unavailable } }
 }
 
-/// Neutral application-supplied configuration; contains no concrete business owners.
-public struct GatewayConfiguration: Sendable {
-    public let engine: any ActionExecutionEngine
-    public let deliverResult: @Sendable (ExecutionResult) async -> ActionResultDelivery
-    public let deliverControl: @Sendable (ActionControlFeedback) async -> ActionResultDelivery
-    public let deliverStart: @Sendable (ExecutionStart) async -> ActionResultDelivery
-    public init(
-        engine: any ActionExecutionEngine,
-        deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed },
-        deliverStart: @escaping @Sendable (ExecutionStart) async -> ActionResultDelivery = { _ in .closed },
-        deliverControl: @escaping @Sendable (ActionControlFeedback) async -> ActionResultDelivery = { _ in .closed }
-    ) {
-        self.engine = engine
-        self.deliverResult = deliverResult
-        self.deliverStart = deliverStart
-        self.deliverControl = deliverControl
-    }
-}
 public struct GatewayCapabilities: Sendable {
     public let admission: GatewayAdmission
     public let signals: SignalTransport
-    public let execution: GatewayExecution
 }
 public struct GatewayObservationSession: Sendable {
     fileprivate let id: UUID
@@ -42,9 +22,9 @@ public struct GatewayObservationSession: Sendable {
 }
 public struct GatewayObservationAccess: Sendable {
     fileprivate weak var root: GatewayContainer?
-    @MainActor public func open(configuration: GatewayConfiguration) throws -> GatewayObservationSession {
+    @MainActor public func open() throws -> GatewayObservationSession {
         guard let root else { throw GatewayContainerError.stopped }
-        return try root.openObservationSession(configuration)
+        return try root.openObservationSession()
     }
     @MainActor public func close(_ session: GatewayObservationSession) async throws {
         guard let root else { throw GatewayContainerError.stopped }
@@ -52,7 +32,7 @@ public struct GatewayObservationAccess: Sendable {
     }
 }
 
-/// App-scoped root. Configuration binds the execution edge; only start opens admission.
+/// App-scoped root. Configuration exposes transport ports; only start opens admission.
 @MainActor public final class GatewayContainer {
     public enum State: String, CaseIterable, Sendable {
         case cold, configured, running, suspended, stopping, stopped, failed
@@ -115,41 +95,22 @@ public struct GatewayObservationAccess: Sendable {
             return configured
         }
     }
-    @discardableResult public func configureExecution(
-        _ configuration: GatewayConfiguration
-    ) throws(GatewayFailure) -> GatewayCapabilities {
-        do {
-            guard state == .cold else { throw GatewayContainerError.alreadyConfigured }
-            let capabilities = try assemble(configuration)
-            configured = capabilities
-            state = .configured
-            return capabilities
-        } catch {
-            if state == .cold { state = .failed }
-            throw failure("configureExecution", error, code: error is GatewayContainerError ? .conflict : nil)
+    @discardableResult public func configure() throws(GatewayFailure) -> GatewayCapabilities {
+        guard state == .cold else {
+            throw failure("configure", GatewayContainerError.alreadyConfigured, code: .conflict)
         }
+        let capabilities = GatewayCapabilities(admission: admission, signals: signals)
+        configured = capabilities
+        state = .configured
+        return capabilities
     }
-    private func assemble(
-        _ configuration: GatewayConfiguration, admission supplied: GatewayAdmission? = nil
-    ) throws -> GatewayCapabilities {
-        let admission = supplied ?? self.admission
-        let signals =
-            supplied == nil
-            ? self.signals : SignalTransport(admission: admission, eventConfiguration: eventConfiguration)
-        try configuration.engine.bindSignals(
-            ActionSignalBinding(
-                validate: { try await signals.validateExecution($0, owner: $1) },
-                deliver: configuration.deliverResult, deliverStart: configuration.deliverStart,
-                deliverControl: configuration.deliverControl))
-        return GatewayCapabilities(
-            admission: admission, signals: signals,
-            execution: GatewayExecution(engine: configuration.engine, admission: admission, signals: signals))
-    }
-    fileprivate func openObservationSession(_ configuration: GatewayConfiguration) throws -> GatewayObservationSession {
+    fileprivate func openObservationSession() throws -> GatewayObservationSession {
         try admission.check()
         guard observationScopes.isEmpty else { throw SignalTransportError.capacityExceeded }
         let scopeAdmission = GatewayAdmission(parent: admission)
-        let ports = try assemble(configuration, admission: scopeAdmission)
+        let ports = GatewayCapabilities(
+            admission: scopeAdmission,
+            signals: SignalTransport(admission: scopeAdmission, eventConfiguration: eventConfiguration))
         let id = UUID()
         scopeAdmission.setOpen(true)
         observationScopes[id] = ObservationScope(capabilities: ports, admission: scopeAdmission)

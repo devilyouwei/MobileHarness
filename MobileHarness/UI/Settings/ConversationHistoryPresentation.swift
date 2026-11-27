@@ -60,6 +60,7 @@ public enum ConversationHistoryPresentation {
     ) -> HistoryTurn {
         HistoryTurn(
             coordination: turn.coordination,
+            replyTruncation: turn.replyTruncation,
             logsCleared: true, generationRounds: generationRounds, messageID: turn.messageID,
             historyOrder: turn.historyOrder,
             id: turn.id, date: turn.date, user: turn.user, request: [], model: "", maximumOutputTokens: nil,
@@ -115,6 +116,7 @@ public enum ConversationHistoryPresentation {
                 projected.requestParametersJSON = request.requestParametersJSON
                 projected.responseEventsJSON = request.responseEventsJSON
                 projected.logsCleared = request.logsCleared
+                projected.replyTruncation = request.replyTruncation
                 return projected
             }
         }.sorted { ($0.historyOrder ?? 0) < ($1.historyOrder ?? 0) }

@@ -185,7 +185,7 @@ extension SQLiteAssistantMessageRepository {
     static func previewSQL(owner: Owner, task: Bool) -> String {
         let scope = assistantPreviewScope(task: task)
         return
-            "SELECT m.id,m.input_key,m.root_input_key,m.position,m.created_at,m.state,m.input_kind,json_extract(m.user_input_json,'$.coordination') AS coordination,substr(COALESCE(json_extract(m.user_input_json,'$.requestText'),json_extract(m.user_input_json,'$.text')),1,240) AS input_text,substr(json_extract(m.assistant_response_json,'$.text'),1,240) AS response_text,json_extract(m.assistant_response_json,'$.id') AS invocation,\(scope.taskColumn),(SELECT COALESCE(json_group_array(json_object('id',json_extract(c.value,'$.id'),'providerID',json_extract(c.value,'$.providerID'),'name',json_extract(c.value,'$.name'),'argumentsJSON',substr(CASE WHEN json_valid(json_extract(c.value,'$.argumentsJSON')) THEN (SELECT json_group_object(a.key,substr(CAST(a.value AS TEXT),1,512)) FROM json_each(json_extract(c.value,'$.argumentsJSON')) a WHERE a.key IN ('command','path','title','description','text','reason','agent_id')) ELSE '{}' END,1),'state',json_extract(c.value,'$.state'))),'[]') FROM json_each(m.tool_calls_json) c) AS tool_calls_json,json_extract(m.assistant_response_json,'$.producerMetadata') AS producer_metadata FROM \(owner.table) m\(scope.join) WHERE m.\(owner.column)=? AND json_extract(m.assistant_response_json,'$.id') IS NOT NULL AND m.position>?\(scope.filter) ORDER BY m.position,m.id LIMIT ? OFFSET ?"
+            "SELECT m.id,m.input_key,m.root_input_key,m.position,m.created_at,m.state,m.input_kind,json_extract(m.user_input_json,'$.coordination') AS coordination,json_extract(m.assistant_response_json,'$.replyTruncation') AS reply_truncation,substr(COALESCE(json_extract(m.user_input_json,'$.requestText'),json_extract(m.user_input_json,'$.text')),1,240) AS input_text,substr(json_extract(m.assistant_response_json,'$.text'),1,240) AS response_text,json_extract(m.assistant_response_json,'$.id') AS invocation,\(scope.taskColumn),(SELECT COALESCE(json_group_array(json_object('id',json_extract(c.value,'$.id'),'providerID',json_extract(c.value,'$.providerID'),'name',json_extract(c.value,'$.name'),'argumentsJSON',substr(CASE WHEN json_valid(json_extract(c.value,'$.argumentsJSON')) THEN (SELECT json_group_object(a.key,substr(CAST(a.value AS TEXT),1,512)) FROM json_each(json_extract(c.value,'$.argumentsJSON')) a WHERE a.key IN ('command','path','title','description','text','reason','agent_id')) ELSE '{}' END,1),'state',json_extract(c.value,'$.state'))),'[]') FROM json_each(m.tool_calls_json) c) AS tool_calls_json,json_extract(m.assistant_response_json,'$.producerMetadata') AS producer_metadata FROM \(owner.table) m\(scope.join) WHERE m.\(owner.column)=? AND json_extract(m.assistant_response_json,'$.id') IS NOT NULL AND m.position>?\(scope.filter) ORDER BY m.position,m.id LIMIT ? OFFSET ?"
     }
     public func previews(
         dialog id: String, after: UInt64 = 0, taskID: String? = nil, limit: Int = HistoryPaging.pageSize,
@@ -222,6 +222,10 @@ extension SQLiteAssistantMessageRepository {
                     if let coordination: String = row["coordination"] {
                         value.coordination = try JSONDecoder().decode(
                             AssistantInputCoordination.self, from: Data(coordination.utf8))
+                    }
+                    if let truncation: String = row["reply_truncation"] {
+                        value.replyTruncation = try JSONDecoder().decode(
+                            AssistantReplyTruncation.self, from: Data(truncation.utf8))
                     }
                     let calls = try JSONDecoder().decode(
                         [ModelToolCall].self, from: Data((row["tool_calls_json"] as String).utf8))

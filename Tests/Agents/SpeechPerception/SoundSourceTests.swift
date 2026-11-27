@@ -213,10 +213,11 @@ extension LiveRuntimeTests {
         #expect(speech.descriptor.capabilities.internalActions.isEmpty)
         let root = await GatewayContainer()
         let assembly = await AgentGatewayAssembly(
-            signals: root.signals, admission: root.admissionPort, engine: DetachedActionExecution(),
+            signals: root.signals, admission: root.admissionPort,
             configuration: .init(catalog: .init(revision: UUID(), entries: [])))
-        let ports = try await root.configureExecution(assembly.configuration)
-        let main = await assembly.bind(ports: ports, observations: root.observations)
+        let ports = try await root.configure()
+        let main = try await assembly.bind(
+            ports: ports, observations: root.observations, engine: DetachedActionExecution())
         try await root.start()
         let diagnostic = try await main.observations.open(
             policy: policy, observedContracts: ["perception.audio.source.v1"],
@@ -715,13 +716,14 @@ extension LiveRuntimeTests {
         var outputs = agent.outputs.makeAsyncIterator()
         try await ui.home.listeningRequests.submitControl(.setEnabled(true))
         let enabled = try #require(await outputs.next())
-        guard case .actionCall(let call) = enabled.output else {
-            Issue.record("Listening policy must select its protected Action")
+        guard case .toolCall(let call) = enabled.output else {
+            Issue.record("Listening policy must select its protected Tool")
             await agent.stop()
             return
         }
-        #expect(call.actionPath.description == "Speech.Listening.update")
-        #expect(call.parameters["enabled"] == "true")
+        #expect(call.toolPath == "Speech.Listening.update")
+        #expect(call.arguments["enabled"] == "true")
+        #expect(enabled.roundID == nil)
         #expect(enabled.inputMetadata.generation == ui.home.listeningRequests.generation.uuidString)
         try await agent.pause()
         await #expect(throws: UIRequestError.unavailable) {
@@ -747,19 +749,20 @@ extension LiveRuntimeTests {
         try await agent.start()
         var outputs = agent.outputs.makeAsyncIterator()
         try await ui.home.listeningRequests.submitControl(.setEnabled(true))
-        _ = await outputs.next()
-        _ = await outputs.next()
+        let enabled = try #require(await outputs.next())
+        guard case .toolCall(let enableCall) = enabled.output else { throw HarnessError.invalidTransition }
+        #expect(enableCall.toolPath == "Speech.Listening.update")
         ui.invalidate()
         try await agent.pause()
         try await agent.stopListening(sessionID: "listening-revoke")
         var disabled = try #require(await outputs.next())
         while case .communication = disabled.output { disabled = try #require(await outputs.next()) }
-        guard case .actionCall(let call) = disabled.output else {
-            Issue.record("Revocation must select the protected listening Action")
+        guard case .toolCall(let call) = disabled.output else {
+            Issue.record("Revocation must select the protected listening Tool")
             await agent.stop()
             return
         }
-        #expect(call.parameters["enabled"] == "false")
+        #expect(call.toolPath == "Speech.Listening.update" && call.arguments["enabled"] == "false")
         await #expect(throws: UIRequestError.unavailable) {
             try await ui.home.listeningRequests.submitControl(.setEnabled(true))
         }
@@ -812,12 +815,12 @@ extension LiveRuntimeTests {
         try await ui.home.listeningRequests.submitControl(.setEnabled(false))
         var outputs = agent.outputs.makeAsyncIterator()
         let disabled = try #require(await outputs.next())
-        guard case .actionCall(let call) = disabled.output else {
-            Issue.record("The retired enable must not emit a listening Action")
+        guard case .toolCall(let call) = disabled.output else {
+            Issue.record("The retired enable must not emit a listening Tool")
             await agent.stop()
             return
         }
-        #expect(call.parameters["enabled"] == "false")
+        #expect(call.toolPath == "Speech.Listening.update" && call.arguments["enabled"] == "false")
         await agent.stop()
         await ui.stop()
     }

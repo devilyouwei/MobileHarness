@@ -336,6 +336,7 @@ extension AssistantRecordStore {
             request.messageID = preview.id
             request.historyOrder = preview.position
             request.response = preview.response
+            request.replyTruncation = preview.replyTruncation
             request.state = try Self.state(preview.state)
             request.isObservation = preview.isObservation
             turn.modelRequests = [request]

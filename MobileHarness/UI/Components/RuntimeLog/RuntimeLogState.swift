@@ -3,6 +3,8 @@ import Observation
 
 /// UI-owned values. The host maps execution results into these display fields.
 public struct ActionActivityItem: Identifiable, Equatable, Sendable {
+    public static let controlChannel = "Control"
+
     public struct Execution: Equatable, Sendable {
         public enum Phase: String, Sendable { case queued, running, cancelling, succeeded, failed, cancelled }
         public let phase: Phase
@@ -70,9 +72,16 @@ public final class RuntimeLogState: RuntimeLogWriting {
     public internal(set) var selectedChannel: String?
     public internal(set) var selectedFilter: ExecutionLogFilter = .all
     public internal(set) var showsInternalActions = false
-    public private(set) var items: [ActionActivityItem] = []
+    private var actionRecords: [ActionActivityItem] = []
+    private var controlRecords: [ActionActivityItem] = []
+    public var items: [ActionActivityItem] {
+        guard !controlRecords.isEmpty else { return actionRecords }
+        return (actionRecords + controlRecords).sorted { $0.execution.admittedAt < $1.execution.admittedAt }
+    }
     public private(set) var revision: UInt64?
-    public private(set) var evictedCount: UInt64 = 0
+    private var actionEvictions: UInt64 = 0
+    private var controlEvictions: UInt64 = 0
+    public var evictedCount: UInt64 { actionEvictions &+ controlEvictions }
     public internal(set) var observationUnavailable = false
     public private(set) var issues: [ExecutionIssue] = []
     public private(set) var issueEvictions: UInt64 = 0
@@ -105,7 +114,8 @@ public final class RuntimeLogState: RuntimeLogWriting {
     }
 
     public var hasRecords: Bool {
-        !items.isEmpty || !agentEvents.isEmpty || !issues.isEmpty || !decisions.isEmpty
+        !actionRecords.isEmpty || !controlRecords.isEmpty || !agentEvents.isEmpty || !issues.isEmpty
+            || !decisions.isEmpty
     }
     public var sources: [String] {
         Array(
@@ -190,20 +200,30 @@ public final class RuntimeLogState: RuntimeLogWriting {
     func replace(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64) {
         guard self.revision == nil || revision > self.revision! else { return }
         self.revision = revision
-        self.items = records
-        if let selectedChannel, !records.contains(where: { $0.channel == selectedChannel }) {
+        actionRecords = records
+        if let selectedChannel, !actionChannels.contains(selectedChannel) {
             self.selectedChannel = nil
         }
-        self.evictedCount = evictedCount
+        actionEvictions = evictedCount
         dismissed.formIntersection(Set(records.map(\.id)))
     }
+
+    private func recordControl(_ item: ActionActivityItem) {
+        guard !controlRecords.contains(where: { $0.id == item.id }) else { return }
+        if controlRecords.count == 100 {
+            controlRecords.removeFirst()
+            controlEvictions &+= 1
+        }
+        controlRecords.append(item)
+    }
+
     public func dismiss(_ id: String) {
-        guard items.contains(where: { $0.id == id && !$0.isActive }) else { return }
+        guard actionRecords.contains(where: { $0.id == id && !$0.isActive }) else { return }
         dismissed.insert(id)
     }
     public func summaries(at now: Date) -> [ActionChannelSummary] {
         let channels = Dictionary(
-            grouping: items.filter { showsInternalActions || !$0.isInternal || $0.isFailure }, by: \.channel)
+            grouping: actionRecords.filter { showsInternalActions || !$0.isInternal || $0.isFailure }, by: \.channel)
         return channels.values.compactMap { group in
             let active = group.filter(\.isActive)
             let running = active.filter { $0.execution.phase != .queued }
@@ -237,6 +257,7 @@ public final class RuntimeLogState: RuntimeLogWriting {
         case .agent(let event): recordAgentEvent(event)
         case .actions(let revision, let records, let evictedCount):
             replace(revision: revision, records: records, evictedCount: evictedCount)
+        case .agentControl(let record): recordControl(record)
         case .decision(let decision): recordDecision(decision)
         case .issue(let issue): recordIssue(issue)
         case .observationUnavailable: observationUnavailable = true
@@ -285,6 +306,7 @@ public struct StateVariableItem: Identifiable, Sendable, Equatable {
 public enum RuntimeLogEvent: Sendable {
     case agent(AgentRuntimeLogItem)
     case actions(revision: UInt64, records: [ActionActivityItem], evictedCount: UInt64)
+    case agentControl(ActionActivityItem)
     case decision(DecisionLogItem)
     case issue(ExecutionIssue)
     case observationUnavailable

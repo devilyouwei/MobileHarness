@@ -775,7 +775,23 @@ public actor AssistantHistoryStore {
 
     public func recordCoordination(_ evidence: AssistantInputCoordination, for id: String) async throws {
         try await updateTurn(id) {
-            $0.coordination = evidence
+            var updated = evidence
+            if let confirmed = $0.coordination, confirmed.interrupt == true {
+                updated.interrupt = true
+                updated.route = confirmed.route
+            }
+            $0.coordination = updated
+            return true
+        }
+        try await checkpoint(inputID: id)
+    }
+
+    public func recordConfirmedInputInterruption(_ cause: AssistantReplyTruncation.Cause, for id: String) async throws {
+        try await updateTurn(id) { turn in
+            var evidence = turn.coordination ?? .init(source: cause.source, capturedAt: cause.capturedAt)
+            evidence.interrupt = true
+            evidence.route = cause.route
+            turn.coordination = evidence
             return true
         }
         try await checkpoint(inputID: id)
@@ -812,11 +828,18 @@ public actor AssistantHistoryStore {
                 truncated = response
                 return false
             }
-            guard response != original else { return false }
             truncated = response
             requests[index].generatedResponse = original
             requests[index].response = response
             requests[index].replyTruncation = marker
+            if requests[index].state == .completed {
+                requests[index].state = .interrupted
+                requests[index].finishReason = "interrupted"
+            }
+            if index == requests.indices.last, turn.state == .completed {
+                turn.state = .interrupted
+                turn.finishReason = "interrupted"
+            }
             turn.modelRequests = requests
             turn.response = requests.map(\.response).joined()
             return true

@@ -1,4 +1,5 @@
 import AgentCore
+import Foundation
 import FunctionContracts
 import UI
 
@@ -96,6 +97,44 @@ private struct ActionActivityMapping {
 }
 
 extension ActionActivityItem {
+    init(
+        controlAlias: String, callID: String, source: String, inputID: String, arguments: [String: String],
+        startedAt: Date, endedAt: Date, outcome: Result<ActionCompletion, any Error>, language: AppLanguage
+    ) {
+        let phase: Execution.Phase
+        let status: String
+        let issues: [String]
+        let output: String?
+        switch outcome {
+        case .success(let completion):
+            phase = .succeeded
+            status = language.text("Completed")
+            issues = []
+            if case .completed = completion {
+                output = language.text("Completed (no return value)")
+            } else {
+                let response = try? ToolResponse.response(completion, policy: .returning, callID: callID)
+                output = response.map { ActionExecutionRecord.logPreview($0.value, maximumUTF8Bytes: 16_384) }
+            }
+        case .failure(is CancellationError):
+            phase = .cancelled
+            status = language.text("Cancelled")
+            issues = []
+            output = nil
+        case .failure(let error):
+            phase = .failed
+            status = language.text("Execution failed")
+            issues = [ActionExecutionRecord.logPreview(String(describing: error), maximumUTF8Bytes: 2048)]
+            output = nil
+        }
+        self.init(
+            id: callID, title: controlAlias, channel: Self.controlChannel, status: status,
+            issueDescriptions: issues,
+            execution: .init(phase: phase, admittedAt: startedAt, startedAt: startedAt, endedAt: endedAt),
+            source: source, inputID: inputID, parameters: ActionExecutionRecord.logParameters(arguments), output: output
+        )
+    }
+
     public init(execution: ActionExecutionRecord) {
         self.init(execution: execution, language: .english)
     }

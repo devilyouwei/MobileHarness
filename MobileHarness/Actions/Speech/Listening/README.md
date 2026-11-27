@@ -65,4 +65,4 @@ VoiceCaptureRecovery 拥有单 worker 和一个合并的最新故障槽；重复
 
 ## 播放时刻事实
 
-VoiceNativeEffects 使用 `AudioInputOutput.playStream` 的首块调度回调，通过 `playbackChanged(audioID, active, time)` 发布逻辑播放生命周期。VoiceSessionCoordinator 为每次 `speak` 登记独立控制器，并在首块 PCM 调度前通过 `preparePlayback(audioID)` 登记音频句柄。Gateway 定向投递的 `ActionControl` 按 `executionID` 命中生命周期控制器。独立的 `Speech.Playback.setVolume` 按执行所有者和可选目标 ID 修改音量。暂停保留逻辑播放身份和音频租约，实际有声区间由 PlatformKit 更新。清理加入开始发布任务并回报终态。
+VoiceNativeEffects 使用 `AudioInputOutput.playStream` 的首块调度回调，通过 `playbackChanged(audioID, active, time)` 发布逻辑播放生命周期。VoiceSessionCoordinator 为每次 `speak` 登记独立控制器，并在首块 PCM 调度前通过 `preparePlayback(audioID)` 登记音频句柄。Gateway 定向投递的 `ActionControl` 按 `executionID` 命中生命周期控制器。独立 Tool `Speech.Playback.setVolume` 按执行所有者和可选目标 ID 修改音量，同一实例取消已被更高序号覆盖的更新。暂停保留逻辑播放身份和音频租约，实际有声区间由 PlatformKit 更新。清理加入开始发布任务并回报终态。

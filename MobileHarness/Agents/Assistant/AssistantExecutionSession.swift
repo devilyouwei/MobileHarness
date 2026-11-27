@@ -77,7 +77,7 @@ public actor AssistantExecutionSession {
                     try await self.performInterruption(sessionID: session, id: id)
                 }
                 await island.bind { operation, parameters, session in
-                    let result = try await consumer.executeInternal(
+                    let result = try await consumer.callInternalTool(
                         .init(
                             source: .assistant, context: .init(sessionID: session, source: "assistant"),
                             output: .toolCall(
@@ -111,7 +111,12 @@ public actor AssistantExecutionSession {
                             agent.outputs, contracts: AgentContracts.communication
                         ) { envelope in
                             do {
-                                let outcome = try await consumer.execute(envelope)
+                                let outcome: OutputExecutionResult
+                                if case .toolCall = envelope.output {
+                                    outcome = try await self.agent.executeNativeTool(envelope, using: consumer)
+                                } else {
+                                    outcome = try await consumer.execute(envelope)
+                                }
                                 if outcome.isError {
                                     await self.report(
                                         outcome.failure ?? outcome.tool?.value ?? "Agent execution failed")

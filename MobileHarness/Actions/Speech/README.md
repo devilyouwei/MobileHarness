@@ -24,7 +24,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 
 ## 函数与完成
 
-Speech.Playback.speak 等待音频排空；Speech.Listening.update 接收策略与反馈；内部 Speech.Listening.prepare 保留兼容缓存准备端口（首页不调用），启动根在 ready 前预载音效；内部 Speech.Detection.run 关联请求私有就绪与检测执行。后两者的函数工厂与同类入口同处业务目录，执行服务不定义注册入口。缺少可选能力时保留定义并明确失败。
+Speech.Playback.speak 等待音频排空；内部 Tool Speech.Listening.update 接收带版本的策略与录音反馈参数；内部 Speech.Listening.prepare 保留兼容缓存准备端口（首页不调用），启动根在 ready 前预载音效；内部 Speech.Detection.run 关联请求私有就绪与检测执行。后两者的函数工厂与同类入口同处业务目录，执行服务不定义注册入口。缺少可选能力时保留定义并明确失败。
 
 ## 接口与关键技术
 | 函数 | 解析与完成 | 静态 timeout |
@@ -33,7 +33,7 @@ Speech.Playback.speak 等待音频排空；Speech.Listening.update 接收策略�
 | setVolume | 音量为有限的 0…1。指定 executionID 设置对应播报的目标音量，省略时定位同一执行所有者的当前播报。 | 3 秒 |
 | update | enabled/paused 严格为 true/false；revision 为正 UInt64；可选启动反馈参数 | 90 秒 |
 
-`speak` 声明暂停、继续和单实例取消。每次执行登记独立的 `SpeechPlaybackControl`。暂停与继续等待播放器实际状态，播报结束后随执行清理控制器。`setVolume` 走独立的 `SpeechVolume` 执行 Channel，以独立 Action 结果确认目标增益已设置。目标由可信执行所有者与当前播报匹配；音量变更保持当前播放位置和暂停状态。
+`speak` 声明暂停、继续和单实例取消。每次执行登记独立的 `SpeechPlaybackControl`。暂停与继续等待播放器实际状态，播报结束后随执行清理控制器。`setVolume` 是独立 Tool，以单次结果确认目标增益已设置。目标由可信执行所有者与当前播报匹配，旧序号不能覆盖较新的增益；音量变更保持当前播放位置和暂停状态。
 
 speak 将所有参数解析错误映射为 missingAudio，并在播放前后检查取消。端点契约要求播放排空与音频租约释放；入口不把音频存在或写入设备当作已播放完成。函数没有文本合成参数，也没有播放缓存。
 

@@ -520,16 +520,16 @@ private struct PureFunctionFixture: CapabilityModule {
                 .init(id: UUID().uuidString, toolPath: value ?? path.description, arguments: ["mode": mode])),
             roundID: round)
     }
-    let success = try await consumer.executeInternal(envelope())
+    let success = try await consumer.callInternalTool(envelope())
     #expect(!success.isError && success.tool?.value == "accepted")
-    let failure = try await consumer.executeInternal(envelope("fail"))
+    let failure = try await consumer.callInternalTool(envelope("fail"))
     #expect(failure.isError && failure.tool?.isError == true)
     #expect(await agent.receipts.isEmpty)
     await #expect(throws: GatewayOutputConsumer.AdmissionError.internalCallRequired) {
-        try await consumer.executeInternal(envelope(round: UUID().uuidString))
+        try await consumer.callInternalTool(envelope(round: UUID().uuidString))
     }
     await #expect(throws: GatewayOutputConsumer.AdmissionError.internalCallRequired) {
-        try await consumer.executeInternal(envelope(path: "Fixture.Other.run"))
+        try await consumer.callInternalTool(envelope(path: "Fixture.Other.run"))
     }
     #expect(await log.values.count == 2)
     let ordinary = try await consumer.executeReturning(envelope())

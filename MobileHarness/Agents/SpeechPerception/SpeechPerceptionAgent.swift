@@ -70,7 +70,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         }
         await island.submit(content)
     }
-    private var resultInbox = ActionResultInbox()
     private let continuation: AsyncStream<OutputEnvelope>.Continuation
     private let recognition: any SpeechRecognitionCapability
     private let vad: any VoiceActivityCapability
@@ -103,9 +102,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private var onsetCandidatePublished = false
     private var oldestWindowBeforeOnset: Duration?
     private var listeningAdmissionEpoch = UUID()
-    private static let listeningAction = InternalAction(
-        domain: "Speech", module: "Listening", function: "update", channel: "Listening",
-        required: ["enabled", "paused", "revision"])
+    private static let listeningUpdate = InternalTool(
+        path: "Speech.Listening.update", required: ["enabled", "paused", "revision"])
     private var segmenter: VoiceActivitySegmenter?
     private var recognitionTurn: SpeechRecognitionTurn?
     private var publishedRecognitionFinal = false
@@ -178,7 +176,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             id: configuration.agentID, name: "Speech Perception",
             inputs: configuration.communication.inputKinds,
             outputs: mode == .speechAndSoundSource
-                ? [.communication, .actionCall, .toolCall, .control] : [.communication, .control],
+                ? [.communication, .toolCall, .control] : [.communication, .control],
             capabilities: try mode == .speechAndSoundSource
                 ? Self.runtimeCapabilities(configuration.capabilities) : configuration.capabilities)
         let stream = AsyncStream<OutputEnvelope>.makeStream(
@@ -188,9 +186,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     }
     public nonisolated static func runtimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(
-            internalActions: [listeningAction],
             internalTools: [
-                transcript, voiceState, finishTranscript,
+                transcript, voiceState, finishTranscript, listeningUpdate,
                 InternalTool(path: "Speech.Listening.prepare", required: ["pressed"]),
             ] + AgentIslandPublication.permissions)
     }
@@ -394,12 +391,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             recognitionSuspended = true
         }
         try emit(
-            .actionCall(
-                Self.listeningAction.call([
+            .toolCall(
+                Self.listeningUpdate.call([
                     "enabled": String(listeningPolicy.enabled), "paused": "false",
                     "revision": String(listeningPolicy.revision),
                 ])), input: command)
-        try emit(.control("agent.finished"), input: command)
         await refreshIsland()
         traceListening("policy.emitted")
     }
@@ -474,15 +470,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             throw CommunicationError.scopeClosed
         }
         guard !input.metadata.expired else { throw CommunicationError.expired }
-        if case .actionResult(let result) = input.payload {
-            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-                result.owner.agent == descriptor.id,
-                result.owner.sessionID == input.sessionID
-            else { throw CommunicationError.unauthorized }
-            try await prepareSignal(input)
-            resultInbox.accept(result)
-            return
-        }
         throw HarnessError.unsupportedInput
     }
     private func validateAudio(_ input: AgentInput) throws -> AudioInput {
@@ -1216,7 +1203,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     public func contextSnapshot() async throws -> AgentContext<SpeechPerceptionContextState> {
         try await contextRepository.snapshot()
     }
-    public func actionResults() -> [ActionResult] { resultInbox.results }
 }
 
 extension AgentInput {

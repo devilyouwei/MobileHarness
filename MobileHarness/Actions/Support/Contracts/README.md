@@ -2,7 +2,7 @@
 
 ## Dependency and consumers
 
-This existing target imports Foundation and Synchronization only, with no project-target dependency. Actions, Gateway, Agents/AgentCore and App consume its values without importing one another's implementation. Values describe facts and capability ports; they do not perform role authorization, device orchestration or lifecycle lookup.
+This target imports Foundation and Synchronization only, with no project-target dependency. Actions, Agents/AgentCore and App consume its values without importing one another's implementation. Values describe facts and capability ports; they do not perform role authorization, device orchestration or lifecycle lookup.
 
 ## Contract groups
 
@@ -13,10 +13,11 @@ This existing target imports Foundation and Synchronization only, with no projec
 | FunctionInput / FunctionInvocation / ActionExecutionContext | Invocation identity, source/session/input and opaque correlation, reporting and optional Sendable attachment. Cognitive Task/decision strings are opaque correlation, never permission. |
 | ActionExecutionDescriptor / ActionCatalogSnapshot | Immutable descriptions, call protocols and execution/return policies; no handler or mutation API. |
 | PreparedAction / ActionsExecutionPort | Effect-free prepare, one-use revision-bound credential, resources/budget, execute and discard. Root instances retain actual invocations privately. |
-| ActionExecutionEngine / ActionSignalBinding / ScheduledAction / ExecutionStart / ExecutionResult / ActionSchedulingError | Neutral Agent → Action invocation and Action → Agent feedback boundary: Gateway forwards through the Shell contract and binds endpoint validation and the feedback exit once; the Actions Shell implements it. |
+| ActionExecutionEngine / ActionSignalBinding / ScheduledAction / ExecutionStart / ExecutionResult / ActionSchedulingError | Neutral Agent → Action invocation and Action → Agent feedback boundary: App binds the Actions receiver and the Agents feedback adapter to transport. The Actions Shell owns execution and provides the management interface. |
+| ActionCallSignal / ToolCallSignal / CallReply / CallResultSignal | Per-lane call and round messages share an acknowledgment shape. Both return typed execution facts through the same result interface. |
 | CallRoundBoundary / CallLane / CallRoundSettlement | A round boundary belongs to one call lane and carries the Assistant-issued round ID and start or end scope. The End acknowledgement returns a settlement handle for that lane. |
 | ActionControl / ActionPauseControl / ActionControlReceipt / ActionExecutionStateChange | Discoverable instance lifecycle commands, optional pause/resume hooks, and independently correlated feedback. The scheduler owns single-instance cancel. Domain settings use ordinary Action calls. Execution identity, control identity, command order and state version remain separate. |
-| ActionExecutionRecord / ActionExecutionSnapshot | Read-only scheduling observation with canonical path, bounded parameter previews and actual completion evidence. |
+| ActionExecutionRecord / ActionExecutionSnapshot | Read-only scheduling observation with canonical path, bounded parameter previews and actual completion evidence. The argument preview formatter is also used for Agent-owned execution logs. |
 | ActionCompletion / ActionReport / ActionFailure | Real completion/value/activity/report, per-leaf partial effects and independent failure. |
 | ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
 | ActionRequestSlot | Per-request typed attachment/result, session/input admission, single completion/take and explicit close; not a global table or role authorization gate. |
@@ -38,7 +39,9 @@ Budget resolution validates the definition and uses dynamicTimeout before static
 
 ## Completion, failure and ownership
 
-`ActionSchedulingScope` identifies the group for execution, sealing and cancellation. Model rounds, standalone calls, Tasks and inputs remain distinct even if their ID strings match. The execution envelope derives its round ID from the round scope and its standalone call ID from the call scope. `ScheduledAction` reads its execution ID from the contained `FunctionInvocation`.
+`ActionSchedulingScope` identifies the group for execution, sealing and cancellation. Model rounds, Tasks and inputs remain distinct even if their ID strings match. The execution envelope derives its round ID from the round scope and carries the individual call ID separately. `ScheduledAction` reads its execution ID from the contained `FunctionInvocation`.
+
+`CallResultSignal` carries an `ExecutionResult` from the scheduled ledger or a `ToolExecutionResult` with the actual value or execution error. Both retain the execution ID and owner. Result delivery acknowledgment and execution status are separate. `ActionExecutionEventSignal` carries starts and instance control events through a separate contract.
 
 ActionReport holds at most 256 entries. Paths are nonempty up to 128 bytes; details hold at most 16 pairs, keys up to 64 bytes and values up to 512 bytes. Entry states are succeeded, failed, cancelled and notStarted. Independent execution failure is retained alongside prior child results. Producer failure codes are nonempty up to 64 bytes and some value initializers enforce preconditions; callers must provide valid identifiers.
 
@@ -48,7 +51,7 @@ Failure classification prefers actual producer/report failure over pure cancella
 
 ActionRequestSlot admits only matching request/session once. Completion is rejected before admission, after closure or after a prior result. take consumes the result/failure and closes; close releases retained content. Role permission is checked before Gateway, independently of this attachment's business scope.
 
-Prepared credentials are opaque to callers even though they travel as value types: only the owning root can resolve the retained UUID/catalog revision, and execution consumes it once. Cancellation/rejection/stop discards retained data. Gateway uses returned resource descriptors for arbitration; Actions rechecks live permits and business conditions. Result retries never reuse execution credentials.
+Prepared credentials are opaque to callers even though they travel as value types: only the owning root can resolve the retained UUID/catalog revision, and execution consumes it once. Cancellation/rejection/stop discards retained data. Actions uses resource descriptors for arbitration and rechecks live permits and business conditions. Result retries never reuse execution credentials.
 
 [Support algorithms](../README.md) · [Actions root](../../README.md) · [overall chain](../../../README.md)
 

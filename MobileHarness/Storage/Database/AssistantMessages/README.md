@@ -24,4 +24,4 @@ AssistantInputCoordination 的可选 members 保存实际发起批次的成员 I
 
 模型身份在标记实际发出的同一写入中保存，首轮及 ReACT 各自携带自己的模型身份和可用的执行信息。模型传输证据随完整日志清理，业务正文保留。
 
-打断后的回复结算按已发请求 ID 写入。Storage 校验 UTF-8 片段范围，按提交顺序拼接，重复片段只保留一次。`assistant_response_json` 在正文旁保存 `replyTruncation`（轮次及完成的 Action ID）和 `generatedResponse`（原始生成文本）。重复写入同一结果可重试，冲突结果拒绝。旧标记仍可读取，工具配对和 Action journal 保留原有记录。
+打断后的回复结算按已发请求 ID 写入。Storage 校验 UTF-8 片段范围，按提交顺序拼接，重复片段只保留一次。`assistant_response_json` 在正文旁保存 `replyTruncation`（轮次、完成的 Action ID、可选胜出来源与展示标记）和 `generatedResponse`（原始生成文本）。即使拼接结果与原文相同，仍保存打断证据并更新已完成的请求状态。关键词决策在匹配的实际 ASR 输入上合并进协调证据，保留采集与批次归属。后续协调更新保留已确认的打断决定。分页和详情读取这份证据。重复写入同一结果可重试，冲突结果拒绝。旧记录可读取，工具配对和 Action journal 保留。

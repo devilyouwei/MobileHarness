@@ -153,13 +153,14 @@ private actor CaptionEndpoint {
     var outputs = role.outputs.makeAsyncIterator()
     try await ui.home.listeningRequests.submitControl(.setEnabled(true))
     let envelope = try #require(await outputs.next())
-    guard case .actionCall(let call) = envelope.output else {
-        Issue.record("Consent must produce an authorized listening Action")
+    guard case .toolCall(let call) = envelope.output else {
+        Issue.record("Consent must produce an authorized listening Tool")
         await role.stop()
         await ui.stop()
         return
     }
-    let rawRevision = try #require(call.parameters["revision"])
+    #expect(call.toolPath == "Speech.Listening.update")
+    let rawRevision = try #require(call.arguments["revision"])
     let revision = try #require(UInt64(rawRevision))
     try await perception.captureEnded(revision: revision + 1, sessionID: "voice-root")
     try await perception.openCapture(sessionID: "capture")

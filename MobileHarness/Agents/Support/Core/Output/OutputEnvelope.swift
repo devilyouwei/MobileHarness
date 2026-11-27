@@ -15,9 +15,7 @@ public struct OutputEnvelope: Sendable {
     public let sequence: UInt64
     public let roundID: String?
     public let callID: String?
-    public let standaloneAction: Bool
     public var schedulingScope: ActionSchedulingScope {
-        if standaloneAction, let callID { return .standaloneCall(callID) }
         if let roundID { return .round(roundID) }
         if let taskScope { return .task(taskScope.id) }
         return .input(inputID)
@@ -30,7 +28,7 @@ public struct OutputEnvelope: Sendable {
         source: AgentID, context: ProcessingContext, output: AgentOutput, sequence: UInt64 = 0, roundID: String? = nil,
         callID: String? = nil, taskScope: AgentTaskScope? = nil, failure: AgentFailureDiagnostic? = nil,
         media: ImageInput? = nil, executionAttachment: (any Sendable)? = nil, resourceBindings: [String: String] = [:],
-        invocation: ActionInvocationSnapshot? = nil, standaloneAction: Bool = false
+        invocation: ActionInvocationSnapshot? = nil
     ) {
         if failure != nil {
             guard case .control(let value) = output, value.hasPrefix("agent.error:") else {
@@ -45,7 +43,6 @@ public struct OutputEnvelope: Sendable {
         self.failure = failure
         self.roundID = roundID
         self.callID = callID
-        self.standaloneAction = standaloneAction
         self.inputMetadata =
             context.provenance
             ?? InputMetadata(
@@ -73,7 +70,7 @@ extension OutputEnvelope {
         .init(
             source: source, context: context, output: output, sequence: sequence, roundID: roundID, callID: callID,
             taskScope: taskScope, failure: failure, media: media, executionAttachment: executionAttachment,
-            resourceBindings: bindings, invocation: invocation, standaloneAction: standaloneAction)
+            resourceBindings: bindings, invocation: invocation)
     }
 }
 

@@ -40,11 +40,11 @@ public struct GatewayOutputConsumer: Sendable {
         try await consume(envelope, .returningFeedback)
     }
     /// The caller consumes the native result; no ToolResult enters the Agent inbox.
-    @discardableResult public func executeDirect(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+    @discardableResult public func callTool(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         try await consume(envelope, .directReturn)
     }
     /// Gateway-authorized runtime presentation. Completion belongs to the caller, not the Agent inbox.
-    @discardableResult public func executeInternal(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
+    @discardableResult public func callInternalTool(_ envelope: OutputEnvelope) async throws -> OutputExecutionResult {
         try await consume(envelope, .internalCompletion)
     }
 }
@@ -248,8 +248,13 @@ public actor OutputGateway {
             guard envelope.source == id else { throw CommunicationError.unauthorized }
             try await manager.validate(id, incarnation: incarnation, sessionID: envelope.sessionID)
             if mode == .returningFeedback || mode == .directReturn {
-                guard case .toolCall(let call) = envelope.output, await returnsToolResult(for: call) else {
+                guard case .toolCall(let call) = envelope.output else {
                     throw GatewayOutputConsumer.AdmissionError.returningFeedbackRequired
+                }
+                if mode == .returningFeedback {
+                    guard await returnsToolResult(for: call) else {
+                        throw GatewayOutputConsumer.AdmissionError.returningFeedbackRequired
+                    }
                 }
             }
             if mode == .internalCompletion {
@@ -257,7 +262,7 @@ public actor OutputGateway {
                     internalTools.contains(call.toolPath)
                 else { throw GatewayOutputConsumer.AdmissionError.internalCallRequired }
             }
-            return try await AgentToolFeedbackDelivery.$internalCompletion.withValue(
+            return try await AgentToolFeedbackDelivery.$returnsToCaller.withValue(
                 mode == .internalCompletion || mode == .directReturn
             ) {
                 try await OutputProducerBinding.$identity.withValue(.init(agent: id, incarnation: incarnation)) {
@@ -946,8 +951,8 @@ public actor OutputGateway {
                         guard await requests.deliverActionResult(receipt) == .accepted else {
                             throw CommunicationError.scopeClosed
                         }
-                    case .toolCall:
-                        _ = try await requests.deliverToolResult(
+                    case .toolCall where !AgentToolFeedbackDelivery.returnsToCaller:
+                        try await requests.deliverToolResult(
                             .init(
                                 callID: callID, value: failure, isError: true,
                                 failureCode: code?.rawValue ?? "handlerFailed", roundID: roundID,
@@ -1077,11 +1082,6 @@ public actor OutputGateway {
         case .action(let token):
             do {
                 try Task.checkCancellation()
-                if envelope.standaloneAction {
-                    guard envelope.roundID == nil, envelope.taskScope == nil,
-                        envelope.callID != nil
-                    else { throw ActionExecutionError.invalidInvocation }
-                }
                 let owner = try await executionOwner(envelope)
                 if let scope = envelope.taskScope {
                     try await manager.registerExecution(envelope.schedulingScope, scope: scope, agent: envelope.source)
@@ -1108,26 +1108,7 @@ public actor OutputGateway {
                 } else {
                     feedback = .none
                 }
-                do {
-                    try await actions.dispatch(
-                        token, envelope: envelope, owner: owner, feedback: feedback, lease: lease)
-                } catch {
-                    if envelope.standaloneAction {
-                        let report = ActionReport.failureReport(for: error)
-                        _ = await requests.deliverActionResult(
-                            .init(
-                                executionID: nil, owner: owner, path: token.actionPath,
-                                causality: SignalCausality(envelope: envelope),
-                                status: report.isCancellationOnly ? .cancelled : .failed,
-                                effect: error as? SignalTransportError == .expired ? .unknown : .notStarted,
-                                completion: .report(report.agentValue),
-                                failure: report.isCancellationOnly ? .cancelled : .handlerFailed,
-                                callID: envelope.callID))
-                        await actions.cancel(envelope)
-                    }
-                    throw error
-                }
-                if envelope.standaloneAction { try await actions.finish(envelope) }
+                try await actions.dispatch(token, envelope: envelope, owner: owner, feedback: feedback, lease: lease)
             } catch {
                 // Invocation/availability failures reject only this call. Lifecycle and
                 // structural scheduling failures still close the owning Action tree.
@@ -1137,7 +1118,7 @@ public actor OutputGateway {
                 throw error
             }
         case .actionControl(let control):
-            guard envelope.roundID == nil, !envelope.standaloneAction else {
+            guard envelope.roundID == nil else {
                 throw CommunicationError.unauthorized
             }
             let owner = try await executionOwner(envelope)

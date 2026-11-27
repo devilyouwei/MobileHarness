@@ -2,7 +2,6 @@ import AgentCore
 import Foundation
 import FunctionContracts
 import Gateway
-import Synchronization
 
 extension AgentObservationAccess {
     @MainActor public func open(
@@ -10,26 +9,22 @@ extension AgentObservationAccess {
         observeEvent: @escaping @Sendable (AgentInput) async throws -> Void
     ) throws -> AgentObservationSession {
         let manager = AgentManager()
-        let receiver = AgentResultReceiver()
-        let scope = try access.open(
-            configuration: .init(
-                engine: DetachedActionExecution(),
-                deliverResult: { await receiver.deliver($0) }))
+        let scope = try access.open()
+        let execution = DetachedActionExecution()
         let input = InputGateway(
             manager: manager, policy: policy, signals: scope.capabilities.signals,
             admission: scope.capabilities.admission)
-        receiver.bind(input)
         let emptyCatalog = ActionCatalogSnapshot(revision: UUID(), entries: [])
         let output = OutputGateway(
             manager: manager, requests: input, catalog: emptyCatalog,
-            execution: scope.capabilities.execution, policy: policy,
+            execution: execution, policy: policy,
             observedContracts: observedContracts, observeEvent: observeEvent, admission: scope.capabilities.admission,
             sink: { _ in })
         return AgentObservationSession(
             scope: scope,
             capabilities: .init(
                 observations: self, manager: manager,
-                input: input, output: output, execution: scope.capabilities.execution))
+                input: input, output: output, execution: execution))
     }
     @MainActor public func close(_ session: AgentObservationSession) async throws {
         for descriptor in await session.capabilities.manager.descriptors() {
@@ -41,12 +36,11 @@ extension AgentObservationAccess {
 }
 
 @MainActor public final class AgentGatewayAssembly {
-    public let configuration: GatewayConfiguration
     private let manager: AgentManager
     private let input: InputGateway
     private let cognitive: AgentGatewayConfiguration
     public init(
-        signals: SignalTransport, admission: GatewayAdmission, engine: any ActionExecutionEngine,
+        signals: SignalTransport, admission: GatewayAdmission,
         configuration: AgentGatewayConfiguration
     ) {
         let manager = AgentManager()
@@ -59,28 +53,23 @@ extension AgentObservationAccess {
         self.manager = manager
         self.input = input
         self.cognitive = configuration
-        self.configuration = GatewayConfiguration(
-            engine: engine, deliverResult: { await input.deliverActionResult($0.agentValue) },
+    }
+    public func bind(
+        ports: GatewayCapabilities, observations: GatewayObservationAccess, engine: any ActionExecutionHost
+    ) async throws -> AgentGatewayCapabilities {
+        let input = self.input
+        let execution = try await ActionExecutionTransport.connect(
+            ports: ports, engine: engine,
+            receiveActionResult: { try await input.receiveActionResult($0, deadline: $1) },
             deliverStart: { await input.deliverActionStart($0) },
             deliverControl: { await input.deliverActionControl($0) })
-    }
-    public func bind(ports: GatewayCapabilities, observations: GatewayObservationAccess) -> AgentGatewayCapabilities {
         let output = OutputGateway(
             manager: manager, requests: input, catalog: cognitive.catalog,
-            execution: ports.execution, policy: cognitive.policy,
+            execution: execution, policy: cognitive.policy,
             actionFeedback: .terminal, observedContracts: cognitive.observedContracts,
             observeEvent: cognitive.observeEvent, admission: ports.admission, sink: cognitive.sink)
         return .init(
             observations: .init(access: observations), manager: manager, input: input,
-            output: output, execution: ports.execution)
-    }
-}
-
-private final class AgentResultReceiver: Sendable {
-    private let input = Mutex<InputGateway?>(nil)
-    func bind(_ value: InputGateway) { input.withLock { $0 = value } }
-    func deliver(_ result: ExecutionResult) async -> ActionResultDelivery {
-        guard let target = input.withLock({ $0 }) else { return .closed }
-        return await target.deliverActionResult(result.agentValue)
+            output: output, execution: execution)
     }
 }

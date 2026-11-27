@@ -82,7 +82,11 @@
                         value.outputs, contracts: AgentContracts.communication
                     ) { envelope in
                         do {
-                            _ = try await consumer.execute(envelope)
+                            if case .toolCall = envelope.output {
+                                try await consumer.callTool(envelope)
+                            } else {
+                                try await consumer.execute(envelope)
+                            }
                         } catch is CancellationError {
                             throw CancellationError()
                         } catch {

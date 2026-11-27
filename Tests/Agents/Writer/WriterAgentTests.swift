@@ -333,13 +333,23 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     try await manager.register(writer)
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
-    let input = InputGateway(manager: manager, policy: policy)
+    let gateway = await GatewayContainer()
+    let transport = try await gateway.configure()
+    let input = InputGateway(
+        manager: manager, policy: policy, signals: transport.signals, admission: transport.admission)
     let assembly = try BehaviorAssembly(capabilityModules: [
         ArtifactsModule(artifacts: artifacts), IslandModule(island: islandService),
     ])
+    let actions = await ActionsContainer()
+    try await actions.configure(assembly)
+    let engine = try await actions.configureExecution(resources: [])
+    let toolTransport = try await ActionExecutionTransport.connect(ports: transport, engine: engine)
+    try await actions.start()
+    try await gateway.start()
     let failureOutput = WriterFailureOutputProbe()
     let output = await OutputGateway(
-        manager: manager, requests: input, tools: assembly.tools, policy: policy,
+        manager: manager, requests: input, catalog: try await actions.catalog(),
+        execution: toolTransport, policy: policy, admission: transport.admission,
         sink: { await failureOutput.append($0) })
     try await output.bindCommunications(records.agentMessages)
     await writer.bind(try await output.consumer(for: writer), messaging: try await output.messaging(for: .writer))
@@ -350,6 +360,15 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     _ = try await output.consumer(for: sink)
     let messaging = WriterTestRequester(
         port: try await output.messaging(for: .assistant), receiver: sink, records: records)
+    func stopFixture() async throws {
+        await writer.stop()
+        await messaging.close()
+        await output.shutdown()
+        try await gateway.stop()
+        try await actions.stop()
+        try await records.shutdown()
+        await islandState.stop()
+    }
     let report = try await sendWriterMessage(message, through: messaging, records: records, session: session)
     #expect(report.rejected.isEmpty)
     let deadline = ContinuousClock.now.advanced(by: .seconds(20))
@@ -417,6 +436,8 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
                 )
                 await messaging.close()
                 await output.shutdown()
+                try await gateway.stop()
+                try await actions.stop()
                 try await records.shutdown()
                 await islandState.stop()
                 return
@@ -482,11 +503,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(checkpoint.draft.files["document.md"] == expectedSource)
         #expect(try await workspace.list().isEmpty)
         #expect(await model.requests == 5)
-        await writer.stop()
-        await messaging.close()
-        await output.shutdown()
-        try await records.shutdown()
-        await islandState.stop()
+        try await stopFixture()
         return
     }
     if mode == 13 {
@@ -495,11 +512,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(try await workspace.inventory().isEmpty)
         #expect(await startup.shown == false)
         #expect(await model.requests == 2)
-        await writer.stop()
-        await messaging.close()
-        await output.shutdown()
-        try await records.shutdown()
-        await islandState.stop()
+        try await stopFixture()
         return
     }
     if mode == 5 {
@@ -523,11 +536,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(try await records.writerExecutions.request(retry.id, agent: "writer").status == "completed")
         let roots = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("writer").path)
         #expect(roots == [project])
-        await writer.stop()
-        await messaging.close()
-        await output.shutdown()
-        try await records.shutdown()
-        await islandState.stop()
+        try await stopFixture()
         return
     }
     if [3, 4, 6].contains(mode) {
@@ -551,11 +560,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(
             try await records.writerExecutions.request(scope.id, agent: "writer").status
                 == (mode == 4 ? "interrupted" : "failed"))
-        await writer.stop()
-        await messaging.close()
-        await output.shutdown()
-        try await records.shutdown()
-        await islandState.stop()
+        try await stopFixture()
         return
     }
     if cancels {
@@ -566,11 +571,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(saved.status == "cancelled" && saved.cancellationReason == reason)
         #expect(await model.requests == 1)
         #expect(try await workspace.list().isEmpty)
-        await writer.stop()
-        await messaging.close()
-        await output.shutdown()
-        try await records.shutdown()
-        await islandState.stop()
+        try await stopFixture()
         return
     }
     #expect(result.status == .succeeded, "\(resultText)")
@@ -626,11 +627,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         #expect(failure.details["validationCode"] == "invalidParameters")
         #expect(failure.details["executed"] == "false")
     }
-    await writer.stop()
-    await messaging.close()
-    await output.shutdown()
-    try await records.shutdown()
-    await islandState.stop()
+    try await stopFixture()
 }
 
 @Test(.actionCatalog) func artifactServiceIsolatesProjectsAndRejectsCrossTaskStreams() async throws {

@@ -490,7 +490,7 @@ func directIslandResultMustNotBecomeAssistantInputDuringAReply() async throws {
     let consumer = try await gateway.consumer(for: agent)
     try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("Photo review pending")))
     try await specialistEventually { await agent.status().queuedInputs == 0 }
-    let result = try await consumer.executeInternal(
+    let result = try await consumer.callInternalTool(
         .init(
             source: .assistant, context: .init(sessionID: "independent-island", source: "assistant"),
             output: .toolCall(

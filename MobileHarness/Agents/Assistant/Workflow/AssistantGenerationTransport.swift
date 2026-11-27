@@ -1,8 +1,9 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import Gateway
 
-/// One ordered output reader admits Actions immediately; each sealed round joins its own tools and effects.
+/// One output reader admits calls; a round joins only its own tools and effects.
 actor AssistantGenerationTransport {
     private let signalDispatcher: SignalChannelDispatcher<OutputEnvelope>?
     private let contracts: CommunicationContracts?
@@ -10,9 +11,10 @@ actor AssistantGenerationTransport {
     private nonisolated let failures: AsyncStream<any Error>
     private let failureContinuation: AsyncStream<any Error>.Continuation
     private var tools: [String: [String: Task<Void, Error>]] = [:]
+    private var independentTools: [String: Task<Void, Error>] = [:]
     private var toolSeals: [String: Task<Void, Error>] = [:]
     private var seals: [String: Task<Void, Error>] = [:]
-    private let toolRequests = SignalWorkPool()
+    private var activeToolCount = 0
     private nonisolated let directSignals = AsyncStream<OutputEnvelope>.makeStream(
         bufferingPolicy: .bufferingOldest(128))
     private var closed = false
@@ -20,9 +22,9 @@ actor AssistantGenerationTransport {
     init(contracts: CommunicationContracts?, dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void) {
         self.contracts = contracts
         if let contracts {
-            let channels = contracts.registered.compactMap(\.channel) + [GatewayExecution.actionCallChannel]
+            let channels = contracts.registered.compactMap(\.channel) + [ActionCallSignal.channel]
             signalDispatcher = SignalChannelDispatcher(
-                channels: Set(channels), capacities: [GatewayExecution.actionCallChannel: 256])
+                channels: Set(channels), capacities: [ActionCallSignal.channel: 256])
         } else {
             signalDispatcher = nil
         }
@@ -101,9 +103,9 @@ actor AssistantGenerationTransport {
                 try submitDirect(envelope)
                 return
             case .actionCall, .roundFinished, .control("assistant.finished"), .control("agent.finished"):
-                channel = GatewayExecution.actionCallChannel
+                channel = ActionCallSignal.channel
             case .rejectedCall(let rejection) where rejection.kind == .action:
-                channel = GatewayExecution.actionCallChannel
+                channel = ActionCallSignal.channel
             default:
                 channel = nil
             }
@@ -128,18 +130,42 @@ actor AssistantGenerationTransport {
         default: isTool = false
         }
         let dispatch = dispatch
-        if isTool, let round = envelope.roundID {
-            guard tools.values.reduce(0, { $0 + $1.count }) < 128 else { throw HarnessError.queueFull }
-            let task = try await toolRequests.submit {
-                try await dispatch(envelope)
+        if isTool {
+            let id = UUID().uuidString
+            let round = envelope.roundID
+            guard activeToolCount < 128 else { throw HarnessError.queueFull }
+            if round != nil, tools.values.reduce(0, { $0 + $1.count }) >= 128 {
+                throw HarnessError.queueFull
             }
-            tools[round, default: [:]][UUID().uuidString] = task
+            activeToolCount += 1
+            let task = Task {
+                defer {
+                    activeToolCount -= 1
+                    if round == nil { independentTools[id] = nil }
+                }
+                do {
+                    try Task.checkCancellation()
+                    try await dispatch(envelope)
+                } catch {
+                    if round == nil, !closed || !(error is CancellationError) {
+                        failure = error
+                        failureContinuation.yield(error)
+                    }
+                    throw error
+                }
+            }
+            if let round {
+                tools[round, default: [:]][id] = task
+            } else {
+                independentTools[id] = task
+            }
         } else if case .roundFinished(let round) = envelope.output {
             try seal(round, envelope: envelope)
         } else {
             try await dispatch(envelope)
         }
     }
+
     private func submitDirect(_ envelope: OutputEnvelope) throws {
         guard case .enqueued = directSignals.continuation.yield(envelope) else { throw HarnessError.queueFull }
     }
@@ -169,16 +195,20 @@ actor AssistantGenerationTransport {
         closed = true
         for task in Array(seals.values) { try await task.value }
         for task in tools.values.flatMap({ $0.values }) { try await task.value }
+        for task in Array(independentTools.values) { try await task.value }
         if let failure { throw failure }
     }
     private func cancel() async {
         closed = true
-        let pending = Array(seals.values) + Array(toolSeals.values) + tools.values.flatMap { Array($0.values) }
+        let pending =
+            Array(seals.values) + Array(toolSeals.values) + tools.values.flatMap { Array($0.values) }
+            + Array(independentTools.values)
         for task in pending { task.cancel() }
         for task in pending { _ = await task.result }
         toolSeals.removeAll()
         seals.removeAll()
         tools.removeAll()
+        independentTools.removeAll()
         failureContinuation.finish()
     }
 }

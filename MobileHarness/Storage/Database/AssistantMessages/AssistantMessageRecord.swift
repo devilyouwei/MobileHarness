@@ -81,6 +81,7 @@ public struct AssistantToolPreview: Sendable {
 }
 public struct AssistantMessagePreview: Sendable {
     public var coordination: AssistantInputCoordination? = nil
+    public var replyTruncation: AssistantReplyTruncation? = nil
     public var toolCalls: [AssistantToolPreview] = []
     public var metadata: [String: String] = [:]
     public var ordinal: Int = 0

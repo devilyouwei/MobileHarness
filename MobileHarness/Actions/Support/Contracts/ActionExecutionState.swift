@@ -54,6 +54,22 @@ public struct ActionExecutionRecord: Identifiable, Equatable, Sendable {
         self.failure = failure
         self.completion = completion
     }
+
+    private static let credentialFields: Set<String> = [
+        "key", "apikey", "token", "accesstoken", "refreshtoken", "authorization", "password",
+        "secret", "clientsecret", "credential", "credentials", "cookie",
+    ]
+
+    public static func logParameters(_ parameters: [String: String]) -> [String: String] {
+        parameters.reduce(into: [:]) { result, entry in
+            let (name, value) = entry
+            let normalized = name.lowercased().filter(\.isLetter)
+            result[name] =
+                credentialFields.contains(normalized)
+                ? "[redacted]" : logPreview(value, maximumUTF8Bytes: 2048)
+        }
+    }
+
     /// Bound visible payloads by UTF-8 size without emitting a broken code point.
     public static func logPreview(_ value: String, maximumUTF8Bytes: Int) -> String {
         let suffix = "…[truncated]"

@@ -634,6 +634,8 @@ public enum VoiceReplyCancellation {
                 return
             }
             await previousPause?.value
+            try Task.checkCancellation()
+            guard revision == listeningRevision else { return }
             if voiceGeneration == nil {
                 startupTask?.cancel()
                 let id = UUID().uuidString
@@ -655,7 +657,7 @@ public enum VoiceReplyCancellation {
                 }
                 return
             }
-            guard revision == listeningRevision, let generation = voiceGeneration else { return }
+            guard let generation = voiceGeneration else { return }
             if paused {
                 listeningPause = Task { [weak self] in
                     guard let self else { return }
@@ -872,7 +874,8 @@ public enum VoiceReplyCancellation {
                 throw ActionHostError.unauthorized
             }
             if let lastSequence = active.volumeSequence, invocation.context.sequence <= lastSequence {
-                throw ActionHostError.outOfOrder
+                // A newer gain has already reached the same playback.
+                throw CancellationError()
             }
             try active.control.setVolume(volume)
             activeSpeechPlayback?.volumeSequence = invocation.context.sequence

@@ -436,7 +436,7 @@ import Foundation
                             (Text(verbatim: turn.dateReport + " · ").foregroundStyle(.secondary)
                                 + Text(verbatim: turn.stateReport(appCopy)).foregroundStyle(turn.state.color))
                                 .font(.caption)
-                            if turn.coordination?.interrupt == true {
+                            if turn.coordination?.effectiveInterrupt == true || turn.replyTruncation?.cause != nil {
                                 typeBadge(appCopy.text("Interrupt decision"), color: .red)
                             }
                             if turn.isReACT == true {
@@ -649,25 +649,37 @@ import Foundation
                     selectable(turn.displayInput)
                 }
                 Section(appCopy.text("Assistant Response")) {
-                    if !turn.raw.isEmpty {
-                        selectable(turn.raw)
+                    if !turn.displayedResponse.isEmpty {
+                        selectable(turn.displayedResponse)
                     } else if (turn.toolCalls ?? []).isEmpty {
                         Text(turn.responseStatus(appCopy)).foregroundStyle(.secondary)
                     }
                     ForEach(turn.toolCalls ?? []) { call in selectable(call.responseReport(appCopy)) }
                 }
+                if let cause = turn.replyTruncation?.cause {
+                    Section(appCopy.text("Interrupt decision")) {
+                        Text(appCopy.format("Interrupt: %@", interruptReport(true)))
+                        Text(appCopy.text("This reply was interrupted.")).font(.caption).foregroundStyle(.secondary)
+                        selectable(appCopy.text("Source: ") + cause.source)
+                        selectable(appCopy.text("Capture timestamp: ") + cause.capturedAt)
+                        selectable(appCopy.text("Decision route: ") + appCopy.text(cause.route))
+                    }
+                }
                 if let evidence = turn.coordination {
-                    Section(appCopy.text(evidence.interrupt == nil ? "Input source" : "Interrupt decision")) {
-                        if let interrupt = evidence.interrupt {
+                    let member = evidence.interruptingMember
+                    Section(appCopy.text(evidence.effectiveInterrupt == nil ? "Input source" : "Interrupt decision")) {
+                        if let interrupt = evidence.effectiveInterrupt {
                             Text(appCopy.format("Interrupt: %@", interruptReport(interrupt)))
                             if interrupt {
                                 Text(appCopy.text("This input interrupted the reply in progress."))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                        selectable(appCopy.text("Source: ") + evidence.source)
-                        selectable(appCopy.text("Capture timestamp: ") + evidence.capturedAt)
-                        if let route = evidence.route { selectable(appCopy.text("Decision route: ") + route) }
+                        selectable(appCopy.text("Source: ") + (member?.source ?? evidence.source))
+                        selectable(appCopy.text("Capture timestamp: ") + (member?.capturedAt ?? evidence.capturedAt))
+                        if let route = member?.route ?? evidence.route {
+                            selectable(appCopy.text("Decision route: ") + appCopy.text(route))
+                        }
                         if let batch = evidence.batchID { selectable(appCopy.text("Primary input: ") + batch) }
                         if let members = evidence.memberIDs, !members.isEmpty {
                             DisclosureGroup(appCopy.format("Batch members · %@", String(describing: members.count))) {

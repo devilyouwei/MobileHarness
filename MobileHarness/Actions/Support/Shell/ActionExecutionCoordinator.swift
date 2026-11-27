@@ -13,7 +13,7 @@ public final class ActionsAdmission: Sendable {
 
 /// Actions-owned execution engine: Channel scheduling, direct Tool calls, resource arbitration and result feedback.
 /// Gateway reaches it only through ActionExecutionEngine; ActionsContainer owns its lifecycle.
-public final class ActionExecutionCoordinator: ActionExecutionEngine {
+public final class ActionExecutionCoordinator: ActionExecutionHost {
     private final class Binding: Sendable {
         private let value = Mutex<ActionSignalBinding?>(nil)
         func bind(_ binding: ActionSignalBinding) throws {
@@ -27,7 +27,7 @@ public final class ActionExecutionCoordinator: ActionExecutionEngine {
         }
         func deliver(_ result: ExecutionResult) async -> ActionResultDelivery {
             guard let binding = value.withLock({ $0 }) else { return .closed }
-            return await binding.deliver(result)
+            return await binding.deliver(.action(result))
         }
         func deliverControl(_ feedback: ActionControlFeedback) async -> ActionResultDelivery {
             guard let binding = value.withLock({ $0 }) else { return .closed }

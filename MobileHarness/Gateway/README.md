@@ -2,81 +2,47 @@
 
 ## Ownership and interfaces
 
-GatewayContainer is the unique App-scoped Signal root. App configures, starts, suspends and stops it. Gateway owns endpoint identity, Signal envelopes, concurrent Send, Pub/Sub channel order, capacity and the admission fence for all four internal Signals: Agent–Agent requests and events, Agent→Action invocations and Action→Agent feedback. It imports only FunctionContracts and has no AgentCore, Agents, Actions, CallRuntime or ExecutionRuntime dependency.
-
-Agents owns role instances, communication policy, Skill/Task availability and authorization revocation. Its cognitive InputGateway/OutputGateway adapters live in Agents/Support. Gateway does not retain an AgentManager, inspect roles or recheck Skill permission. ActionsContainer owns the [execution Shell](../Actions/Support/Shell/README.md) behind the neutral `ActionExecutionEngine` contract: Channel scheduling, direct Tool calls, resource arbitration, function resolution, validation, budgets and actual work.
+GatewayContainer owns the App-scoped transport, admission and bounded observation scopes. SignalTransport owns endpoint identity, envelope validation, addressed Send, typed Request/Reply and channel-ordered best-effort Pub/Sub. The Gateway target uses system libraries and has no project dependencies. Endpoint owners register handlers and supply their payload types, size policies and deadlines.
 
 ## Direct relationships
 
 ```mermaid
 flowchart LR
-    App["App"] -.->|configure and control lifecycle| G["GatewayContainer"]
-    Agent["Bound Agents adapters"] -->|request, event, invocation| G
-    G -->|delivery, reply or feedback| Agent
-    G -->|invocation Signals via ActionExecutionEngine| X["Actions execution Shell"]
-    X -->|feedback Signals| G
-    linkStyle default stroke:#64748b,stroke-width:1.5px
+    App["App Composition"] -.->|configure transport and register connections| G["GatewayContainer"]
+    Agents["Agents endpoints"] <-->|requests, replies and events| G
+    Actions["Actions execution endpoint"] <-->|requests, acknowledgments and feedback| G
 ```
 
-The App edge shows lifecycle and configuration. Solid arrows show requests, delivery and returned data. App builds the Shell in ActionsContainer first and hands it to Gateway; Gateway binds the endpoint-identity check and the feedback exit into it exactly once.
-
-## Internal ownership
-
-| Area | Responsibility |
-| --- | --- |
-| GatewayContainer / GatewayFailure | Configuration, admission, revision-fenced foreground transitions, main facilities and bounded isolated scopes. |
-| [Input](Input/README.md) | Agent–Agent Signals: opaque endpoint delivery, typed Request/Reply, explicit-channel events, endpoint tokens/incarnations, envelope checks, bounded sends and joined retirement. |
-| GatewayExecution | Agent→Action and Action→Agent edge: gates new invocations, lease requests and calls on Gateway admission and forwards to the Shell. DetachedActionExecution rejects every invocation for isolated observation scopes that have no Actions attached. |
-
-Scheduling, direct calls, resource arbitration and result ledgers are not implemented here. Role routing, coverage and policy validation compile from Agents/Support.
-
-## Signal categories in this module
-
-Gateway carries internal Signals only. Agent–Agent traffic (typed Request/Reply and event pub/sub) uses [Input](Input/README.md); Agent–Action traffic (invocation and result feedback) crosses GatewayExecution into the Actions Shell. External Signals from PlatformKit, UI and ModelKit use their own SignalListener contracts and never enter Gateway.
+App configures the transport and connects the [Agents adapters](../Agents/Support/README.md) and [Actions execution endpoint](../Actions/Support/Shell/README.md). Each receiving endpoint owns authorization, payload interpretation and business results. Addressed sends carry in-process `Sendable` values and dispatch them to the registered endpoint without serialization.
 
 ## Internal flow
 
 ```mermaid
 flowchart TB
-    Envelope["Bound endpoint and live scope"] --> Route{"Signal kind"}
-    Route -->|request / event| T["SignalTransport · endpoint delivery"]
-    Route -->|invocation| E["GatewayExecution · admission fence"]
-    E --> Shell["Actions Shell · scheduling, direct calls, resources"]
-    Shell -->|feedback| F["Bound feedback exit"]
-    F --> Agent["Owning Agent"]
-    linkStyle default stroke:#64748b,stroke-width:1.5px
+    Envelope["Endpoint and envelope"] --> Admit["Validate token, deadline and capacity"]
+    Admit --> Kind{"Delivery facility"}
+    Kind -->|Send or typed Request| Direct["Run addressed handler"]
+    Kind -->|Pub/Sub| Queues["Reserve subscriber FIFO branches"]
+    Direct --> Return["Return acknowledgment, reply or failure"]
+    Queues --> Publish["Return local admission to publisher"]
+    Queues --> Deliver["Deliver in order within each branch"]
 ```
 
-## Admission and execution edge
-
-GatewayExecution checks the root admission fence before enqueue, schedule, control, direct execution and lease acquisition or renewal. It uses addressed Send for Action calls and their round boundaries on `action.call.v1`, and for instance lifecycle commands declared by the Action on `action.control.v1`. Control has a separate 16-delivery admission limit and uses the trusted endpoint and session from its Send envelope. Both contracts target the Actions execution edge. Native Tool calls and Tool round boundaries use `action.tool.v1`. Tool calls return completion within the same request under a 120-second deadline. A round End returns a settlement handle for the corresponding lane. Leases use their existing ports. Finish, cancel, release and snapshot calls stay available while draining so cleanup can complete. The Shell validates endpoint identity through the bound `signals.validateExecution` check, which fences stale incarnations. ActionCall, ToolCall, preparation, Channel/wait ordering, resource permits and result retry are specified in the [Shell design](../Actions/Support/Shell/README.md). Gateway never interprets a function, resource or result.
-
-The feedback exit delivers execution start, terminal result, state changes and control receipts to the registered Agents adapter. The adapter uses addressed delivery to the owning Agent. Accepted means receiving admission, retry indicates temporary pressure, and closed indicates a stale or absent scope. The Shell owns execution facts and result redelivery. Gateway owns addressed admission, acknowledgment and capacity. Agents projects Assistant’s Action, round and interruption-scope events through `action.execution.event.v1` and sends Action, Tool and control results through `action.result.v1`, `tool.result.v1` and `action.control.result.v1` respectively and authenticates their owner, session and causal identity. See the [ownership matrix](../README.md#action-lifecycle-responsibilities).
+| Area | Responsibility |
+| --- | --- |
+| GatewayContainer / GatewayFailure | Root configuration, admission, revision-fenced lifecycle and isolated observation scopes. |
+| [Input](Input/README.md) | Opaque endpoint delivery, registered request and event contracts, capacity accounting, ordering and joined retirement. |
 
 ## Signal channel ordering
 
-`SignalTransport` runs directed Send and Request concurrently within the admission budget, including requests with the same channel and target. Gateway authenticates the endpoints and reports receiver acknowledgment, typed reply or failure to the caller. Its deadline also applies after dispatch. When a Pub/Sub channel fans out, Gateway reserves independent FIFO branches by channel and subscriber. Each subscriber sees that channel’s admission order across publishers. A slow subscriber consumes only its own branch capacity.
-
-Gateway supplies bounded producer workers for workflows that read outputs before asynchronous authorization and routing. Published values enter the worker for their registered channel in business order. Dedicated work slots admit independent directed messages, ActionControl and native Tool requests. Assistant submits model ActionCalls and wait directives in business order before round settlement joins that round's Tools. Actions owns execution Channels, resource waits and control sequence arbitration.
-
-Gateway forwards the typed scheduling scope to the execution engine for sealing and cancellation. Send acknowledges admission. A timed-out Send reports an unconfirmed admission outcome to the producer, which can still receive execution feedback on the original call.
+Addressed Send and Request can run concurrently on the same channel and target within the shared capacity budget. A deadline applies after dispatch, and the transport joins cancelled delivery tasks. Pub/Sub delivers in admission order for each channel and subscriber. Each branch has its own bounded queue. Publishers receive local admission without waiting for subscriber completion. SignalChannelDispatcher also offers bounded per-channel producer queues for callers that must preserve their own submission order.
 
 ## Lifetime and capacity
 
-Construction creates stable inert transport/admission ports. Configuration occurs once and binds the Shell. App starts Actions → Gateway → Agents; stop joins Agents → Gateway → Actions, then unbinds host ports. Gateway closes its admission fence before joining transport work. ActionsContainer owns the Shell lifecycle: it cancels and joins scheduled, direct and resource work on suspension and stop. Gateway stops neither Agents nor Actions itself.
+Construction creates stable transport and admission ports. App configures the root once, opens it after its dependencies start and closes it before releasing endpoint owners. Suspend closes ordinary admission and joins outstanding ordinary deliveries. Trusted cleanup retains reserved capacity while draining. Stop closes the main transport and any observation scope and joins their work. An isolated observation scope owns independent transport and cleanup under the root's admission fence. Root observation scope capacity is one.
 
-SignalTransport bounds endpoints to 128, active sends to 256 and declared retained payload bytes to 8 MiB, rejecting overflow. Execution bounds and overflow rules are owned by the Shell README. Root observation scope capacity is one; each scope owns independent transport and cleanup, with parent admission/revision fencing. Replacement does not inherit old endpoint tokens or work.
-
-Pause retains identity-bound terminal/draining behavior and joins ordinary transport work before resume. Rapid foreground changes cannot reopen a stale generation. Stop is coalesced and retains cleanup failure. There is no hidden conversation TTL, durable transport, global fairness queue or claim of hardware stop acknowledgment. Evidence limitations are recorded in [validation](../../docs/validation/README.md).
+SignalTransport bounds endpoints to 128, active deliveries to 256 and reserved bytes to 8 MiB. Overflow rejects admission. Request descriptors may reserve a byte budget for replies. In-process value replies can reuse the caller's bounded request lifetime without reserving serialized reply bytes. Receiver validation, expiry and endpoint replacement still apply.
 
 ## Reflexive state reads
 
-`GatewayContainer.stateSnapshot() async throws` returns root data and an index for the Signal transport. stateReaders() binds independent readers for the root and `gateway.signals` without opening capabilities, observation scopes or sampling any facility. Nodes describe tracked endpoints/deliveries/bytes and event bindings, publications, branches and observers. Scheduler, direct and resource nodes are published by ActionsContainer as `actions.scheduler`, `actions.direct` and `actions.resources`. Root and child reads remain actor-isolated; collection is not a transaction across facilities.
-
-Gateway State queue depths and endpoint/delivery counts are Runtime. Its engineering health/issues remain separate; no transport counter is a Business attribute.
-
-Agent-provided Action calls use their registration Channel; the Shell schedules these resolved calls and ordered wait events, and model text cannot override routing. Assistant supplies an opaque conversation ordering scope so same-Channel outputs remain FIFO across model rounds. Classification and batch formation remain in Agents.
-
-Signal delivery keeps a bounded reserve for trusted cleanup and fences completion after endpoint replacement. Capacity, cancellation and joining semantics are defined by [Input](Input/README.md).
-
-Signal transport exposes two neutral typed facilities: direct Request/Reply with registered schema/handler and deadline, and explicit-channel event publications with source bindings and independent bounded consumer branches. Gateway owns these tasks, queues and cancellation; Agents owns role enablement, authentication, Task scopes and schema content. See [Input](Input/README.md). Event publication is best-effort live delivery without subscriber acknowledgment or late replay; subscriptions can cover a whole channel or an explicit scope/session. Request/Reply remains the direct addressed path. Event limits are injected at GatewayContainer construction and propagated into isolated observation scopes.
+Gateway state reports transport phase, endpoint and delivery counts, bytes, publications, branches and observers. State readers are independent actor-isolated snapshots. Execution, resource and role state belong to their respective owners.

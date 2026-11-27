@@ -507,26 +507,14 @@ public actor InputGateway {
     }
 
     /// Module-internal: returning Tools bind the original execution owner, never public external admission.
-    func deliverToolResult(_ result: ToolResult, owner: ExecutionOwner, envelope: OutputEnvelope) async throws
-        -> DeliveryReport?
-    {
+    func deliverToolResult(_ result: ToolResult, owner: ExecutionOwner, envelope: OutputEnvelope) async throws {
         guard owner.agent == envelope.source, owner.sessionID == envelope.sessionID else {
             throw CommunicationError.unauthorized
         }
-        try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
         let agent = try await manager.agent(owner.agent)
-        guard agent.descriptor.inputs.contains(.toolResult) else { return nil }
-        let context = envelope.inputMetadata
-        guard (0..<8).contains(context.hops) else { throw CommunicationError.hopLimitExceeded }
-        let payload = InputPayload.toolResult(result)
-        let input = AgentInput(
-            id: UUID().uuidString,
-            sessionID: owner.sessionID, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: "runtime", origin: .runtime, sequence: envelope.sequence,
-                rootID: context.rootID, parentID: envelope.inputID, hops: context.hops + 1),
-            turn: envelope.turn, taskScope: envelope.taskScope)
-        return try await deliver(input, targets: [(owner.agent, owner.incarnation)])
+        guard agent.descriptor.inputs.contains(.toolResult) else { return }
+        let input = try envelope.toolFeedbackInput(result)
+        try await receiveExecutionInput(input, owner: owner, agent: agent, retryHandlerFailure: false)
     }
 
     func deliverExecutionFeedback(_ feedback: ExecutionFeedback, owner: ExecutionOwner, causality: SignalCausality)
@@ -563,16 +551,63 @@ public actor InputGateway {
                 owner: event.recipient)
         } catch { return .closed }
     }
+    private func usesUnifiedActionFeedback(_ agent: any Agent) -> Bool {
+        agent.descriptor.inputs.contains(.executionFeedback) && !agent.descriptor.inputs.contains(.actionResult)
+    }
+
     private func usesUnifiedActionFeedback(_ owner: ExecutionOwner) async -> Bool {
-        guard let target = try? await manager.agent(owner.agent) else { return false }
-        return target.descriptor.inputs.contains(.executionFeedback)
-            && !target.descriptor.inputs.contains(.actionResult)
+        guard let agent = try? await manager.agent(owner.agent) else { return false }
+        return usesUnifiedActionFeedback(agent)
+    }
+
+    private func actionResultPayload(_ result: ActionResult, unified: Bool) -> InputPayload {
+        unified ? .executionFeedback(.actionFinished(result)) : .actionResult(result)
+    }
+
+    func receiveActionResult(_ result: ExecutionResult, deadline: ContinuousClock.Instant?) async throws {
+        let owner = result.owner
+        let causality = result.causality
+        guard owner.sessionID == result.envelope.sessionID,
+            owner.endpoint == result.envelope.source
+        else { throw CommunicationError.unauthorized }
+        guard (0..<8).contains(causality.hops) else { throw CommunicationError.hopLimitExceeded }
+
+        let agent = try await manager.agent(owner.agent)
+        let input = feedbackInput(
+            actionResultPayload(result.agentValue, unified: usesUnifiedActionFeedback(agent)),
+            owner: owner, causality: causality, deadline: deadline)
+        try await receiveExecutionInput(input, owner: owner, agent: agent)
+    }
+
+    /// Complete feedback in Agents once the Actions transport reply has arrived.
+    private func receiveExecutionInput(
+        _ input: AgentInput, owner: ExecutionOwner, agent: any Agent, retryHandlerFailure: Bool = true
+    ) async throws {
+        let traceID = beginSignal(input, mode: .feedback, targets: [owner.agent])
+        do {
+            _ = try validatePayload(input)
+            try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
+            try validateFeedbackReceiver(input, agent: agent)
+            try Task.checkCancellation()
+        } catch {
+            finishSignal(traceID, phase: .rejected, reason: String(describing: error))
+            throw error
+        }
+        do {
+            try await agent.receive(input)
+        } catch {
+            finishSignal(traceID, phase: .rejected, reason: String(describing: error))
+            try Task.checkCancellation()
+            guard retryHandlerFailure else { throw error }
+            try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
+            guard !closed else { throw CommunicationError.scopeClosed }
+            throw CommunicationError.capacityExceeded
+        }
+        finishSignal(traceID, phase: .accepted)
     }
 
     public func deliverActionResult(_ result: ActionResult) async -> ActionResultDelivery {
-        let payload: InputPayload =
-            await usesUnifiedActionFeedback(result.owner)
-            ? .executionFeedback(.actionFinished(result)) : .actionResult(result)
+        let payload = actionResultPayload(result, unified: await usesUnifiedActionFeedback(result.owner))
         return await deliverFeedback(payload, owner: result.owner, causality: result.causality)
     }
 
@@ -600,24 +635,44 @@ public actor InputGateway {
     }
 
     public func deliverActivityEvent(_ event: ActivityEvent) async -> ActionResultDelivery {
-        await deliverFeedback(
-            .activityEvent(event), owner: event.owner,
-            causality: event.causality, sequence: event.sequence)
+        guard (0..<8).contains(event.causality.hops) else { return .closed }
+        return await deliverRuntime(
+            feedbackInput(
+                .activityEvent(event), owner: event.owner, causality: event.causality, sequence: event.sequence),
+            owner: event.owner)
     }
 
     private func deliverFeedback(
-        _ payload: InputPayload, owner: ExecutionOwner, causality: SignalCausality, sequence: UInt64? = nil
+        _ payload: InputPayload, owner: ExecutionOwner, causality: SignalCausality
     ) async -> ActionResultDelivery {
         guard (0..<8).contains(causality.hops) else { return .closed }
-        let input = AgentInput(
+        do {
+            let agent = try await manager.agent(owner.agent)
+            try await receiveExecutionInput(
+                feedbackInput(payload, owner: owner, causality: causality), owner: owner,
+                agent: agent)
+            return .accepted
+        } catch CommunicationError.capacityExceeded { return .retry } catch { return .closed }
+    }
+
+    private func feedbackInput(
+        _ payload: InputPayload, owner: ExecutionOwner, causality: SignalCausality,
+        sequence: UInt64? = nil, deadline: ContinuousClock.Instant? = nil
+    ) -> AgentInput {
+        AgentInput(
             id: UUID().uuidString,
             sessionID: owner.sessionID, payload: payload,
             metadata: InputMetadata(
                 payload: payload, source: "runtime", origin: .runtime,
                 sequence: sequence ?? causality.sequence, rootID: causality.rootID,
-                parentID: causality.inputID, hops: causality.hops + 1), turn: causality.turn,
+                parentID: causality.inputID, hops: causality.hops + 1, deadline: deadline), turn: causality.turn,
             taskScope: causality.taskScope)
-        return await deliverRuntime(input, owner: owner)
+    }
+
+    private func validateFeedbackReceiver(_ input: AgentInput, agent: any Agent) throws {
+        guard agent.descriptor.inputs.contains(input.payload.kind),
+            policy?.accepts(input, target: agent.descriptor.id) ?? true
+        else { throw CommunicationError.unsupportedContract }
     }
 
     private func deliverRuntime(_ input: AgentInput, owner: ExecutionOwner) async -> ActionResultDelivery {
@@ -625,9 +680,7 @@ public actor InputGateway {
         do {
             try await manager.validate(owner.agent, incarnation: owner.incarnation, sessionID: owner.sessionID)
             let agent = try await manager.agent(owner.agent)
-            guard agent.descriptor.inputs.contains(input.payload.kind),
-                policy?.accepts(input, target: owner.agent) ?? true
-            else { throw CommunicationError.unsupportedContract }
+            try validateFeedbackReceiver(input, agent: agent)
         } catch {
             finishSignal(traceID, phase: .rejected, reason: String(describing: error))
             return .closed

@@ -294,23 +294,19 @@ import Foundation
         }
 
         private func channelLabel(_ channel: String) -> some View {
-            let color = channelColor(channel)
-            return Label {
-                Text(channel)
-            } icon: {
-                Circle().fill(color).frame(width: 6, height: 6)
-            }
-            .lineLimit(1)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.24), in: Capsule())
+            Text(channel)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(channelColor(channel).opacity(0.22), in: RoundedRectangle(cornerRadius: 5))
         }
 
         private func channelColor(_ channel: String) -> Color {
             switch channel {
             case "Camera": return .cyan
+            case ActionActivityItem.controlChannel: return .teal
             case "Display": return .indigo
             case "Listening": return .teal
             case "ListeningControl": return .mint

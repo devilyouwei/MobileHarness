@@ -177,13 +177,14 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let registry = agent.descriptor.capabilities
     #expect(
         Set(registry.internalActions.map { $0.path.description }) == [
-            "Speech.Playback.speak", "Speech.Playback.setVolume", "UI.Caption.beginReplyTurn", "UI.Caption.print",
+            "Speech.Playback.speak", "UI.Caption.beginReplyTurn", "UI.Caption.print",
             "UI.Expression.setReplyWaiting",
         ])
-    #expect(Set(registry.internalTools.map(\.path)) == ["UI.Island.present", "UI.Island.end"])
+    #expect(
+        Set(registry.internalTools.map(\.path)) == ["Speech.Playback.setVolume", "UI.Island.present", "UI.Island.end"])
     #expect(registry.tools.isEmpty)
     #expect(!registry.actions.contains { $0.path.description == "UI.Expression.setReplyWaiting" })
-    #expect(!registry.internalActions.contains { $0.path.description == "Speech.Listening.update" })
+    #expect(!registry.internalTools.contains { $0.path == "Speech.Listening.update" })
     #expect(
         registry.permits(
             ActionCall(
@@ -582,7 +583,7 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
 @Test(.actionCatalog) func writerDeclaresOnlyConsumedInputsAndPeerReports() throws {
     let communication = try AgentConfigurations.load(named: "Writer").communication
     #expect(communication.requests == ["agent.task.v1"])
-    #expect(communication.feedback == ["action.result.v1", "tool.result.v1"])
+    #expect(communication.feedback.isEmpty)
     #expect(communication.publications == [.init(channel: "agent.task", protocol: "agent.task.events.v1")])
     #expect(communication.subscriptions.isEmpty)
 }

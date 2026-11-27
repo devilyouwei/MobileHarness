@@ -42,6 +42,31 @@ func interruptedReplyPromptAndHistoryUseTheSameLocalizedMarker(language: String)
     }
 }
 
+@Test(.actionCatalog) func completeRetainedTextStillRecordsTheInterruption() async throws {
+    let database = try SQLiteRepositories.temporary()
+    let records = try AssistantRecordStore(
+        repository: database.assistantMessages, tasks: database.assistantTasks,
+        conversations: database.assistantConversations, logs: database.logs)
+    let store = AssistantHistoryStore(records: records)
+    let id = UUID().uuidString
+    let request = UUID().uuidString
+    let text = "<express emotion=\"smile\"/>"
+    _ = try await store.admitUserInput(id: id, user: "Start", model: "Fixture")
+    try await store.beginModelRequest(.init(id: request, input: "Start", requestJSON: "[]"), for: id)
+    try await store.append(text, to: id)
+    try await store.finish(id, state: .completed)
+    let marker = AssistantReplyTruncation(
+        roundID: request, completedCallIDs: ["action"],
+        markerText: try AgentPrompts.load(named: "Assistant").render("replyInterruptedMarker"))
+    #expect(
+        try await store.recordReplyTruncation(
+            marker, fragments: [0..<text.utf8.count], inputID: id, requestID: request) == text)
+    let reopened = try await AssistantHistoryStore(records: records).readCurrent()
+    let saved = try #require(reopened.current.turns.first?.modelRequests?.first)
+    #expect(saved.response == text && saved.generatedResponse == text)
+    #expect(saved.replyTruncation == marker && saved.state == .interrupted)
+}
+
 private actor LiveTitleChatProbe: ChatCapability {
     let provider: OpenAIChat
     var request: ChatRequest?

@@ -160,7 +160,7 @@ VAD 达到静音端点时，同一 PCM 消费任务等待可选 `SpeechEndpointC
 | sound.source | Native direction/quality/RMS and active/inactive/uncertain/unavailable; ≤10 Hz and 500 ms freshness |
 | UI.Caption.setTranscript / finishTranscript | Internal completion-only calls; final text precedes sealing, including explicit empty result |
 | UI.VoiceState.setVoiceState | Internal hearing/processing/listening display, no device control |
-| Speech.Listening.update | Internal policy Action for the actual resident producer/root session |
+| Speech.Listening.update | Independent internal Tool that applies the resident producer's listening policy to the root recording session |
 
 | 频道协议 | 事实 |
 | --- | --- |

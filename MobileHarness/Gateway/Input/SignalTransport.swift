@@ -1,7 +1,6 @@
 import Foundation
-import FunctionContracts
 
-/// Internal Signal (Agent–Agent) envelope; Agent–Action execution uses ExecutionEnvelope instead.
+/// Addressed internal signal metadata; application payloads belong to the endpoint owners.
 public struct SignalEnvelope: Sendable {
     public let id: String
     public let sessionID: String
@@ -41,14 +40,14 @@ public struct GatewaySignal: Sendable {
 }
 public enum SignalTransportError: Error, Sendable {
     case invalidEnvelope, expired, closed, capacityExceeded, unknownEndpoint, staleEndpoint
-    case unsupportedProtocol, duplicateProtocol, schemaMismatch, invalidReply, cyclicRequest
+    case unsupportedProtocol, duplicateProtocol, duplicateEndpoint, schemaMismatch, invalidReply, cyclicRequest
 }
 
 private enum SignalDispatchOwnership {
     @TaskLocal static var current: UUID?
 }
 
-/// Internal Signal (Agent–Agent) transport. Opaque endpoint delivery: payload contracts and receiver policy belong to the endpoint owner.
+/// Internal Signal transport. Opaque endpoint delivery: payload contracts and receiver policy belong to the endpoint owner.
 public actor SignalTransport {
     private struct Endpoint: Sendable {
         let port: SignalEndpoint
@@ -101,7 +100,7 @@ public actor SignalTransport {
         self.eventConfiguration = eventConfiguration
     }
     public func register(
-        address: String, incarnation: String,
+        address: String, incarnation: String, replaceExisting: Bool = true,
         receive: @escaping @Sendable (GatewaySignal) async throws -> Void
     ) async throws -> SignalEndpoint {
         guard !closed else { throw SignalTransportError.closed }
@@ -109,6 +108,7 @@ public actor SignalTransport {
             throw SignalTransportError.invalidEnvelope
         }
         guard endpoints[address] != nil || endpoints.count < 128 else { throw SignalTransportError.capacityExceeded }
+        guard replaceExisting || endpoints[address] == nil else { throw SignalTransportError.duplicateEndpoint }
         if let existing = endpoints[address], existing.port.incarnation == incarnation { return existing.port }
         let retired = endpoints[address]?.port
         if let retired {
@@ -123,25 +123,13 @@ public actor SignalTransport {
         try validateRequestEndpoint(port)
         return port
     }
-    func executionEndpoint(address: String, incarnation: String? = nil) throws -> SignalEndpoint {
+    public func endpoint(address: String, incarnation: String? = nil) throws -> SignalEndpoint {
         guard !closed, let endpoint = endpoints[address]?.port,
             incarnation == nil || endpoint.incarnation == incarnation
         else { throw SignalTransportError.staleEndpoint }
         return endpoint
     }
 
-    public func validateExecution(_ input: FunctionInvocation, owner: ExecutionOwner?) throws {
-        guard !closed else { throw SignalTransportError.closed }
-        guard let owner, let endpoint = endpoints[owner.endpoint]?.port,
-            endpoint.incarnation == owner.incarnation
-        else { throw SignalTransportError.staleEndpoint }
-        guard input.context.source == owner.endpoint, input.context.sessionID == owner.sessionID,
-            !owner.sessionID.isEmpty, owner.sessionID.utf8.count <= 128,
-            !input.context.inputID.isEmpty, input.context.inputID.utf8.count <= 128
-        else {
-            throw SignalTransportError.invalidEnvelope
-        }
-    }
     public func unregister(_ endpoint: SignalEndpoint) async {
         guard endpoints[endpoint.address]?.port == endpoint else { return }
         endpoints[endpoint.address] = nil

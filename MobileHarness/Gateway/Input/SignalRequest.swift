@@ -1,19 +1,20 @@
 import Foundation
 import Synchronization
 
-/// Internal Signal (Agent–Agent send): a neutral, typed request/reply contract. Registration supplies real handlers, never role routing.
+/// A typed in-process request/reply contract registered by its endpoint owner.
 public struct SignalRequestProtocol<Request: Sendable, Reply: Sendable>: Sendable {
     public let id: String
     public let maximumRequestBytes: Int
-    public let maximumReplyBytes: Int
+    /// A nil budget returns an in-process value without a serialized reply reservation.
+    public let maximumReplyBytes: Int?
     public let timeout: Duration
     let requestSize: @Sendable (Request) throws -> Int
-    let replySize: @Sendable (Reply) throws -> Int
+    private let replySize: (@Sendable (Reply) throws -> Int)?
 
     public init(
-        id: String, maximumRequestBytes: Int, maximumReplyBytes: Int, timeout: Duration = .seconds(30),
+        id: String, maximumRequestBytes: Int, maximumReplyBytes: Int?, timeout: Duration = .seconds(30),
         requestSize: @escaping @Sendable (Request) throws -> Int,
-        replySize: @escaping @Sendable (Reply) throws -> Int
+        replySize: (@Sendable (Reply) throws -> Int)? = nil
     ) throws {
         let parts = id.split(separator: ".", omittingEmptySubsequences: false)
         guard id.utf8.count <= 64, (3...6).contains(parts.count),
@@ -22,7 +23,9 @@ public struct SignalRequestProtocol<Request: Sendable, Reply: Sendable>: Sendabl
                 return part.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) }
             }), let version = parts.last, version.first == "v", version.dropFirst().first != "0",
             !version.dropFirst().isEmpty, version.dropFirst().utf8.allSatisfy({ (48...57).contains($0) }),
-            (1...4_194_304).contains(maximumRequestBytes), (1...4_194_304).contains(maximumReplyBytes),
+            (1...4_194_304).contains(maximumRequestBytes),
+            maximumReplyBytes.map({ (1...4_194_304).contains($0) }) ?? true,
+            (maximumReplyBytes == nil) == (replySize == nil),
             timeout > .zero, timeout <= .seconds(120)
         else { throw SignalTransportError.invalidEnvelope }
         self.id = id
@@ -31,6 +34,12 @@ public struct SignalRequestProtocol<Request: Sendable, Reply: Sendable>: Sendabl
         self.timeout = timeout
         self.requestSize = requestSize
         self.replySize = replySize
+    }
+
+    fileprivate func validateReply(_ reply: Reply) throws {
+        guard let maximumReplyBytes, let replySize else { return }
+        let size = try replySize(reply)
+        guard (0...maximumReplyBytes).contains(size) else { throw SignalTransportError.invalidReply }
     }
 }
 
@@ -43,7 +52,7 @@ public struct SignalRequestContext: Sendable {
 
 struct SignalRequestHandler: Sendable {
     let maximumRequestBytes: Int
-    let maximumReplyBytes: Int
+    let maximumReplyBytes: Int?
     let timeout: Duration
     let measureRequest: @Sendable (any Sendable) throws -> Int
     let requestType: ObjectIdentifier
@@ -99,10 +108,7 @@ extension SignalTransport {
                     throw SignalTransportError.invalidEnvelope
                 }
                 let reply = try await handler(request, context)
-                let replySize = try descriptor.replySize(reply)
-                guard replySize >= 0, replySize <= descriptor.maximumReplyBytes else {
-                    throw SignalTransportError.invalidReply
-                }
+                try descriptor.validateReply(reply)
                 return reply
             })
     }
@@ -137,16 +143,13 @@ extension SignalTransport {
         let deadline = metadata.expiresAt.map { min($0, timeout) } ?? timeout
         let requestEnvelope = SignalEnvelope(
             id: metadata.id, sessionID: metadata.sessionID, contract: descriptor.id, channel: metadata.channel,
-            version: metadata.version, hops: metadata.hops, payloadBytes: size + descriptor.maximumReplyBytes,
+            version: metadata.version, hops: metadata.hops, payloadBytes: size + (descriptor.maximumReplyBytes ?? 0),
             expiresAt: deadline, cleanup: metadata.cleanup, control: metadata.control)
         let invocation = SignalRequestInvocation {
             let value = try await handler.operation(
                 request, .init(source: source, target: target, protocolID: descriptor.id, envelope: requestEnvelope))
             guard let reply = value as? Reply else { throw SignalTransportError.invalidReply }
-            let replyBytes = try descriptor.replySize(reply)
-            guard replyBytes >= 0, replyBytes <= descriptor.maximumReplyBytes else {
-                throw SignalTransportError.invalidReply
-            }
+            try descriptor.validateReply(reply)
             box.store(reply)
         }
         try await SignalRequestChain.$endpoints.withValue(chain + [target.address]) {

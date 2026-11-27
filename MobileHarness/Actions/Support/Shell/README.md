@@ -1,11 +1,12 @@
 # Execution Shell
 
-Like an operating-system shell, the Shell takes invocation requests and handles scheduling, resource arbitration, execution and result return. ActionsContainer owns the execution Shell that runs admitted Agent → Action invocation Signals and produces Action → Agent feedback Signals. Gateway carries those Signals and the Shell implements the neutral [ActionExecutionEngine](../Contracts/ActionExecutionEngine.swift) contract; Agents reach it only through Gateway, and Actions imports neither. The Shell compiles in ExecutionRuntime; its invocation/result contracts (ExecutionEnvelope, ScheduledAction, ExecutionResult, ActionSchedulingError) compile in FunctionContracts.
+Like an operating-system shell, the Shell takes invocation requests and handles scheduling, resource arbitration, execution and result return. ActionsContainer owns the execution Shell that runs admitted Agent → Action invocation Signals and produces Action → Agent feedback Signals. App binds the neutral [ActionExecutionEndpoint](../Contracts/ActionExecutionEngine.swift) to Gateway and injects the management port separately. Gateway carries the registered requests and replies. Actions uses neutral contracts for identity and feedback. The Shell compiles in ExecutionRuntime; its invocation/result contracts (ExecutionEnvelope, ScheduledAction, ExecutionResult, ActionSchedulingError) compile in FunctionContracts.
 
 ```mermaid
 flowchart LR
-    Agents["Agents · invocation Signal"] --> Gateway["Gateway · GatewayExecution<br/>admission and endpoint identity"]
-    Gateway --> Shell["ActionExecutionCoordinator"]
+    Agents["Agents · invocation Signal"] --> Gateway["Gateway · SignalTransport"]
+    Gateway --> Receive["Actions · ActionExecutionEndpoint"]
+    Receive --> Shell["ActionExecutionCoordinator"]
     Shell --> Scheduler["ChannelScheduler · Action calls"]
     Shell --> Direct["DirectExecutionDispatcher · Tool calls"]
     Scheduler --> Resources["ResourceCoordinator"]
@@ -13,11 +14,13 @@ flowchart LR
     Scheduler --> Port["Container prepare / execute"]
     Direct --> Port
     Scheduler --> Ledger["ActionResultLedger"]
-    Ledger -->|"feedback Signal"| Gateway
-    Gateway --> Agents
+    Ledger -->|"Action terminal"| Results["CallResultSignal"]
+    Direct -->|"Tool terminal"| Results
+    Results --> Gateway
+    Gateway -->|"addressed result"| Agents
 ```
 
-[ActionExecutionCoordinator.swift](ActionExecutionCoordinator.swift) is the facade. ActionsContainer builds it from the container's own preparation/execution and the resource definitions supplied at composition; it owns an ActionsAdmission that opens at start and closes at invalidation or stop. suspend cancels and joins scheduler, direct and resource work and releases leases so the Shell can reopen. shutdown additionally closes the Shell permanently and preserves primary and cleanup failures. Gateway binds exactly once through bindSignals, supplying the endpoint-identity check and the feedback exit; before binding, scope checks pass and feedback reports closed. Direct Tool calls, scheduled Action calls and resource leases use the same preparation, permit and cancellation contracts. State nodes are `actions.scheduler`, `actions.direct` and `actions.resources`.
+[ActionExecutionCoordinator.swift](ActionExecutionCoordinator.swift) is the facade. ActionsContainer builds it from the container's own preparation/execution and the resource definitions supplied at composition; it owns an ActionsAdmission that opens at start and closes at invalidation or stop. suspend cancels and joins scheduler, direct and resource work and releases leases so the Shell can reopen. shutdown additionally closes the Shell permanently and preserves primary and cleanup failures. App composition binds exactly once through bindSignals, supplying the endpoint-identity check and the feedback exit; before binding, scope checks pass and feedback reports closed. Direct Tool calls, scheduled Action calls and resource leases use the same preparation, permit and cancellation contracts. State nodes are `actions.scheduler`, `actions.direct` and `actions.resources`.
 
 ### Scheduling
 
@@ -25,7 +28,7 @@ flowchart LR
 
 Bounded task-local FIFO/wait trees with separate resource arbitration. [ChannelScheduler](Scheduling/ChannelScheduler.swift) owns ordering, admission, finish, cancel and passive execution observation. Each task root contains phases and nested wait groups. A wait joins preceding parent work, executes ordinary per-Channel FIFO internally and releases its continuation only when closed and all children complete. Open active phases may execute received calls; dormant groups hold no resource locks. Native Tools are outside the tree.
 
-The scheduler keys each root by producer and typed scheduling scope. The execution coordinator admits each round separately on the Action and Tool call lanes. It closes admission at each lane’s End and returns a settlement handle. Finishing or cancelling a round selects that root even when a standalone call uses the same ID string. Session and endpoint cancellation continue to select all matching roots.
+The scheduler keys each root by producer and typed scheduling scope. The execution coordinator admits each round separately on the Action and Tool call lanes. It closes admission at each lane’s End and returns a settlement handle. Finishing or cancelling a round selects that root even when an input uses the same ID string. Session and endpoint cancellation continue to select all matching roots.
 
 `wait` is a scoped ActionCall handled on the Shell's main track. A Skill registers it (`callType: "scheduling"`, no Channel); the Shell converts its scoped ActionCall into internal `beginWait`, `endWait` and `pause(milliseconds:)` directives and owns no instructions or catalog text. Agent controls are never allowed inside a wait. A pause (`<wait time="seconds"/>`, decimal seconds on the call, converted to milliseconds by the Shell) is accepted for a tracked task after the producer's earlier events, holds only that task's main-track dispatch for the timer and never joins Actions already dispatched, so Channel lanes keep running. Each task may pause at most 120 seconds in total (`pauseLimitExceeded`); explicit cancellation, session cancellation or shutdown cancels the timer and the caller receives cancellation instead of a completed pause, and a pause holds no resource lock or Channel capacity.
 
@@ -74,7 +77,9 @@ Production camera capture requires its persistent lease, acquired through Camera
 
 [`Results/`](Results/) holds the result ledger; ExecutionResult itself is a [contract](../Contracts/ExecutionResult.swift).
 
-[ExecutionResult.swift](../Contracts/ExecutionResult.swift) preserves status, effect certainty, completion, report and failure separately. Queued cancellation is `notStarted`, a failure or cancellation after starting may leave an unknown effect, and success is `contractCompleted`. The scheduler-owned [ActionResultLedger.swift](Results/ActionResultLedger.swift) reserves one of 512 terminal slots by default (configurable 1–1,024) before admitting a feedback-producing action; overflow rejects admission. The feedback policy is `none`, `failuresOnly` or `terminal`. For feedback-enabled Assistant model calls, the ledger records actual execution start before the terminal result. A queued cancellation records the terminal after discarding preparation. A single worker redelivers immutable evidence through the Gateway feedback exit with backoff capped at one second until acceptance, scope closure, shutdown or a 60-second limit measured from result completion. Retry covers temporary receiver pressure only: past the limit the record ends as `expired`, keeps its result and invocation snapshot as evidence and counts toward `expiredResults`. finishRoundDelivery treats `expired` like `closed` and fails the round with resultDeliveryFailed, and reports unconfirmed native cleanup after the round’s deliveries settle. History keeps 256 outcomes with counted oldest eviction, and retained invocation evidence is limited to 32 MiB. Accepted means receiving admission, retry indicates temporary pressure and closed indicates a stale or absent scope.
+[ExecutionResult.swift](../Contracts/ExecutionResult.swift) preserves status, effect certainty, completion, report and failure separately. Queued cancellation is `notStarted`, a failure or cancellation after starting may leave an unknown effect, and success is `contractCompleted`. The scheduler-owned [ActionResultLedger.swift](Results/ActionResultLedger.swift) reserves one of 512 terminal slots by default (configurable 1–1,024) before admitting a feedback-producing action; overflow rejects admission. The feedback policy is `none`, `failuresOnly` or `terminal`. For feedback-enabled Assistant model calls, the ledger records actual execution start before the terminal result. A queued cancellation records the terminal after discarding preparation. A single worker redelivers immutable evidence through the Gateway result signal with backoff capped at one second until acceptance, scope closure, shutdown or a 60-second limit measured from result completion. A temporarily unconfirmed delivery past the limit ends as `expired`, keeps its result and invocation snapshot as evidence and counts toward `expiredResults`. finishRoundDelivery treats `expired` like `closed` and fails the round with resultDeliveryFailed, and reports unconfirmed native cleanup after the round’s deliveries settle. History keeps 256 outcomes with counted oldest eviction, and retained invocation evidence is limited to 32 MiB.
+
+Direct Tools send their value or execution error through the same addressed result exit. The Actions endpoint awaits delivery under the original request's bounded lifetime, retrying temporary pressure without executing the Tool again. Its request reply acknowledges the execution ID after result delivery. Scheduled Action request replies acknowledge enqueue admission. The direct dispatcher attaches the authenticated execution owner before invoking the handler. Independent Tools require no scheduler scope or round seal.
 
 Execution envelopes carry the immutable ActionInvocationSnapshot captured by the producing adapter before effects, so archived references survive scheduling and retries. Agents owns schema projection; Storage owns large evidence archives.
 

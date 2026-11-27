@@ -143,7 +143,7 @@ In synchronous mode, the worker joins all admitted calls, reliable results and t
 | Provider/stream/parser/observation construction failure | Join admitted work, preserve causes and terminate the decision without automatic retry. |
 | Uncertain round closure/delivery | Preserve primary and cleanup evidence; uncertainty cannot authorize retry. |
 
-Successful send/publish is an admission acknowledgment. Model stop/toolCalls/lengthLimit only ends generation; it does not itself request another round. Passive State, active Tasks and waiting for a user do not create polling. Unmatched Tool feedback is rejected rather than treated as a fresh input.
+Successful send or publish confirms admission. Model stop/toolCalls/lengthLimit ends generation. Action and Tool outcomes return via the [shared Agents result adapter](../Support/README.md#interfaces-and-flow). The execution session matches each outcome to the original call, and only calls carrying a round ID enter that round's settlement.
 
 Runtime-generated caption, speech and waiting calls can join completion and retain diagnostics, but their values/failures never become model observations or independently trigger reasoning. A real model business observation remains deliverable even if internal presentation fails in the same round. Without business observations, the worker handles internal failure through its runtime-failure path.
 

@@ -213,3 +213,53 @@ MobileHarness 0.1.0（2026112613）通过 iPhoneOS Debug 构建、严格签名�
 普通 Swift 回归的 IntegrationTests 报告 1,293 项通过，定向 Send 和 Request 的超时回归串行通过。原生集成首轮发现委派 Agent 同时订阅两类反馈时收不到独立的 Action 结果，以及声源证据写入失败后仍会发布。机械臂与蓝牙替身装配缺少内部音量 Action。修复后 29 项定向回归通过，覆盖声源写入失败、委派次轮、机械臂、蓝牙、回包关联、VAD 能量和 Gateway 超时。
 
 最终源码的五个模拟器目标构建通过，App 的 Agent／Skill、Live Activity 和中英文本地化资源校验通过。将静态检查结果与提交前的 HEAD 对照，两处检查类别的报错一致。原生呈现套件未给出完整结果。本轮未执行物理设备或真实模型验收。
+
+### Gateway 通信边界与 Writer Tool 直返
+
+2026-11-27。187 项 Swift 扩展回归通过。定向回归覆盖超过 4 MiB 的完整 Tool 结果、跨会话执行拒绝、重复接线隔离、播报暂停续播、委派结果和声源诊断。Writer 使用真实 Gateway、Actions 接收端和 SQLite 测试库跑完 17 个工作区场景。两项 Gateway 超时用例串行复测通过。最后复跑的 7 项链路测试和 6 项 Wait、独立封口、打断测试均通过。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过，App 的 Agent／Skill、Live Activity 和中英文本地化资源校验通过。`check.sh` 在既有的 State Value codec 和 Xcode 中文资源归属检查处退出，报错与修改前的基线一致。变更 Swift 格式、8 项 Python 工程工具测试、plist 和 `git diff --check` 通过。本轮未执行设备验收或传输吞吐压测。
+
+### Assistant Tool 同请求直返
+
+2026-11-27。57 项 Swift 扩展回归和最终 6 项定向回归通过。Assistant 的轮次回归通过实际执行返回值核对原生 Tool 与模型 toolCallID 的配对、历史持久化、并发、混合轮次、独立封口和取消。直接路径的成功和准入拒绝均验证没有 `tool.result.v1` 回投。显式异步 Tool 反馈回归及 Writer 的 17 个创作场景继续通过。
+
+`./scripts/build-ios.sh` 的五个模拟器目标及 App 的 Agent／Skill、Live Activity 和中英文本地化资源校验通过。`check.sh` 在既有 State Value codec 和 Xcode 中文资源归属检查处退出。变更文件 Swift 严格格式、8 项 Python 工具测试、plist 与 `git diff --check` 通过。本轮未执行真机验收。
+
+### Assistant 与 Writer 的对称执行通信
+
+2026-11-27。真实 Actions 与 Gateway 接线回归覆盖共用终态信道、来源与会话验证、同一终态临时拒收后的重投、执行次数及轮次结算。并行 Tool 测试从同一角色会话的不同轮次复用原生调用 ID，校对每个调用收到对应且完整的长结果。Assistant 回归覆盖 Action、Tool 和混合轮次的历史关联与打断。Writer 创作场景使用实际 Gateway、Actions 工作区和 SQLite 测试库，模型响应为受控替身。
+
+15 项 Swift 定向测试通过，含参数化的 17 个 Writer 场景和 3 个播报控制场景。`./scripts/build-ios.sh` 的五个模拟器目标通过，主 App 用最终源码复编译后通过 Agent／Skill、Live Activity 和中英文本地化资源校验。变更 Swift 文件严格格式、8 项 Python 工具测试、plist 和 `git diff --check` 通过。`./scripts/check.sh` 仍在既有的 State Value codec 和 Xcode 中文资源归属检查退出，输出与修改前基线一致。本轮未执行真实模型、原生 UI 交互或真机验收。
+
+### 灵动岛发布请求隔离
+
+2026-11-27。新增回归使用真实 SignalTransport，从 Actions 请求处理器提交灵动岛更新，并等待发布工作者向同一端点独立发送。修复前更新未到达且记录失败。修复后 6 项 Swift 定向测试通过，覆盖该复现、真正循环的拒绝、语音／Assistant／Writer 的发布、重试和停止，以及执行终态送达。变更文件格式和 `git diff --check` 通过。`./scripts/check.sh` 的 State Value codec 和 Xcode 中文资源归属报错与修改前基线一致。
+
+`./scripts/build-ios.sh` 五个模拟器目标通过。模拟器与真机 App 的 Agent／Skill、Live Activity 和中英文本地化资源校验通过。签名真机构建通过，iPhone 17 Pro 已安装并读回版本 `2026112702`，设备确认启动成功。未在真机重新执行收音与灵动岛场景。
+
+### 关键词和模型打断历史一致性
+
+2026-11-27。对真机 SQLite 和 WAL 的只读副本执行完整性检查并比对近期记录。截图附近有已中断的回复仍保存完整生成文本，且没有 `replyTruncation`。模型 Decision 触发输入存在 `coordination.interrupt=true`，被打断回复也存在缺少截断证据的情况。设备数据未被修改。
+
+7 项定向测试和 44 项扩展 Swift 测试通过。关键词和模型分支分别在零完成动作和跨轨道部分完成场景写入 SQLite，重开后确认截断、原文、决策来源、列表和详情投影、模型历史。全文均被保留时仍写入证据和中断状态。Swift 格式、字符串目录 JSON、`git diff --check` 通过。`check.sh` 停在基线已有的 State Value codec 与 Xcode 中文资源归属检查。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过。模拟器与真机 App 的 Agent／Skill、Live Activity 和中英文本地化资源通过校验。iPhone 17 Pro 已安装并读回 `2026112703`，设备确认启动成功。未做真机收音与打断验收。
+
+### 关键词打断触发输入的历史关联
+
+2026-11-27。真机 SQLite 及 WAL 的只读副本完整性检查通过。20:26:40 的被打断回复有关键词来源和 JSON 标记，20:26:49 含「停下」的合批请求及其两个成员均缺少打断决策。20:26:33 的模型 Decision 触发记录已有打断决策。取证未修改设备数据库。
+
+52 项 Swift 扩展测试通过。关键词先于 ASR、ASR 先于关键词和 ASR 迟于清理确认三种顺序都通过 SQLite 回读及列表和详情投影验证。合批次要成员及模型决策对照通过。变更 Swift 格式与 `git diff --check` 通过。`check.sh` 仍在基线已有的 State Value codec 和 Xcode 中文资源归属检查处退出。
+
+五个 iOS 模拟器构建目标通过。模拟器与真机 App 的 Agent／Skill、Live Activity 和中英文本地化资源校验通过。iPhone 17 Pro 已安装并读回 `2026112704`，设备确认启动成功。未在真机复测关键词触发后的新历史条目。
+
+### 独立 Tool 回包与执行事件
+
+2026-11-27。定向 Swift 回归覆盖 Tool 单项直返、无轮次 Tool 不阻塞其他调用或轮次封口、拒绝结果不重复投递、执行所有者绑定，以及收听策略版本和播报控制。播报用例接入真实 Gateway 与 Actions，音频设备和模型使用替身。本轮未执行真实模型或真机验收。
+
+普通 Swift 回归通过，IntegrationTests 报告 1,300 项。串行运行时套件通过 232 项。`./scripts/build-ios.sh` 的五个模拟器目标构建通过。主 App 使用最终源码复编译通过，Agent／Skill、Live Activity 及中英文本地化资源通过校验。
+
+`check.sh` 在已有的 State Value codec 与 Xcode 中文资源归属检查处退出。Swift 严格格式检查、8 项 Python 工具测试、工程 plist 和 `git diff --check` 分开执行通过。
+
+MobileHarness 0.1.0（`2026112705`）通过 iPhoneOS Debug 构建、严格签名和打包资源校验。在 iPhone 17 Pro 原位安装，设备应用清单确认构建号，App 启动成功。字幕、灵动岛和播报行为待真机验收。

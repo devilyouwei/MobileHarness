@@ -1297,11 +1297,11 @@ private actor PerceptionListeningProbe {
         {
             finalRoots.append(envelope.inputMetadata.rootID)
         }
-        guard case .actionCall(let call) = envelope.output,
-            call.actionPath.description == "Speech.Listening.update",
-            let enabled = call.parameters["enabled"].flatMap(Bool.init),
-            let paused = call.parameters["paused"].flatMap(Bool.init),
-            let revision = call.parameters["revision"].flatMap(UInt64.init)
+        guard case .toolCall(let call) = envelope.output,
+            call.toolPath == "Speech.Listening.update",
+            let enabled = call.arguments["enabled"].flatMap(Bool.init),
+            let paused = call.arguments["paused"].flatMap(Bool.init),
+            let revision = call.arguments["revision"].flatMap(UInt64.init)
         else { return }
         values.append(Value(enabled: enabled, paused: paused, revision: revision))
     }

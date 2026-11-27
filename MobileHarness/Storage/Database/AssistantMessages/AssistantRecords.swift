@@ -32,14 +32,32 @@ public struct AssistantDecisionMetadata: Codable, Sendable {
 
 /// Completed reply Action evidence for a settled interruption.
 public struct AssistantReplyTruncation: Codable, Equatable, Sendable {
+    public struct Cause: Codable, Equatable, Sendable {
+        public let inputID: String
+        public let source: String
+        public let capturedAt: String
+        public let route: String
+
+        public init(inputID: String, source: String, capturedAt: String, route: String) {
+            self.inputID = inputID
+            self.source = source
+            self.capturedAt = capturedAt
+            self.route = route
+        }
+    }
+
     public let roundID: String
     public let callID: String?
     public let completedCallIDs: [String]?
+    public let cause: Cause?
+    public let markerText: String?
 
-    public init(roundID: String, completedCallIDs: [String]) {
+    public init(roundID: String, completedCallIDs: [String], cause: Cause? = nil, markerText: String? = nil) {
         self.roundID = roundID
         self.callID = completedCallIDs.last
         self.completedCallIDs = completedCallIDs
+        self.cause = cause
+        self.markerText = markerText
     }
 }
 

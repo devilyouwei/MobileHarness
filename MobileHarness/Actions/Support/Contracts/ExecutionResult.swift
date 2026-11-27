@@ -50,6 +50,62 @@ public struct ExecutionResult: Sendable {
     public var roundID: String? { envelope.roundID }
 }
 
+public struct ToolExecutionResult: Sendable {
+    public let executionID: String
+    public let owner: ExecutionOwner
+    public let inputID: String
+    public let roundID: String?
+    public let outcome: Result<ActionCompletion, any Error>
+}
+
+/// Terminal execution payload sent to the original caller independently of call acknowledgment.
+public enum CallResultSignal: Sendable {
+    public static let contract = "execution.call.result.v1"
+    public static let channel = "execution.call.result"
+    case action(ExecutionResult)
+    case tool(ToolExecutionResult)
+
+    public var executionID: String {
+        switch self {
+        case .action(let result): result.executionID
+        case .tool(let result): result.executionID
+        }
+    }
+
+    public var owner: ExecutionOwner {
+        switch self {
+        case .action(let result): result.owner
+        case .tool(let result): result.owner
+        }
+    }
+}
+
+/// Execution lifecycle notifications, independent of terminal call results and control acknowledgments.
+public enum ActionExecutionEventSignal: Sendable {
+    public static let contract = "action.execution.event.v1"
+    public static let channel = "action.execution.event"
+    case started(ExecutionStart)
+    case control(ActionControlFeedback)
+
+    public var executionID: String {
+        switch self {
+        case .started(let event): return event.executionID
+        case .control(let event):
+            switch event.event {
+            case .stateChanged(let change): return change.executionID
+            case .receipt(let receipt): return receipt.executionID
+            }
+        }
+    }
+
+    public var owner: ExecutionOwner {
+        switch self {
+        case .started(let event): event.owner
+        case .control(let event): event.owner
+        }
+    }
+}
+
 extension ActionStatus {
     public var executionResultStatus: ExecutionResult.Status {
         switch self {

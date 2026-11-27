@@ -142,7 +142,8 @@ private enum RootCompositionFailure: Error { case startup }
             id: "bindings",
             start: {
                 try root.configure(BehaviorAssembly(capabilityModules: []))
-                _ = try gateway.configureExecution(.init(engine: root.configureExecution(resources: [])))
+                let engine = try root.configureExecution(resources: [])
+                _ = try await ActionExecutionTransport.connect(ports: gateway.configure(), engine: engine)
                 order.append("bindings")
             },
             stop: {
@@ -197,7 +198,8 @@ private enum RootCompositionFailure: Error { case startup }
             id: "bindings",
             start: {
                 try actions.configure(BehaviorAssembly(capabilityModules: []))
-                _ = try gateway.configureExecution(.init(engine: actions.configureExecution(resources: [])))
+                let engine = try actions.configureExecution(resources: [])
+                _ = try await ActionExecutionTransport.connect(ports: gateway.configure(), engine: engine)
             },
             stop: {
                 #expect(actions.state == .stopped && gateway.state == .stopped)

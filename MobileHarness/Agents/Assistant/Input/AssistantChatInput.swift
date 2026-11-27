@@ -215,41 +215,14 @@ extension AssistantChatWorker {
             try await acceptActionTerminal(result, input: input)
             return
         }
+        if case .toolResult(let result) = input.payload {
+            try await acceptToolFeedback(result, input: input)
+            return
+        }
         if try await acceptPendingFeedback(input) { return }
         if case .executionFeedback(let feedback) = input.payload,
             try await acceptExecutionLifecycle(feedback, input: input)
         {
-            return
-        }
-        if case .toolResult(let result) = input.payload,
-            let activeInput, let receiptRound = roundID,
-            let index = roundCalls.firstIndex(where: { $0.id == result.callID && $0.tool })
-        {
-            try validateFeedback(input)
-            guard result.roundID == nil || result.roundID == receiptRound else { throw CommunicationError.unauthorized }
-            try await persistFeedback(input)
-            if try await acceptPendingFeedback(input, persisted: true) { return }
-            do {
-                try await conversations.recordToolOutcome(
-                    result.callID, for: activeInput.id,
-                    state: result.isCancellationOnly ? .cancelled : (result.hasFailure ? .failed : .completed),
-                    output: result.value,
-                    error: result.isError ? result.failureCode : nil)
-            } catch {
-                feedbackFailure = "Native outcome persistence failed"
-                throw error
-            }
-            if try await acceptPendingFeedback(input, persisted: true, toolOutcomeRecorded: true) { return }
-            if roundID == receiptRound, roundCalls.indices.contains(index), roundCalls[index].id == result.callID {
-                try acceptResult(result, at: index)
-            }
-            return
-        }
-        if case .toolResult(let value) = input.payload {
-            guard let id = value.roundID, ownsExecutionRound(id, input: input),
-                id != roundID || activeInput == nil
-            else { throw CommunicationError.unauthorized }
-            try await persistFeedback(input)
             return
         }
         // Host control bypasses ordinary admission, including when the queue is full or paused.
@@ -503,8 +476,9 @@ extension AssistantChatWorker {
             do {
                 _ = try await conversations.admitUserInput(id: input.id, user: userText, model: "Not started")
                 if fullDuplex {
-                    let evidence = AssistantInputCoordination(
+                    var evidence = AssistantInputCoordination(
                         source: input.metadata.source, capturedAt: String(input.metadata.capturedAt))
+                    attachSpeechInterruption(to: input, evidence: &evidence)
                     coordination[input.id] = evidence
                     try await conversations.recordCoordination(evidence, for: input.id)
                 }
@@ -541,16 +515,7 @@ extension AssistantChatWorker {
         // Freeze context and target before enqueue can trigger this input's own reply.
         let occupied = replyAtArrival || playbackAtArrival == true
         let turn = occupied ? turnAtArrival.flatMap { $0.sessionID == input.sessionID ? $0 : nil } : nil
-        let keywordInterrupted: Bool
-        if input.sessionID == speechSessionID, let turn = input.turn,
-            case .transcript(_, final: true)? = input.payload.perception,
-            let index = keywordInterruptedTurns.firstIndex(of: turn.id)
-        {
-            keywordInterruptedTurns.remove(at: index)
-            keywordInterrupted = true
-        } else {
-            keywordInterrupted = false
-        }
+        let keywordInterrupted = hasKeywordInterruption(for: input)
         // Idle input skips interruption Decision and uses ordinary queue admission.
         let snapshot = (turn != nil && !keywordInterrupted && !awakened ? userText : nil).map { text in
             InputDecisionSnapshot(
@@ -568,9 +533,13 @@ extension AssistantChatWorker {
                 try await decisionQueue.submit(
                     .init(
                         snapshot: snapshot, target: target,
-                        interrupt: { [weak self] signal, session in
+                        interrupt: { [weak self] signal, session, route in
                             guard let self else { throw CommunicationError.unavailableTarget }
-                            return try await self.requestInterrupt(signal, sessionID: session, source: "decision")
+                            return try await self.admitInterrupt(
+                                signal, sessionID: session, source: "decision", keyword: nil,
+                                cause: .init(
+                                    inputID: input.id, source: input.metadata.source,
+                                    capturedAt: String(input.metadata.capturedAt), route: route.rawValue))
                         },
                         complete: { [weak self] snapshot, result, duration in
                             await self?.completeInputDecision(snapshot, outcome: result, duration: duration)
@@ -604,7 +573,10 @@ extension AssistantChatWorker {
         else { return }
         _ = try await admitInterrupt(
             .init(target: .reply(reply.id)), sessionID: input.sessionID, source: "keyword",
-            keyword: (input, match))
+            keyword: (input, match),
+            cause: .init(
+                inputID: input.id, source: input.metadata.source,
+                capturedAt: String(input.metadata.capturedAt), route: DecisionLogItem.Route.keyword.rawValue))
     }
 
     func interactionViews(sessionID: String) async throws -> [AgentTaskView] {

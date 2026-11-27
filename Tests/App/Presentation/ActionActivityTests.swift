@@ -25,6 +25,35 @@ private func activityRecord(
         failure: failure, completion: completion)
 }
 
+@Test @MainActor func controlLogMergesWithActionSnapshotsAndUsesItsOwnRetention() throws {
+    let log = RuntimeLogState()
+    let now = Date.now
+    let action = ActionActivityItem(execution: activityRecord(at: now))
+    log.record(.actions(revision: 1, records: [action], evictedCount: 5))
+    for index in 0...100 {
+        let time = now.addingTimeInterval(Double(index + 1))
+        log.record(
+            .agentControl(
+                .init(
+                    id: "control-\(index)", title: "state.set", channel: ActionActivityItem.controlChannel,
+                    status: "Completed", issueDescriptions: [],
+                    execution: .init(
+                        phase: index == 100 ? .cancelled : .succeeded,
+                        admittedAt: time, startedAt: time, endedAt: time), source: "assistant")))
+    }
+    #expect(log.evictedCount == 6)
+    #expect(log.items.first?.id == action.id && log.items[1].id == "control-1")
+    #expect(log.summaries(at: now).map(\.id) == [action.channel])
+    log.selectedChannel = ActionActivityItem.controlChannel
+    log.record(.actions(revision: 2, records: [], evictedCount: 7))
+    #expect(log.selectedChannel == ActionActivityItem.controlChannel)
+    #expect(log.visibleActions.count == 100 && log.evictedCount == 8)
+    log.selectedFilter = .succeeded
+    #expect(log.visibleActions.count == 99)
+    log.selectedSource = "writer"
+    #expect(log.visibleActions.isEmpty)
+}
+
 @Test @MainActor func actionActivityGroupsParallelChannelsAndKeepsDetailsAfterAutoHide() {
     let state = RuntimeLogState()
     let now = Date()

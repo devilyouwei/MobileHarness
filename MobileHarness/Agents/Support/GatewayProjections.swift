@@ -4,6 +4,16 @@ import FunctionContracts
 import Gateway
 
 extension OutputEnvelope {
+    func toolFeedbackInput(_ result: ToolResult) throws -> AgentInput {
+        guard (0..<8).contains(inputMetadata.hops) else { throw CommunicationError.hopLimitExceeded }
+        let payload = InputPayload.toolResult(result)
+        return AgentInput(
+            id: UUID().uuidString, sessionID: sessionID, payload: payload,
+            metadata: InputMetadata(
+                payload: payload, source: "runtime", origin: .runtime, sequence: sequence,
+                rootID: inputMetadata.rootID, parentID: inputID, hops: inputMetadata.hops + 1),
+            turn: turn, taskScope: taskScope)
+    }
     public var schedulingEnvelope: ExecutionEnvelope {
         .init(
             source: source.rawValue, sessionID: sessionID, inputID: inputID, schedulingScope: schedulingScope,
@@ -22,12 +32,15 @@ extension OutputEnvelope {
     }
 }
 extension ExecutionResult {
+    var causality: SignalCausality {
+        (envelope.correlation as? SignalCausality) ?? .root(id: envelope.inputID)
+    }
+
     public var agentValue: ActionResult {
         ActionResult(
             executionID: executionID, owner: owner,
             path: .init(domain: path.domain, module: path.module, function: path.function),
-            causality: (envelope.correlation as? SignalCausality)
-                ?? .init(inputID: envelope.inputID, rootID: envelope.inputID, hops: 0),
+            causality: causality,
             status: status.agentValue, effect: effect.agentValue, completion: completion?.agentValue,
             failure: failure?.agentValue, callID: envelope.callID, roundID: envelope.roundID,
             invocation: envelope.invocationSnapshot ?? invocation)
@@ -159,6 +172,14 @@ extension ActionReport {
 }
 extension ToolCall {
     public var executionRequest: ToolRequest { .init(id: id, toolPath: toolPath, arguments: arguments) }
+}
+
+extension ToolResponse {
+    func agentResult(roundID: String?, invocation: ActionInvocationSnapshot?) -> ToolResult {
+        .init(
+            callID: callID, value: value, isError: isError, failureCode: failureCode?.rawValue,
+            completion: completion?.agentValue, roundID: roundID, invocation: invocation)
+    }
 }
 
 extension ActionReport.Entry.Status {

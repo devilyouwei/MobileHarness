@@ -13,7 +13,7 @@ Support contains mechanisms shared across business domains. Each directory has o
 | [Localization](Localization/): ActionLocalization | Actions | Loads and validates per-language translations of declared function prose from the Actions resource bundle via `Bundle.module`; depends on FunctionContracts. |
 | Call: ActionMacro | Actions | @Action / @ActionCatalog author API; [macro implementation](../../../Macros/BehaviorDefinitions/README.md) emits definitions and pure preflight. |
 
-Actual App execution uses ActionsContainer's port and the [execution Shell](Shell/README.md) built over it. Gateway reaches the Shell only through the neutral ActionExecutionEngine contract and does not import these registries/executors or invoke raw handlers. Agents reads neutral metadata and performs cognitive authorization separately. Business-specific services remain in their owning domains.
+Actual App execution uses ActionsContainer's port and the [execution Shell](Shell/README.md) built over it. App registers the Actions receiver through Gateway's typed request facility. Agents reads neutral metadata and performs cognitive authorization separately. Business-specific services remain in their owning domains.
 
 ## Validation and preparation
 
@@ -37,4 +37,4 @@ Function value completions are not rejected by a generic byte ceiling. Activity 
 
 ## Execution Shell
 
-[Shell](Shell/README.md) is the Actions-owned Shell that runs admitted Agent → Action invocation Signals and returns Action → Agent feedback Signals: Channel scheduling, direct Tool calls, resource arbitration and result feedback. Gateway reaches it only through the neutral ActionExecutionEngine contract in [Contracts](Contracts/README.md).
+[Shell](Shell/README.md) is the Actions-owned Shell that runs admitted Agent → Action invocation Signals and returns Action → Agent feedback Signals. It owns Channel scheduling, direct Tool calls, resource arbitration and result feedback. [Contracts](Contracts/README.md) defines the receiver, call types and separate management capabilities.

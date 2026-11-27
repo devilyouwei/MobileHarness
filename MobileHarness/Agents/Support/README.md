@@ -10,9 +10,10 @@ Module-wide [host bindings](../AgentHostBindings.swift) and [Gateway ports](../A
 
 | File | Responsibility |
 | --- | --- |
-| [RuntimeLogProjection.swift](RuntimeLogProjection.swift) | Passive execution/Agent/Task log projection and localized app-owned copy. |
+| [RuntimeLogProjection.swift](RuntimeLogProjection.swift) | Passive Action execution, Agent control and Agent/Task log projection with localized app-owned copy. |
 | [ActionDispatcher.swift](ActionDispatcher.swift) | Scheduled Action admission, channel ordering, finish and cancellation barriers. |
-| [ToolDispatcher.swift](ToolDispatcher.swift) | Direct Tool calls, fresh execution attachments and correlated feedback or internal completion. |
+| [ActionExecutionTransport.swift](ActionExecutionTransport.swift) | Bound Action, Tool and Control request client and shared terminal receiver. Connects the Actions endpoint and uses an injected management port for resources and cleanup. |
+| [ToolDispatcher.swift](ToolDispatcher.swift) | Direct Tool calls, fresh execution attachments, caller-owned replies and optional addressed feedback. |
 | [ExecutionRouter.swift](ExecutionRouter.swift) | OutputValidator permission checks and side-effect-free output classification. |
 | [OutputExecutionResult.swift](OutputExecutionResult.swift) | Cognitive execution outcome, direct response and UI transaction result values. |
 | [InputGateway.swift](InputGateway.swift) | Bound role endpoints, semantic communication checks, direct replies and result delivery. |
@@ -56,20 +57,24 @@ flowchart LR
     Input["InputGateway / direct input"] --> Role["Role policy"]
     Role --> Context["Context / Chat"] --> Output["OutputGateway"]
     Output --> Policy["Validation / routing"] --> Dispatch["Action / Tool / communication"]
-    Dispatch --> Projection["Neutral Gateway invocation"]
-    Results["Gateway outcomes"] --> Input
+    Dispatch --> Projection["Neutral execution call"] --> Transport["Gateway"]
+    Transport --> Results["Authenticated execution results"]
+    Results -->|Action feedback| Input
+    Results --> Caller["Waiting Tool caller"]
     Results --> Logs["Passive localized presentation"]
 ```
 
 Roles produce OutputEnvelope with local processing identity. OutputGateway authenticates producer/incarnation, frozen decision/Skill catalog and Task scope. ActionCall uses ChannelScheduler; ToolCall uses DirectExecutionDispatcher. Catalog executionPolicy metadata does not switch these routes. Gateway does not repeat cognitive authorization. Revocation explicitly cancels the matching execution scope.
 
-InputGateway registers neutral endpoints. Broadcast requires exact subscription; directed messages and runtime feedback require declared inputs. OutputGateway constructs broadcast metadata from registered contracts. Gateway transports opaque payloads under its own endpoint/envelope/capacity/scope checks. Action/Tool completion values have no observation-byte quota; trusted identity, Task permissions and result consistency remain mandatory. Model context selection is separate.
+InputGateway registers role endpoints. Broadcast requires exact subscription; directed messages and runtime feedback require declared inputs. OutputGateway constructs broadcast metadata from registered contracts. Gateway transports opaque payloads under its own endpoint/envelope/capacity/scope checks. Model context selection is separate.
+
+All roles share the call adapter and receive terminal values from the same authenticated Actions sender over `execution.call.result.v1`. The shared result receiver checks the endpoint and message identities. Execution start and control events cross the same endpoints through `action.execution.event.v1`. InputGateway validates an Action result's owner and feedback declaration, then delivers the projected input locally to that role. A Tool result resolves the original caller's bounded entry keyed by the execution owner, original input, optional round and execution ID. The entry exists for the request lifetime and is released on completion, cancellation or failure. Action/Tool completion values are in-process values retained by the execution or waiting request, with no observation-byte quota.
 
 OutputGateway correlates model-round start and terminal events with the initiating input. It joins session-scoped cancellation with action admission, direct work, scheduled cleanup, and per-round delivery before sending the interruption terminal. The Assistant declares the unified execution feedback contract. InputGateway preserves the per-call legacy projection for roles declaring it.
 
-The output adapter projects round, standalone call, Task and input scopes to the Actions engine. A standalone Action uses its call ID as the scope key. Task grants retain their typed scheduling scopes for completion and cancellation. A definite pre-admission rejection carries the original call identity and has no execution ID. A Send timeout records a delivery failure, leaving execution status unconfirmed.
+The output adapter projects round, Task and input scheduling scopes to the Actions engine. A Tool without a model round has its own caller-bound completion. Task grants retain their typed scheduling scopes for completion and cancellation. A definite pre-admission rejection carries the original call identity and has no execution ID. A Send timeout records a delivery failure, leaving execution status unconfirmed.
 
-AgentGatewayAssembly receives SignalTransport and GatewayAdmission, prepares communication and a neutral GatewayConfiguration, then binds returned execution/observation capabilities. App alone configures GatewayContainer. No adapter searches or configures an upstream root. Camera/device ports exclude scene, root shutdown and native idle-join controls.
+AgentGatewayAssembly receives SignalTransport and GatewayAdmission and prepares cognitive communication. App configures GatewayContainer and supplies the Actions host for ActionExecutionTransport to connect to transport. Observation scopes expose independent Signal ports. Camera/device ports exclude scene, root shutdown and native idle-join controls.
 
 ## Lifetime, capacity and failures
 
@@ -85,7 +90,7 @@ AgentRuntimeLogWorkflow bounds pending failure events to 100 with explicit rejec
 
 ## Task authorization and internal completion
 
-GatewayOutputConsumer.executeInternal requires the registered role's internalTools and no roundID. Agents checks permission, Gateway checks admission/resources and Actions executes. Actual results return only to the internal caller, without InputGateway ToolResult feedback. execute and executeReturning retain protocol feedback and call identity.
+GatewayOutputConsumer.callInternalTool requires the registered role's internalTools and no roundID. Agents checks role permission, Gateway transports the request and Actions owns resource admission and execution. Actual results return to the internal caller. All callers may use `callTool` to receive their own value or completion, including Tools with a completion-only catalog policy. `execute` and `executeReturning` preserve local ToolResult continuations for roles that declare them. These continuations use the original bound owner and require one trip through Gateway for each direction.
 
 Task retirement is bound to the registered executor. OutputGateway closes grant admission, joins or cancels existing work according to terminal status, then revokes the admission generation. InputGateway records successful local retirement for diagnostics. Already missing grants from cleanup/restart can converge without fabricating an active grant.
 
@@ -93,7 +98,7 @@ Writer may request execution authorization after admitting a new ordinary messag
 
 ## Shared Island transport
 
-IndependentOutputWorkflow owns AgentIslandPublication. Roles provide IslandContent or an end intent. One immutable in-flight command and one replaceable latest pending command use stable activity/session identity and increasing revisions. Failed publication retains bounded evidence and retries latest state every 500 ms. Stop closes admission, cancels/joins the worker, then joins the final registered end call before producer retirement; Gateway supplies its deadline and cleanup failure remains visible.
+IndependentOutputWorkflow owns AgentIslandPublication. Roles provide IslandContent or an end intent. One immutable in-flight command and one replaceable latest pending command use stable activity/session identity and increasing revisions. The role-owned worker starts a fresh request chain even when a request handler submits the display update. Failed publication retains bounded evidence and retries latest state every 500 ms. Stop closes admission, cancels and joins the worker, then joins the final registered end call before producer retirement. Gateway supplies its deadline and cleanup failure remains visible.
 
 Shared permissions/bind helpers own internal-tool declarations, trusted identity and result checking. Content, timing, terminal fences and response handling remain role-owned. SpeechPerception, Assistant, Photographer and ApplicationControl do not publish for each other. App-bound audio callbacks report actual audioID start/end facts only. UI owns selection/layout/animation.
 
@@ -111,7 +116,7 @@ The default internal-action filter covers transcript/reply captions, reply waiti
 
 Signal requests are bound to the live role's registered typed handler. Gateway owns event FIFO tails, per-consumer capacity, retained bytes, optional observer branches and cancellation/join; InputGateway binds explicit static declarations and generic consumer-owned subscription handles, and projects passive diagnostics. It owns no task observation table; publishing never binds, starts or probes a consumer. AgentMessaging.send returns the direct Reply without an inbox receipt. Fixed-task roles bind this port rather than pumping an independent communication stream. Consumer assembly installs the generic stop observer before binding endpoints, so even idle static listeners retire with their role. Startup validates static source/publication pairs and real role handlers without probing online instances. Static declarations use signals.requests/feedback/publications/subscriptions, and public model directories are derived from actual enabled code adapters.
 
-AgentGatewayAssembly injects the validated production request/event implementation catalogs into InputGateway. Isolated observation sessions use role-supplied receive handlers and independently assembled contracts, so test/observation Agent IDs do not select unrelated production role types. executeDirect returns only to the native caller; executeReturning preserves paired ToolResult continuation for fixed UI workflows and uses the direct value for UI reply projection only.
+AgentGatewayAssembly injects the validated production request/event implementation catalogs into InputGateway. Isolated observation sessions use role-supplied receive handlers and independently assembled contracts, so test/observation Agent IDs do not select unrelated production role types. `callTool` returns the authenticated result to the waiting native caller. `executeReturning` preserves paired ToolResult continuation for fixed UI workflows and uses the direct value for UI reply projection only.
 
 InputGateway reports completed publication branches through the assembly-provided settlement callback, including delivered and rejected recipients; publication itself still returns admission only. The runtime uses this fact to retire failed or unobserved speech finals, without forwarding text outside Gateway or changing recipient authorization.
 

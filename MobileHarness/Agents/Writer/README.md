@@ -6,7 +6,7 @@ WriterWorkflow 消费独立注入的 ModelKit.ChatCapability，要求原生工�
 
 控制历史按完整调用/结果组裁剪，保留本次目标及最新配对；不设置固定创作轮数或整任务期限；委托统一通过显式 finish 结束。控制轮只返回正文时，运行时在恢复预算内要求补交工具调用。编辑任务通过 Actions Shell发布校验，纯作品库任务核对实际成功库操作，显式 outcome=explanation 在尚无文件操作时完成无产物说明，成功后直接结束，不额外要求一轮模型调用。控制响应文本与源码流均不设额外字节截断，模型采用 Provider 默认输出预算；原生参数与完整观察不设置单项字节拒绝，源码响应不受历史层256KiB累积上限限制。取消会取消模型会话并中止写入；中止失败与原始错误同时保留。未正常结束的流不得完成事务。每个检查点读取追加要求，文件流期间不切换目标。
 
-WriterAgent 是独立 AgentCore 角色，WriterContainer 随 Agents 根注册、暂停、恢复和关闭。来自 Assistant 的 agent.task.v1 正文通过真实 Input/OutputGateway 认证；工作区工具直接返回，不进入 ChannelScheduler。单任务准入（等待补充、暂停和取消清理也占用），每任务通过 ModelKit ChatModel 获取固定模型配置的能力句柄，暂停/补充期间保留；SDK 统一管理并发/本地排队和资源回收，Writer 不关闭或重开模型租约。Writer 不复用 Assistant 的 ChatWorker、XML、提示词或对话历史。
+WriterAgent 是独立 AgentCore 角色，WriterContainer 随 Agents 根注册、暂停、恢复和关闭。来自 Assistant 的 `agent.task.v1` 正文通过 Agents 的通信适配认证。Writer 和 Assistant 共用 [Agents 执行适配](../Support/README.md#interfaces-and-flow)。工作区工具通过 `tool.call.v1` 交给 Actions 直接执行，结果经 Gateway 回到等待中的原请求，由 Writer 使用原生 `toolCallID` 写回模型工具观察。单任务准入（等待补充、暂停和取消清理也占用），每任务通过 ModelKit ChatModel 获取固定模型配置的能力句柄，暂停或补充期间保留。SDK 统一管理并发、本地排队和资源回收。Writer 保留独立的创作工作流、提示词和历史。
 
 工作区工具与内容续写共享同一个委托所有者，但完成边界不同：Actions 的 edit 结果仅创建编辑流；append/complete/abort 经宿主 ArtifactStreaming 直接进入已接纳会话，单次 complete 只完成文件写入。取消、根暂停和停止先取消已捕获的生成 worker 并 revoke 续写准入，再加入这些 worker；worker 负责加入模型、预览和 release 后才提交终态或允许恢复。revoke 不取消已开始的 abort；release 等待全部在途效果，不因取消者自身退出而提前释放。恢复经 Gateway start/resume 重新接纳，旧 streamID 无效。Actions 根另有 shutdown 兜底。普通 Scene 隐藏不撤销创作会话。服务的互斥、容量与失败契约见 [Artifacts 生命周期](../../Actions/Artifacts/README.md#执行与续写生命周期)。
 
@@ -20,7 +20,7 @@ Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应�
 
 | 文件 | 职责 |
 | --- | --- |
-| [WriterAgent.swift](WriterAgent.swift) | AgentCore 角色：收件、准入、执行 worker、工具端口绑定与 agent.task.response 回报队列。状态全部 private，同一编译目标内的 Assistant 不可访问。 |
+| [WriterAgent.swift](WriterAgent.swift) | AgentCore 角色：收件、准入、执行 worker、工具端口绑定与 agent.task.events.v1 回报队列。状态全部 private，同一编译目标内的 Assistant 不可访问。 |
 | [WriterWorkflow.swift](Workflow/WriterWorkflow.swift) | 控制/内容模型循环、收件意图判定（inboxIntent）及 WriterBudget 字节预算。 |
 | [WriterTools.swift](Workflow/WriterTools.swift) | 宿主绑定的 WriterTools 端口、工具结果、控制域和本地工具声明，以及共享的 WriterToolGroup 工具分组。 |
 | [WriterContainer.swift](WriterContainer.swift) | 根拥有的注册、暂停、恢复、关闭与存储装配。 |
@@ -29,7 +29,7 @@ Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应�
 | [WriterHistory.swift](State/WriterHistory.swift) / [WriterRecovery.swift](Workflow/WriterRecovery.swift) / [WriterDiagnostics.swift](State/WriterDiagnostics.swift) | 请求历史与恢复上下文、有界恢复、失败分类。 |
 | [WriterPreview.swift](Output/WriterPreview.swift) / [WriterIslandPresentation.swift](Output/WriterIslandPresentation.swift) / [WriterNotifications.swift](WriterNotifications.swift) | 预览刷新、自有灵动岛、终态持久投递。 |
 
-对外只暴露 Agent 通信协议（agent.task.request / agent.task.response）及根装配接口。作品导出端口 WriterArtifactsControlling 由宿主经 AgentContainer.writerArtifacts 直接提供给设置页，Writer 不持有 UI 导出能力。
+对等 Agent 通过 `agent.task.v1` 提交委派，通过 `agent.task.events.v1` 接收回报。作品导出端口 WriterArtifactsControlling 由宿主经 AgentContainer.writerArtifacts 直接提供给设置页，Writer 不持有 UI 导出能力。
 
 ## 创作执行流程
 

@@ -260,8 +260,11 @@ for target_name, path, dependencies in (
             errors.append(f'Forbidden isolated execution import: {source.relative_to(ROOT)}')
 if {next(iter(d.values()))[0] for d in targets['FunctionContractTests'].get('dependencies', [])} != {'FunctionContracts'}:
     errors.append('FunctionContractTests must prove contracts without execution/call dependencies')
-if {next(iter(d.values()))[0] for d in targets['Gateway'].get('dependencies', [])} != {'FunctionContracts'}:
-    errors.append('Gateway must not depend on native input SDKs')
+if targets['Gateway'].get('dependencies'):
+    errors.append('Gateway must not depend on application or native input modules')
+for source in target_sources(targets['Gateway']):
+    if imported_modules(source.read_text()) - {'Foundation', 'Synchronization'}:
+        errors.append(f'Gateway contains a non-transport import: {source.relative_to(ROOT)}')
 if 'Support/Contracts' not in targets['Actions'].get('exclude', []):
     errors.append('Actions must exclude its independent FunctionContracts source target')
 if target_sources(targets['Gateway']) & (target_sources(targets['ExecutionRuntime']) | target_sources(targets['CallRuntime'])):

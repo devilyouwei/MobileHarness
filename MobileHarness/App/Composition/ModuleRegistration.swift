@@ -48,11 +48,11 @@ import Gateway
                     let log = services.actionAssembly.connectActionLog(to: services.uiContainer.runtimeLog)
                     let engine = try services.actions.configureExecution(
                         resources: business.resources, onExecutionSnapshot: log)
+                    let ports = try services.gateway.configure()
                     let communication = AgentGatewayAssembly(
-                        signals: services.gateway.signals,
-                        admission: services.gateway.admissionPort, engine: engine, configuration: binding.configuration)
-                    let ports = try services.gateway.configureExecution(communication.configuration)
-                    let facilities = communication.bind(ports: ports, observations: services.gateway.observations)
+                        signals: ports.signals, admission: ports.admission, configuration: binding.configuration)
+                    let facilities = try await communication.bind(
+                        ports: ports, observations: services.gateway.observations, engine: engine)
                     try services.agents.bindExecution(binding, facilities: facilities)
                 },
                 stop: {

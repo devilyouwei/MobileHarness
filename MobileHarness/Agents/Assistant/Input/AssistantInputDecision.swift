@@ -549,7 +549,9 @@ actor AssistantDecisionQueue {
     struct Job: Sendable {
         let snapshot: InputDecisionSnapshot
         let target: UUID?
-        let interrupt: @Sendable (AssistantInterrupt, String) async throws -> AssistantInterruptResult
+        let interrupt:
+            @Sendable (AssistantInterrupt, String, InputDecisionOutcome.Route) async throws
+                -> AssistantInterruptResult
         let complete: @Sendable (InputDecisionSnapshot, InputDecisionOutcome, Duration) async -> Void
         let updated: @Sendable () async -> Void
         var canClassify: @Sendable () async -> Bool = { true }
@@ -603,7 +605,7 @@ actor AssistantDecisionQueue {
                     } else if let target = job.target {
                         do {
                             result.signalStatus = try await job.interrupt(
-                                AssistantInterrupt(target: .reply(target)), job.snapshot.input.sessionID
+                                AssistantInterrupt(target: .reply(target)), job.snapshot.input.sessionID, result.route
                             ).rawValue
                         } catch {
                             result.signalStatus = "interrupt_failed"

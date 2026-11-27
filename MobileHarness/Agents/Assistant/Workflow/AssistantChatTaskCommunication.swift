@@ -83,9 +83,6 @@ extension AssistantChatWorker {
         case .executionFeedback(.interruptionFinished(let value)):
             return activeInterruption?.id == value.id
         case .executionFeedback(.actionFinished(let value)):
-            if value.roundID == nil, value.path == Self.playbackVolume.path {
-                return value.owner.agent == descriptor.id && value.owner.sessionID == input.sessionID
-            }
             return value.roundID.map { ownsExecutionRound($0, input: input) } == true
         case .toolResult(let value):
             return roundCalls.contains { $0.id == value.callID }

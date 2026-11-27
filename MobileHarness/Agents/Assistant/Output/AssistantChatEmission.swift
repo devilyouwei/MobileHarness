@@ -67,6 +67,9 @@ extension AssistantChatWorker {
     func dispatchRequest(_ input: AgentInput, requestID: String, model: InferenceModelIdentity? = nil) async throws {
         try await conversations.markModelRequestDispatched(
             input.id, requestID: requestID, modelID: model?.modelID, displayName: model?.displayName)
+        if decisionTurn?.inputID == input.id, decisionTurn?.replyActions?.requestID != requestID {
+            decisionTurn?.replyActions = ReplyActions(requestID: requestID)
+        }
         interruptedIntents[input.sessionID] = nil
     }
 
@@ -102,7 +105,7 @@ extension AssistantChatWorker {
                 try await AgentChatDriver.collect(
                     request, using: chat,
                     consumers: .init(
-                        text: { try await self.consumeActionText($0, input: input, requestID: roundID) },
+                        text: { try await self.consumeActionText($0, input: input) },
                         native: { _ = try await self.consumeNativeTools($0, input: input) },
                         evidence: { event in
                             try await self.dispatchRequest(input, requestID: roundID)
@@ -160,7 +163,7 @@ extension AssistantChatWorker {
     }
 
     func consumeActionText(
-        _ fragments: AsyncThrowingStream<String, any Error>, input: AgentInput, requestID: String
+        _ fragments: AsyncThrowingStream<String, any Error>, input: AgentInput
     )
         async throws -> String
     {
@@ -172,9 +175,6 @@ extension AssistantChatWorker {
         var emittedCalls = 0
         for try await delta in fragments {
             try Task.checkCancellation()
-            if !delta.isEmpty, decisionTurn?.inputID == input.id, decisionTurn?.replyActions == nil {
-                decisionTurn?.replyActions = ReplyActions(requestID: requestID)
-            }
             try await recordGenerationEvidence { try await conversations.append(delta, to: input.id) }
             text += delta
             try await emitLocatedFunctions(generator.appendLocated(Data(delta.utf8)), for: input, count: &emittedCalls)
@@ -485,7 +485,7 @@ extension AssistantChatWorker {
     @discardableResult
     func emit(
         _ output: AgentOutput, for input: AgentInput, callID: String? = nil, terminalRound: String? = nil,
-        failure: AgentFailureDiagnostic? = nil, standaloneAction: Bool = false
+        failure: AgentFailureDiagnostic? = nil, independentOfRound: Bool = false
     ) -> Bool {
         if case .control(let value) = output,
             value == "agent.finished" || value == "agent.cancelled" || value.hasPrefix("agent.error:")
@@ -494,7 +494,7 @@ extension AssistantChatWorker {
         }
         outputSequence += 1
         let outputRoundID: String?
-        if standaloneAction {
+        if independentOfRound {
             outputRoundID = nil
         } else if case .communication = output {
             outputRoundID = nil
@@ -508,7 +508,7 @@ extension AssistantChatWorker {
                 source: descriptor.id, context: input.context, output: output, sequence: outputSequence,
                 roundID: outputRoundID,
                 callID: callID, taskScope: input.taskScope, failure: failure,
-                resourceBindings: outputRoundID == nil ? [:] : resourceBindings, standaloneAction: standaloneAction))
+                resourceBindings: outputRoundID == nil ? [:] : resourceBindings))
         {
         case .enqueued:
             return true
