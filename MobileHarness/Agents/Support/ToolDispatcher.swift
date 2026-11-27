@@ -43,7 +43,7 @@ struct ToolDispatcher: Sendable {
                 let completion = try await executor.execute(
                     FunctionInvocation(
                         tool: call.executionRequest, context: envelope.executionContext,
-                        attachment: try Self.executionAttachment(envelope)), owner: owner)
+                        attachment: try Self.executionAttachment(envelope), roundID: envelope.roundID), owner: owner)
                 result = try ToolResponse.response(
                     completion,
                     policy: envelope.roundID != nil ? .returning : descriptor.directResultPolicy, callID: call.id)

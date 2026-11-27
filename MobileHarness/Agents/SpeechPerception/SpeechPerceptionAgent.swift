@@ -90,7 +90,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private var recentVADWindows: [Duration] = []
     private var vadWindowSequence: UInt64 = 0
     private var publishedVADWindowSequence: UInt64 = 0
-    private var onsetRevision: UInt64 = 0
+    private var utteranceEnergy: (utterance: String, policy: SpeechEnergyBands)?
     private var speechFrameSequence: UInt64 = 0
     private let pcmPreparation: SpeechPCMPreparation
     private let speechEnhancementEnabled: @Sendable () async throws -> Bool
@@ -313,7 +313,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     }
 
     /// The native route decides whether capture can stay open during playback.
-    func setCaptureDuplex(_ supported: Bool) {
+    func setCaptureDuplex(_ supported: Bool) async {
         microphoneAdmissionOpenedAt = nil
         listeningPolicy.fullDuplex = supported
     }
@@ -620,7 +620,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             do {
                 try await communicate(
                     SpeechRecognition(.partial, text: text, generation: vadGeneration).message(),
-                    parent: parent, recordEvidence: false)
+                    parent: parent, evidence: .none)
             } catch {
                 Logger(subsystem: "dev.mobileharness", category: "SpeechRecognition").error(
                     "Partial transcript not published: \(String(describing: error), privacy: .public)")
@@ -774,6 +774,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         recognitionTurn: SpeechRecognitionTurn, playing: Bool, useShortEndpoint: Bool,
         capturedAt: ContinuousClock.Instant
     ) async throws {
+        let captureGeneration = vadGeneration
         activeInput = acceptedInput.assigning(turn: currentTurn)
         try Task.checkCancellation()
         let onset = SpeechOnsetPolicy(
@@ -783,6 +784,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             useShortEndpoint: useShortEndpoint,
             onsetThreshold: onset.onsetThreshold)
         try Task.checkCancellation()
+        guard vadGeneration == captureGeneration else { return }
         let beganTurn =
             currentTurn == nil
             && (result.isSpeaking
@@ -795,8 +797,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             currentTurn = AgentTurn(id: UUID().uuidString, ordinal: turnOrdinal)
             traceOnset(onset, playing: playing, probability: result.probability, level: frame.rmsDecibels)
         }
-        await reportVAD(result.windows, capturedAt: capturedAt, confirmed: beganTurn ? currentTurn?.id : nil)
+        await reportVAD(
+            result.windows, capturedAt: capturedAt, confirmed: beganTurn ? currentTurn?.id : nil)
+        guard vadGeneration == captureGeneration else { return }
         await updateKeywordProbe(result.windows, capturedAt: capturedAt)
+        guard vadGeneration == captureGeneration else { return }
         let input = acceptedInput.assigning(turn: currentTurn)
         activeInput = input
         if beganTurn { try presentTranscript("", input: input) }
@@ -826,8 +831,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private func finishUtterance(
         input: AgentInput, recognitionTurn: SpeechRecognitionTurn, noTextEndpoint: Bool = false
     ) async throws {
+        let captureGeneration = vadGeneration
         resetKeywordProbe()
         recognitionSuspended = true
+        await finishUtteranceEnergy()
+        guard vadGeneration == captureGeneration else { return }
         phase = .processing
         soundEstimator.reset()
         if soundLayout == .firstOrderAmbisonicsACNSN3D, case .audio(let audio) = input.payload {
@@ -843,14 +851,16 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         if input.turn != nil {
             await pcmPreparation.reset()
         }
+        guard vadGeneration == captureGeneration else { return }
         try emit(.toolCall(Self.transcript.call(["text": String(text.suffix(320))])), input: input)
         try emit(.toolCall(Self.finishTranscript.call([:])), input: input)
         try emit(.control("agent.finished"), input: input)
         if input.turn != nil {
             try await communicate(
                 SpeechRecognition(
-                    .final, text: text, generation: vadGeneration, oldestWindowBeforeOnset: oldestWindowBeforeOnset
+                    .final, text: text, generation: captureGeneration, oldestWindowBeforeOnset: oldestWindowBeforeOnset
                 ).message(), parent: input)
+            guard vadGeneration == captureGeneration else { return }
             publishedRecognitionFinal = true
         }
         try await resetListening(after: input, requireFreshOnset: noTextEndpoint)
@@ -867,24 +877,31 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
 
     /// A failed utterance does not close the resident Agent, microphone or output stream.
     private func recoverRecognition(_ error: any Error) async {
+        let captureGeneration = vadGeneration
         resetKeywordProbe()
+        await finishUtteranceEnergy()
+        guard vadGeneration == captureGeneration else { return }
         let failedInput = activeInput?.assigning(turn: currentTurn)
         if let failedInput, failedInput.turn != nil, !publishedRecognitionFinal {
             let detail = String(decoding: String(describing: error).utf8.prefix(496), as: UTF8.self)
             do {
                 try await communicate(
                     SpeechRecognition(
-                        .final, text: "", generation: vadGeneration, failure: detail,
+                        .final, text: "", generation: captureGeneration, failure: detail,
                         oldestWindowBeforeOnset: oldestWindowBeforeOnset
                     ).message(),
                     parent: failedInput)
             } catch { reportError(error, input: failedInput) }
         }
-        await endVADCapture()
+        guard vadGeneration == captureGeneration else { return }
         let failedSession = sessionID
         let failedGeneration = nativeCaptureGeneration
         let failedRecognition = recognitionTurn
         let failedSegmenter = segmenter
+        await endVADCapture()
+        guard vadGeneration == nil, sessionID == failedSession, nativeCaptureGeneration == failedGeneration else {
+            return
+        }
         if let failedInput { reportError(error, input: failedInput) }
         await failedRecognition?.cancel()
         await failedSegmenter?.cancel()
@@ -1025,7 +1042,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         vadGeneration = generation
         vadWindowSequence = 0
         publishedVADWindowSequence = 0
-        onsetRevision = 0
         recentVADWindows.removeAll(keepingCapacity: true)
         await publishSpeech(SpeechActivity(.captureStarted, generation: generation))
     }
@@ -1033,6 +1049,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     func endVADCapture() async {
         guard let generation = vadGeneration else { return }
         vadGeneration = nil
+        utteranceEnergy = nil
         onsetCandidatePublished = false
         resetKeywordProbe()
         await publishSpeech(SpeechActivity(.captureStopped, generation: generation))
@@ -1044,7 +1061,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let parent = AgentInput(
             id: UUID().uuidString, sessionID: interactionSessionID, payload: .event("speech.activity"))
         do {
-            try await communicate(activity.message(), parent: parent, recordEvidence: activity.kind != .vadProgress)
+            try await communicate(
+                activity.message(), parent: parent,
+                evidence: activity.kind == .vadProgress || activity.kind == .energyChanged ? .none : .afterPublication)
         } catch {
             Logger(subsystem: "dev.mobileharness", category: "SpeechActivity").error(
                 "\(activity.kind.rawValue, privacy: .public) not published: \(String(describing: error), privacy: .public)"
@@ -1061,6 +1080,18 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             guard vadGeneration == generation else { return }
             await publishOnset(candidate: window.onsetCandidate, confirmed: index == confirmation ? utterance : nil)
             guard vadGeneration == generation else { return }
+            if index == confirmation, let utterance {
+                utteranceEnergy = (utterance, SpeechEnergyBands())
+            }
+            if window.speaking, let utterance = utteranceEnergy?.utterance,
+                let energy = utteranceEnergy?.policy.observe(window.pcm, hasVoice: window.hasVoice)
+            {
+                await publishSpeech(
+                    SpeechActivity(
+                        .energyChanged, generation: generation, utterance: utterance,
+                        energy: energy))
+                guard vadGeneration == generation else { return }
+            }
             guard window.sampleCount == 512 else { continue }
             let start = capturedAt + .nanoseconds(window.offset * 62_500)
             recentVADWindows.append(SpeechSignalClock.offset(at: start))
@@ -1070,14 +1101,23 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         }
     }
 
+    private func finishUtteranceEnergy() async {
+        guard let previous = utteranceEnergy else { return }
+        utteranceEnergy = nil
+        guard previous.policy.energy != .low, let generation = vadGeneration else { return }
+        await publishSpeech(
+            SpeechActivity(
+                .energyChanged, generation: generation, utterance: previous.utterance,
+                energy: .low))
+    }
+
     private func publishVADProgress() async {
         guard let generation = vadGeneration, vadWindowSequence > publishedVADWindowSequence else { return }
         publishedVADWindowSequence = vadWindowSequence
         let oldest = recentVADWindows.count == SpeechActivity.progressWindowCount ? recentVADWindows.first : nil
         await publishSpeech(
             SpeechActivity(
-                .vadProgress, generation: generation, sequence: vadWindowSequence, oldestWindow: oldest,
-                onsetRevision: onsetRevision))
+                .vadProgress, generation: generation, sequence: vadWindowSequence, oldestWindow: oldest))
     }
 
     private func publishOnset(candidate: Bool, confirmed utterance: String?) async {
@@ -1088,52 +1128,69 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             await publishVADProgress()
             guard vadGeneration == generation else { return }
             onsetCandidatePublished = true
-            onsetRevision += 1
             await publishSpeech(
                 SpeechActivity(
-                    .onsetStarted, generation: generation, onsetRevision: onsetRevision,
+                    .onsetStarted, generation: generation,
                     oldestWindowBeforeOnset: preceding))
+            guard vadGeneration == generation else { return }
         }
         if let utterance {
             onsetCandidatePublished = false
-            onsetRevision += 1
             await publishSpeech(
                 SpeechActivity(
-                    .onsetConfirmed, generation: generation, utterance: utterance, onsetRevision: onsetRevision,
+                    .onsetConfirmed, generation: generation, utterance: utterance,
                     oldestWindowBeforeOnset: oldestWindowBeforeOnset))
         } else if onsetCandidatePublished, !candidate {
             onsetCandidatePublished = false
-            onsetRevision += 1
-            await publishSpeech(SpeechActivity(.onsetCleared, generation: generation, onsetRevision: onsetRevision))
+            await publishSpeech(SpeechActivity(.onsetCleared, generation: generation))
         }
     }
 
     // MARK: - Communication output
 
-    func communicate(_ message: AgentMessage, parent: AgentInput, recordEvidence: Bool = true) async throws {
+    enum PublicationEvidence: Equatable {
+        case beforePublication, afterPublication, none
+    }
+
+    func communicate(
+        _ message: AgentMessage, parent: AgentInput, evidence: PublicationEvidence = .afterPublication
+    ) async throws {
         var parent = parent
         if let interactionSessionID, message.contract == SpeechRecognition.contract {
             parent = AgentInput(
                 id: parent.id, sessionID: interactionSessionID, payload: parent.payload,
                 metadata: parent.metadata, turn: parent.turn, taskScope: parent.taskScope)
         }
-        let causalParent = parent
         let action = try CommunicationAction(message: message)
-        if recordEvidence {
-            let evidence = try JSONEncoder().encode(
-                SignalEvidence(
-                    AgentInput(
-                        id: action.id, sessionID: causalParent.sessionID, payload: .observation(message),
-                        metadata: causalParent.metadata, turn: causalParent.turn, taskScope: causalParent.taskScope)))
-            try await contextRepository.update {
-                try $0.append(
-                    .init(
-                        id: action.id, taskID: causalParent.taskScope?.id ?? causalParent.id,
-                        kind: "communication.output", data: evidence),
-                    retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
-            }
+        if evidence == .beforePublication {
+            try await recordCommunication(action, parent: parent)
+            try Task.checkCancellation()
+            guard !parent.metadata.expired else { throw CommunicationError.expired }
         }
         try emit(.communication(action), input: parent)
+        if evidence == .afterPublication {
+            do {
+                try await recordCommunication(action, parent: parent)
+            } catch {
+                Logger(subsystem: "dev.mobileharness", category: "SpeechActivity").error(
+                    "Could not record \(message.contract, privacy: .public): \(String(describing: error), privacy: .public)"
+                )
+            }
+        }
+    }
+
+    private func recordCommunication(_ action: CommunicationAction, parent: AgentInput) async throws {
+        let input = AgentInput(
+            id: action.id, sessionID: parent.sessionID, payload: .observation(action.message),
+            metadata: parent.metadata, turn: parent.turn, taskScope: parent.taskScope)
+        let evidence = try JSONEncoder().encode(SignalEvidence(input))
+        try await contextRepository.update {
+            try $0.append(
+                .init(
+                    id: action.id, taskID: parent.taskScope?.id ?? parent.id,
+                    kind: "communication.output", data: evidence),
+                retainingLast: SpeechPerceptionSignalPreprocessor.evidenceCapacity)
+        }
     }
 
     // MARK: - Context

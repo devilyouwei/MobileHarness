@@ -53,7 +53,9 @@ public struct CommunicationContract: Sendable {
 public struct CommunicationContracts: Sendable {
     private let entries: [String: CommunicationContract]
     public static let standard = CommunicationContracts(standard: [
-        .init(name: "action.result.v1", kind: .actionResult),
+        .init(name: ExecutionFeedback.actionResultContract, kind: .actionResult),
+        .init(name: ExecutionFeedback.toolResultContract, kind: .toolResult),
+        .init(name: ExecutionFeedback.controlResultContract, kind: .executionFeedback),
         .init(name: ExecutionFeedback.contract, kind: .executionFeedback),
     ])
     private init(standard: [CommunicationContract]) {
@@ -128,8 +130,13 @@ public struct CommunicationDeclaration: Codable, Sendable {
     public var inputKinds: Set<InputKind> {
         // Every role has the unified entry for authenticated dynamic Task observations.
         var kinds: Set<InputKind> = [.observation]
-        if feedback.contains("action.result.v1") { kinds.formUnion([.actionResult, .toolResult]) }
-        if feedback.contains(ExecutionFeedback.contract) { kinds.formUnion([.executionFeedback, .toolResult]) }
+        if feedback.contains(ExecutionFeedback.actionResultContract) {
+            kinds.insert(.actionResult)
+        }
+        if feedback.contains(ExecutionFeedback.toolResultContract) { kinds.insert(.toolResult) }
+        if feedback.contains(ExecutionFeedback.contract) || feedback.contains(ExecutionFeedback.controlResultContract) {
+            kinds.insert(.executionFeedback)
+        }
         return kinds
     }
     public func validate(contracts: CommunicationContracts = .standard, agentID: AgentID = .init(rawValue: "unbound"))
@@ -150,7 +157,10 @@ public struct CommunicationDeclaration: Codable, Sendable {
                 SignalIdentifier.protocol($0) && contracts[$0]?.kind == .observation && contracts[$0]?.channel == nil
             }),
             feedback.allSatisfy({
-                ["action.result.v1", ExecutionFeedback.contract].contains($0) && contracts[$0] != nil
+                [
+                    ExecutionFeedback.actionResultContract, ExecutionFeedback.toolResultContract,
+                    ExecutionFeedback.controlResultContract, ExecutionFeedback.contract,
+                ].contains($0) && contracts[$0] != nil
             }),
             publications.allSatisfy({
                 SignalIdentifier.channel($0.channel) && contracts[$0.protocol]?.channel == $0.channel
@@ -222,11 +232,9 @@ public struct CommunicationPolicy: Sendable {
     public func accepts(_ input: AgentInput, target: AgentID) -> Bool {
         guard input.metadata.version == 1, let declaration = agents[target] else { return false }
         switch input.payload.kind {
-        case .actionResult: return declaration.feedback.contains("action.result.v1")
-        case .toolResult:
-            return declaration.feedback.contains("action.result.v1")
-                || declaration.feedback.contains(ExecutionFeedback.contract)
-        case .executionFeedback: return declaration.feedback.contains(ExecutionFeedback.contract)
+        case .actionResult: return declaration.feedback.contains(ExecutionFeedback.actionResultContract)
+        case .toolResult: return declaration.feedback.contains(ExecutionFeedback.toolResultContract)
+        case .executionFeedback: return declaration.feedback.contains(input.metadata.contract)
         case .activityEvent: return input.metadata.origin == .runtime
         case .observation:
             // Host feedback is authenticated by its execution-owner delivery port.

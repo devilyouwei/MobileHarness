@@ -14,6 +14,8 @@ This existing target imports Foundation and Synchronization only, with no projec
 | ActionExecutionDescriptor / ActionCatalogSnapshot | Immutable descriptions, call protocols and execution/return policies; no handler or mutation API. |
 | PreparedAction / ActionsExecutionPort | Effect-free prepare, one-use revision-bound credential, resources/budget, execute and discard. Root instances retain actual invocations privately. |
 | ActionExecutionEngine / ActionSignalBinding / ScheduledAction / ExecutionStart / ExecutionResult / ActionSchedulingError | Neutral Agent → Action invocation and Action → Agent feedback boundary: Gateway forwards through the Shell contract and binds endpoint validation and the feedback exit once; the Actions Shell implements it. |
+| CallRoundBoundary / CallLane / CallRoundSettlement | A round boundary belongs to one call lane and carries the Assistant-issued round ID and start or end scope. The End acknowledgement returns a settlement handle for that lane. |
+| ActionControl / ActionPauseControl / ActionControlReceipt / ActionExecutionStateChange | Discoverable instance lifecycle commands, optional pause/resume hooks, and independently correlated feedback. The scheduler owns single-instance cancel. Domain settings use ordinary Action calls. Execution identity, control identity, command order and state version remain separate. |
 | ActionExecutionRecord / ActionExecutionSnapshot | Read-only scheduling observation with canonical path, bounded parameter previews and actual completion evidence. |
 | ActionCompletion / ActionReport / ActionFailure | Real completion/value/activity/report, per-leaf partial effects and independent failure. |
 | ExecutionOwner / ResourceDefinition / ResourceLease / ResourceExecutionPermit | Opaque endpoint owner, configured resource mechanisms and live revocable authority. No Agent identity or role lookup. |
@@ -35,6 +37,8 @@ validateInput checks path, at most 32 arguments, keys up to 64 bytes, without a 
 Budget resolution validates the definition and uses dynamicTimeout before static/default timeout. The default is 30 seconds; expected duration is nonnegative and timeout positive, at least expected and at most 86,400 seconds. Serial budgets sum; parallel budgets take maxima; empty composition uses zero expected and a 100-ms timeout. Budget values do not themselves stop work.
 
 ## Completion, failure and ownership
+
+`ActionSchedulingScope` identifies the group for execution, sealing and cancellation. Model rounds, standalone calls, Tasks and inputs remain distinct even if their ID strings match. The execution envelope derives its round ID from the round scope and its standalone call ID from the call scope. `ScheduledAction` reads its execution ID from the contained `FunctionInvocation`.
 
 ActionReport holds at most 256 entries. Paths are nonempty up to 128 bytes; details hold at most 16 pairs, keys up to 64 bytes and values up to 512 bytes. Entry states are succeeded, failed, cancelled and notStarted. Independent execution failure is retained alongside prior child results. Producer failure codes are nonempty up to 64 bytes and some value initializers enforce preconditions; callers must provide valid identifiers.
 

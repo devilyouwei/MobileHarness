@@ -52,16 +52,16 @@ extension AssistantChatWorker {
         }
     }
     /// Presentation calls participate in the round, but never count as a model-generated answer.
-    func finishReplyWaiting(_ requestID: String, input: AgentInput) async throws {
-        guard replyWaitingRequest == requestID else { return }
-        replyWaitingRequest = nil
+    func finishReplyWaiting(_ waitingID: String, input: AgentInput) async throws {
+        guard activeReplyWaitingID == waitingID else { return }
+        activeReplyWaitingID = nil
         await replyPresentation?(false)
         guard presentsReply, input.turn != nil else { return }
         // A cancelled round is cleared by the local presentation lifecycle.
         guard !Task.isCancelled else { return }
         guard
             try emitAction(
-                Self.replyWaiting.call(["enabled": "false", "requestID": requestID]), for: input)
+                Self.replyWaiting.call(["enabled": "false", "requestID": waitingID]), for: input)
         else { throw HarnessError.queueFull }
     }
     func dispatchRequest(_ input: AgentInput, requestID: String, model: InferenceModelIdentity? = nil) async throws {
@@ -70,30 +70,30 @@ extension AssistantChatWorker {
         interruptedIntents[input.sessionID] = nil
     }
 
-    func collect(_ request: ChatRequest, input: AgentInput, invocationID: String, using chat: any ChatCapability)
+    func collect(_ request: ChatRequest, input: AgentInput, roundID: String, using chat: any ChatCapability)
         async throws
         -> String
     {
         try Task.checkCancellation()
-        let requestID = UUID().uuidString
+        let replyWaitingID = UUID().uuidString
         if presentsReply, input.turn != nil {
             guard
                 try emitAction(
-                    Self.replyWaiting.call(["enabled": "true", "requestID": requestID]), for: input)
+                    Self.replyWaiting.call(["enabled": "true", "requestID": replyWaitingID]), for: input)
             else { throw HarnessError.queueFull }
-            replyWaitingRequest = requestID
+            activeReplyWaitingID = replyWaitingID
         }
         if let replyPresentation {
-            replyWaitingRequest = requestID
+            activeReplyWaitingID = replyWaitingID
             await replyPresentation(true)
         }
         var request = request.measuringInference()
         let recordedRequest = request
         request.onDispatch = { [self] in
-            if recordedRequest.metadata?.model == nil { try await self.dispatchRequest(input, requestID: invocationID) }
+            if recordedRequest.metadata?.model == nil { try await self.dispatchRequest(input, requestID: roundID) }
         }
         request.onModelDispatch = { [self] model in
-            try await self.dispatchRequest(input, requestID: invocationID, model: model)
+            try await self.dispatchRequest(input, requestID: roundID, model: model)
         }
         let startCalls = generationCalls
         let result: Result<String, any Error>
@@ -102,15 +102,15 @@ extension AssistantChatWorker {
                 try await AgentChatDriver.collect(
                     request, using: chat,
                     consumers: .init(
-                        text: { try await self.consumeActionText($0, input: input, requestID: invocationID) },
+                        text: { try await self.consumeActionText($0, input: input, requestID: roundID) },
                         native: { _ = try await self.consumeNativeTools($0, input: input) },
                         evidence: { event in
-                            try await self.dispatchRequest(input, requestID: invocationID)
+                            try await self.dispatchRequest(input, requestID: roundID)
                             switch event {
                             case .text(let text) where !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty:
-                                try await self.finishReplyWaiting(requestID, input: input)
+                                try await self.finishReplyWaiting(replyWaitingID, input: input)
                             case .toolCall, .finished:
-                                try await self.finishReplyWaiting(requestID, input: input)
+                                try await self.finishReplyWaiting(replyWaitingID, input: input)
                             default: break
                             }
                             try await self.modelEvidence(event, input: input)
@@ -144,14 +144,14 @@ extension AssistantChatWorker {
                                             input: $0.input, generated: $0.generated, total: $0.total,
                                             cachedInput: $0.cachedInput, cacheWriteInput: $0.cacheWriteInput)
                                     }, finishReason: metadata.finishReason.map(\.rawValue), for: input.id,
-                                    requestID: invocationID)
+                                    requestID: roundID)
                             }
                         })))
         } catch {
             result = .failure(error)
         }
         // Runs for errors before a stream exists as well as cancellation of a live stream.
-        try await finishReplyWaiting(requestID, input: input)
+        try await finishReplyWaiting(replyWaitingID, input: input)
         let answer = try result.get()
         guard generationCalls > startCalls else {
             throw CapabilityError.unavailable("LLM returned no speakable answer")
@@ -359,11 +359,6 @@ extension AssistantChatWorker {
                 guard emit(.rejectedCall(rejection), for: input) else { throw HarnessError.queueFull }
                 continue
             }
-            if case .scheduling(let directive) = event {
-                try Task.checkCancellation()
-                guard emit(.scheduling(directive), for: input) else { throw HarnessError.queueFull }
-                continue
-            }
             if case .tool(let call) = event {
                 try Task.checkCancellation()
                 try reserveGeneratedCall(count: &count)
@@ -395,6 +390,10 @@ extension AssistantChatWorker {
             let call = original
             try Task.checkCancellation()
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+            if call.isWait {
+                guard emit(.actionCall(call), for: input) else { throw HarnessError.queueFull }
+                continue
+            }
             try reserveGeneratedCall(count: &count)
             if call.actionPath == ActionPath(domain: "Speech", module: "Playback", function: "speak"),
                 let text = call.parameters["text"]
@@ -486,7 +485,7 @@ extension AssistantChatWorker {
     @discardableResult
     func emit(
         _ output: AgentOutput, for input: AgentInput, callID: String? = nil, terminalRound: String? = nil,
-        failure: AgentFailureDiagnostic? = nil
+        failure: AgentFailureDiagnostic? = nil, standaloneAction: Bool = false
     ) -> Bool {
         if case .control(let value) = output,
             value == "agent.finished" || value == "agent.cancelled" || value.hasPrefix("agent.error:")
@@ -495,7 +494,11 @@ extension AssistantChatWorker {
         }
         outputSequence += 1
         let outputRoundID: String?
-        if case .communication = output {
+        if standaloneAction {
+            outputRoundID = nil
+        } else if case .communication = output {
+            outputRoundID = nil
+        } else if case .actionControl = output {
             outputRoundID = nil
         } else {
             outputRoundID = terminalRound ?? (input.id == activeInput?.id ? roundID : nil)
@@ -505,7 +508,7 @@ extension AssistantChatWorker {
                 source: descriptor.id, context: input.context, output: output, sequence: outputSequence,
                 roundID: outputRoundID,
                 callID: callID, taskScope: input.taskScope, failure: failure,
-                resourceBindings: outputRoundID == nil ? [:] : resourceBindings))
+                resourceBindings: outputRoundID == nil ? [:] : resourceBindings, standaloneAction: standaloneAction))
         {
         case .enqueued:
             return true

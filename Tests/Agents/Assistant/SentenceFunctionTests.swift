@@ -248,10 +248,12 @@ private struct ExcessiveSentencesChat: ChatCapability {
         try generator.append("<express emotion='thinking'/><wait>然后回答</wait>尾巴")
         + generator.finish()
     let calls = events.compactMap(\.actionCall).filter { $0.actionPath.module != "Caption" }
-    #expect(calls.map { $0.actionPath.function } == ["speak", "express", "speak", "speak"])
+    try #require(calls.map { $0.actionPath.function } == ["speak", "express", "wait", "speak", "wait", "speak"])
     #expect(calls[0].parameters["text"] == "你好，先想一下")
-    #expect(calls[2].channel == "Speech" && calls[2].parameters["text"] == "然后回答")
-    #expect(calls[3].parameters["text"] == "尾巴")
+    #expect(calls[2].scope == .start)
+    #expect(calls[3].channel == "Speech" && calls[3].parameters["text"] == "然后回答")
+    #expect(calls[4].scope == .end)
+    #expect(calls[5].parameters["text"] == "尾巴")
 }
 
 @Test(.actionCatalog) func sharedSegmentationDefaultsToSentenceBoundariesAndAcceptsExplicitLimits() throws {

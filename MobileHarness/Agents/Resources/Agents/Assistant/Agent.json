@@ -27,7 +27,10 @@
   "signals": {
     "requests": [],
     "feedback": [
-      "action.execution.feedback.v1"
+      "action.execution.event.v1",
+      "action.result.v1",
+      "tool.result.v1",
+      "action.control.result.v1"
     ],
     "publications": [
       {

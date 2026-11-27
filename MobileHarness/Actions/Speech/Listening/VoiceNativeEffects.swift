@@ -72,7 +72,7 @@
         }
 
         public func play(
-            _ stream: AudioStream, context: ActionExecutionContext,
+            _ stream: AudioStream, context: ActionExecutionContext, control: AudioPlaybackControl,
             validate: @escaping @MainActor () throws -> Void,
             currentSession: @escaping @MainActor () -> Bool,
             activeChanged: @escaping @MainActor (Bool, ContinuousClock.Instant) async -> Void
@@ -108,6 +108,7 @@
                 try Task.checkCancellation()
                 try validate()
                 try await audio.playStream(
+                    control: control,
                     onStarted: {
                         guard !started else { return }
                         started = true

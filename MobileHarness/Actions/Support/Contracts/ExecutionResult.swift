@@ -4,8 +4,15 @@ public struct ExecutionStart: Sendable {
     public let executionID: String
     public let owner: ExecutionOwner
     public let envelope: ExecutionEnvelope
-    public init(executionID: String, owner: ExecutionOwner, envelope: ExecutionEnvelope) {
+    public let path: ActionIdentifier?
+    public let controlCapabilities: Set<String>
+    public init(
+        executionID: String, owner: ExecutionOwner, envelope: ExecutionEnvelope,
+        path: ActionIdentifier? = nil, controlCapabilities: Set<String> = []
+    ) {
         self.executionID = executionID
+        self.path = path
+        self.controlCapabilities = controlCapabilities
         self.owner = owner
         self.envelope = envelope
     }

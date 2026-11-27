@@ -145,6 +145,7 @@ extension AssistantChatWorker {
             input.sessionID == speechSessionID
         {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
+            try settleSpeechEnergy(input, recognition: recognition)
             if recognition.text.isEmpty {
                 if let failure = recognition.failure {
                     emit(.control("agent.error: speech recognition: \(failure)"), for: input)
@@ -210,46 +211,14 @@ extension AssistantChatWorker {
         }
         if case .event = input.payload { throw HarnessError.unsupportedInput }
         guard !input.metadata.expired else { throw CommunicationError.expired }
+        if case .executionFeedback(.actionFinished(let result)) = input.payload {
+            try await acceptActionTerminal(result, input: input)
+            return
+        }
         if try await acceptPendingFeedback(input) { return }
         if case .executionFeedback(let feedback) = input.payload,
             try await acceptExecutionLifecycle(feedback, input: input)
         {
-            return
-        }
-        if case .executionFeedback(.actionFinished(let result)) = input.payload {
-            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-                result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID
-            else { throw CommunicationError.unauthorized }
-            if let id = result.callID {
-                guard let receiptRound = result.roundID, ownsExecutionRound(receiptRound, input: input) else {
-                    throw CommunicationError.unauthorized
-                }
-                if receiptRound == roundID, activeInput != nil {
-                    guard let index = roundCalls.firstIndex(where: { $0.id == id && !$0.tool }),
-                        roundCalls[index].path == result.path.description
-                    else { throw CommunicationError.unauthorized }
-                    recordReplyActionCompletion(result)
-                    try await persistFeedback(input)
-                    if try await acceptPendingFeedback(input, persisted: true) { return }
-                    if receiptRound == roundID, roundCalls.indices.contains(index), roundCalls[index].id == id {
-                        let value = try Self.completionText(result.completion)
-                        try acceptResult(
-                            .init(
-                                callID: id, value: value, isError: result.status != .succeeded,
-                                failureCode: result.failure?.rawValue, completion: result.completion ?? .completed,
-                                roundID: receiptRound),
-                            at: index)
-                        roundCalls[index].actionResult = result
-                    }
-                } else {
-                    // Cleanup can outlive the generation. Retain the terminal as execution evidence.
-                    recordReplyActionCompletion(result)
-                    try await persistFeedback(input)
-                }
-            } else {
-                try await persistFeedback(input)
-            }
-            resultInbox.accept(result)
             return
         }
         if case .toolResult(let result) = input.payload,
@@ -776,24 +745,32 @@ extension AssistantChatWorker {
     }
     func drain() {
         guard worker == nil, lifecycle == .running, !hostCancellationInProgress else { return }
-        let waitingForSettlement = executionCancellationBarrier || !pendingRounds.isEmpty
-        let settlements = Set(
-            pendingRounds.values.filter { $0.queued && (!executionCancellationBarrier || $0.cancelled) }
-                .map { $0.input.id })
-        guard !waitingForSettlement || !settlements.isEmpty else { return }
-        if !settlementAdmissions.isEmpty {
-            settlementAdmissions.formIntersection(Set(admittingInputs.keys))
-            guard waitingForSettlement || settlementAdmissions.isEmpty else { return }
+        if let index = readyRoundSettlements.firstIndex(where: { id in
+            guard let pending = pendingRounds[id], !pending.publishing else { return false }
+            return !executionCancellationBarrier || pending.cancelled
+        }), let pending = pendingRounds[readyRoundSettlements[index]] {
+            let id = readyRoundSettlements.remove(at: index)
+            pendingRounds[id]?.settling = true
+            let input = pending.input
+            // Finish admissions already in flight for the same batch before selecting the next model input.
+            settlementAdmissions.formUnion(admittingInputs.filter { $0.value == input.sessionID }.keys)
+            processed += 1
+            activeInput = input
+            beginDecisionTurn(input)
+            worker = Task { await self.generate(pending.text, input: input, using: pending.chat, settlingRoundID: id) }
+            return
         }
+        guard !executionCancellationBarrier, pendingRounds.isEmpty else { return }
+        settlementAdmissions.formIntersection(Set(admittingInputs.keys))
+        guard settlementAdmissions.isEmpty else { return }
         while lifecycle == .running && !queue.isEmpty {
             var excluded = Set(
                 queue.inputs.filter { queued in
-                    !settlements.contains(queued.id)
-                        && (waitingForSettlement || blockedSessions.contains(queued.sessionID)
-                            || (queued.sessionID == speechSessionID && interruptionWait != nil))
+                    blockedSessions.contains(queued.sessionID)
+                        || (queued.sessionID == speechSessionID && interruptionWait != nil)
                 }.map(\.id))
             let ordinarySpeech = queue.inputs.filter {
-                $0.sessionID == speechSessionID && !excluded.contains($0.id) && !settlements.contains($0.id)
+                $0.sessionID == speechSessionID && !excluded.contains($0.id)
             }
             let laterSpeech: Set<String>
             if ordinarySpeech.contains(where: { !isAfterSpeechWindow($0) }) {
@@ -805,13 +782,8 @@ extension AssistantChatWorker {
             guard let entry = queue.take(excluding: excluded) else { return }
             let input = entry.input
             processed += 1
-            if settlements.contains(input.id) {
-                // Wait for the inputs already being admitted for this batch, without waiting for Decision.
-                settlementAdmissions.formUnion(admittingInputs.filter { $0.value == input.sessionID }.keys)
-            } else if fullDuplex, Self.inputText(input) != nil {
-                let excluded = Set(pendingRounds.values.map { $0.input.id })
-                    .union(queue.inputs.filter { Self.inputText($0) == nil }.map(\.id))
-                    .union(laterSpeech)
+            if fullDuplex, Self.inputText(input) != nil {
+                let excluded = Set(queue.inputs.filter { Self.inputText($0) == nil }.map(\.id)).union(laterSpeech)
                 let entries = [input] + queue.takeAll(sessionID: input.sessionID, excluding: excluded).map(\.input)
                 var seen: Set<String> = []
                 let members = entries.flatMap { batchMembers[$0.id] ?? [$0] }.filter { seen.insert($0.id).inserted }

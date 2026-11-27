@@ -89,6 +89,7 @@
 			CEB6001397C0A7B4AE7C1D26 /* MobileHarness/Agents/Support/Core/Capability/ControlRegistration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Support/Core/Capability/ControlRegistration.swift; sourceTree = SOURCE_ROOT; };
 			9D5BAC32FA283F503253B4CB /* MobileHarness/Gateway/GatewayExecution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Gateway/GatewayExecution.swift; sourceTree = SOURCE_ROOT; };
 			2FFE8CC6492EB394E069F32E /* MobileHarness/Actions/Camera/Runtime/CameraResourceBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Camera/Runtime/CameraResourceBinding.swift; sourceTree = SOURCE_ROOT; };
+			F265E334E5E5EF4460969B1D /* MobileHarness/Actions/Support/Contracts/ActionControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionControl.swift; sourceTree = SOURCE_ROOT; };
 			527E4459BC57DAEA14CAFDFB /* MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift; sourceTree = SOURCE_ROOT; };
 			CCE94058A4E720D2CD30BE28 /* MobileHarness/Actions/Support/Contracts/ExecutionRuntimeFacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Contracts/ExecutionRuntimeFacts.swift; sourceTree = SOURCE_ROOT; };
 			81B3F90DF18939B949CB948D /* MobileHarness/Actions/Support/Shell/ActionExecutionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/ActionExecutionCoordinator.swift; sourceTree = SOURCE_ROOT; };
@@ -260,6 +261,7 @@
 		31AB194E865CBDC832B224AF /* MobileHarness/ModelKit/Vision/PoseCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/ModelKit/Vision/PoseCapability.swift; sourceTree = SOURCE_ROOT; };
 		3243C6CE3D047B5D026E6D9B /* MobileHarness/Agents/Resources/Agents/Assistant/Prompts.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MobileHarness/Agents/Resources/Agents/Assistant/Prompts.json; sourceTree = SOURCE_ROOT; };
 		326B8E70EFEA2688232FD88D /* MobileHarness/Actions/System/ModelResources/ModelResourcesClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/System/ModelResources/ModelResourcesClient.swift; sourceTree = SOURCE_ROOT; };
+		0E21DCC3CDC66BE07A45BFE2 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionControlRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Scheduling/ActionControlRuntime.swift; sourceTree = SOURCE_ROOT; };
 		32EAA1A798BA523C78A0E871 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionExecutionLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Actions/Support/Shell/Scheduling/ActionExecutionLedger.swift; sourceTree = SOURCE_ROOT; };
 		3314CD4193E638E9F9164B28 /* MobileHarness/Agents/AgentFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/AgentFailure.swift; sourceTree = SOURCE_ROOT; };
 		331A5EBAD14D83CEB04429D3 /* MobileHarness/UI/Components/Island/IslandState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/UI/Components/Island/IslandState.swift; sourceTree = SOURCE_ROOT; };
@@ -1650,6 +1652,7 @@
 					isa = PBXGroup;
 					children = (
 					6E46A3A5CD5F048899975480 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionDiagnostics.swift */,
+					0E21DCC3CDC66BE07A45BFE2 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionControlRuntime.swift */,
 					32EAA1A798BA523C78A0E871 /* MobileHarness/Actions/Support/Shell/Scheduling/ActionExecutionLedger.swift */,
 					08636EA24BA78B9745FD27D5 /* MobileHarness/Actions/Support/Shell/Scheduling/ChannelScheduler.swift */,
 					99EAAB2154D5C07D493D0805 /* MobileHarness/Actions/Support/Shell/Scheduling/ExecutionChannel.swift */,
@@ -2969,6 +2972,7 @@
 				F5DA6EA7766AF354D7FF21E8 /* MobileHarness/Actions/Support/Contracts/VoicePerceptionHandling.swift */,
 				C3AD5B0A293B8C3C9459CA80 /* MobileHarness/Actions/Support/Contracts/VoicePresentationHandling.swift */,
 				3A6B6BA857B619F78FD43ED9 /* MobileHarness/Actions/Support/Contracts/ArtifactStreaming.swift */,
+				F265E334E5E5EF4460969B1D /* MobileHarness/Actions/Support/Contracts/ActionControl.swift */,
 				527E4459BC57DAEA14CAFDFB /* MobileHarness/Actions/Support/Contracts/ActionExecutionEngine.swift */,
 				9383D74BF742AAF24A3F87C1 /* MobileHarness/Actions/Support/Contracts/ActionSchedulingError.swift */,
 				52C53A58E540AA3626E65D9D /* MobileHarness/Actions/Support/Contracts/ExecutionResult.swift */,

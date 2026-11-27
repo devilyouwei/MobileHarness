@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 /// Agent-owned failure classification; producers retain the original typed cause.
 public struct AgentFailureDiagnostic: Equatable, Sendable {
@@ -20,9 +21,10 @@ public enum AgentOutput: Equatable, Sendable {
     case communication(CommunicationAction)
     case rejectedCall(CallRejection)
     case actionCall(ActionCall)
+    case actionControl(ActionControl)
     case toolCall(ToolCall)
     case control(String)
-    case scheduling(SchedulingDirective)
+    case roundBranchSealed(CallLane, String)
     case roundStarted(String)
     case roundFinished(String)
     public var kind: OutputKind {
@@ -31,9 +33,8 @@ public enum AgentOutput: Equatable, Sendable {
         case .rejectedCall(let rejection): rejection.kind == .tool ? .toolCall : .actionCall
         case .actionCall: .actionCall
         case .toolCall: .toolCall
-        case .control: .control
-        case .scheduling: .scheduling
-        case .roundStarted, .roundFinished: .control
+        case .control, .actionControl: .control
+        case .roundStarted, .roundBranchSealed, .roundFinished: .control
         }
     }
 }
@@ -54,17 +55,33 @@ public struct ExecutionEnd: Codable, Equatable, Sendable {
 
 /// Addressed runtime feedback. An Action, a model round and a session interruption have distinct identities.
 public enum ExecutionFeedback: Codable, Equatable, Sendable {
-    public static let contract = "action.execution.feedback.v1"
-    case actionStarted(roundID: String, callID: String)
+    public static let contract = "action.execution.event.v1"
+    public static let actionResultContract = "action.result.v1"
+    public static let toolResultContract = "tool.result.v1"
+    public static let controlResultContract = "action.control.result.v1"
+
+    public var protocolID: String {
+        switch self {
+        case .actionFinished: Self.actionResultContract
+        case .actionControlReceipt: Self.controlResultContract
+        default: Self.contract
+        }
+    }
+    case actionStarted(
+        roundID: String?, callID: String?, executionID: String? = nil, controlCapabilities: Set<String>? = nil,
+        path: ActionPath? = nil)
+    case actionStateChanged(ActionExecutionStateChange)
+    case actionControlReceipt(ActionControlReceipt)
     case actionFinished(ActionResult)
     case roundStarted(String)
+    case roundBranchFinished(CallLane, ExecutionEnd)
     case roundFinished(ExecutionEnd)
     case interruptionStarted(String)
     case interruptionFinished(ExecutionEnd)
 }
 
 public enum OutputKind: String, Codable, Sendable {
-    case communication, scheduling, actionCall, toolCall, control
+    case communication, actionCall, toolCall, control
 }
 
 /// Agent call intent; Gateway translates it to an Actions request. source/input/session correlation is carried by OutputEnvelope.
@@ -72,11 +89,15 @@ public struct ActionCall: Equatable, Sendable {
     public let actionPath: ActionPath
     public let channel: String
     public let parameters: [String: String]
+    public let scope: CallScope?
+    public var isWait: Bool { actionPath == Self.waitPath }
+    public static let waitPath = ActionPath(domain: "Scheduling", module: "Wait", function: "wait")
 
-    public init(actionPath: ActionPath, channel: String, parameters: [String: String] = [:]) {
+    public init(actionPath: ActionPath, channel: String, parameters: [String: String] = [:], scope: CallScope? = nil) {
         self.actionPath = actionPath
         self.channel = channel
         self.parameters = parameters
+        self.scope = scope
     }
 }
 

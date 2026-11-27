@@ -25,10 +25,12 @@ extension ActionInvocation {
     }
 }
 extension ChannelScheduler {
-    func finish(inputID: String, source: AgentID) async throws {
-        try await finish(inputID: inputID, source: source.rawValue)
+    func finish(scope: ActionSchedulingScope, source: AgentID) async throws {
+        try await finish(scope: scope, source: source.rawValue)
     }
-    func cancel(inputID: String, source: AgentID) async { await cancel(inputID: inputID, source: source.rawValue) }
+    func cancel(scope: ActionSchedulingScope, source: AgentID) async {
+        await cancel(scope: scope, source: source.rawValue)
+    }
     func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async {
         await cancel(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
     }

@@ -103,6 +103,7 @@ public actor OutputGateway {
         switch envelope.output {
         case .toolCall(let call): title = call.toolPath
         case .actionCall(let call): title = call.actionPath.description
+        case .actionControl: title = "Action control"
         case .rejectedCall(let rejection): title = rejection.alias
         default: title = "Output"
         }
@@ -145,7 +146,8 @@ public actor OutputGateway {
     private var cancellingProducers: [ProducerSession: ExecutionEnd.Reason] = [:]
     private var directExecutions: [String: DirectExecution] = [:]
     private var openRounds: [String: OutputEnvelope] = [:]
-    private var endingRounds: [String: (scope: OutputScope, task: Task<Void, Error>)] = [:]
+    private var endingRounds:
+        [String: (token: UUID, scope: OutputScope, reason: ExecutionEnd.Reason, task: Task<Void, Error>)] = [:]
     private func isCancelled(_ scope: OutputScope) -> Bool {
         cancelledScopes.contains(scope)
             || cancellingProducers[.init(source: scope.source, session: scope.session)] != nil
@@ -173,7 +175,7 @@ public actor OutputGateway {
     }
     private func dispatchOwned(_ envelope: OutputEnvelope) async throws -> ToolResponse? {
         switch envelope.output {
-        case .actionCall, .toolCall, .communication:
+        case .actionCall, .actionControl, .toolCall, .communication:
             guard directExecutions.count < 128 else { throw HarnessError.queueFull }
             let id = UUID().uuidString
             let task = Task {
@@ -193,6 +195,7 @@ public actor OutputGateway {
         default: return try await dispatch(envelope)
         }
     }
+    private var branchSettlements: [String: [CallLane: CallRoundSettlement]] = [:]
     private var roundFailures: [String: String] = [:]
     private var outputResults: [OutputExecutionResult] = []
     private var evictedOutputs: UInt64 = 0
@@ -388,7 +391,7 @@ public actor OutputGateway {
                     if task.kind == .result {
                         let completion = try await manager.beginTaskCompletion(task.scope, executor: source)
                         try await joinTaskCompletion(
-                            task.scope, executionIDs: completion.executionIDs,
+                            task.scope, schedulingScopes: completion.schedulingScopes,
                             succeeded: task.status == .succeeded)
                     }
                 }
@@ -460,8 +463,8 @@ public actor OutputGateway {
         let requests = self.requests
         try await manager.observeStops(id: lifecycleObserverID) { [weak self] agent, incarnation, terminations in
             for event in terminations {
-                for executionID in event.executionIDs {
-                    await scheduler.cancel(inputID: executionID, source: event.scope.executor)
+                for schedulingScope in event.schedulingScopes {
+                    await scheduler.cancel(scope: schedulingScope, source: event.scope.executor)
                 }
                 await self?.cancelTaskCalls(event.scope.id)
                 let outcome = await requests.deliverTaskTermination(event)
@@ -508,15 +511,17 @@ public actor OutputGateway {
         retainTaskFailure(event.scope.id, message: "Task terminal delivery rejected")
     }
 
-    private func joinTaskCompletion(_ scope: AgentTaskScope, executionIDs: Set<String>, succeeded: Bool) async throws {
+    private func joinTaskCompletion(
+        _ scope: AgentTaskScope, schedulingScopes: Set<ActionSchedulingScope>, succeeded: Bool
+    ) async throws {
         let calls = taskCalls[scope.id] ?? [:]
         if !succeeded {
-            for id in executionIDs { await actions.executor.cancel(inputID: id, source: scope.executor) }
+            for id in schedulingScopes { await actions.executor.cancel(scope: id, source: scope.executor) }
             for call in calls.values { call.cancel() }
             for call in calls.values { _ = await call.result }
         }
-        for id in executionIDs {
-            do { try await actions.executor.finish(inputID: id, source: scope.executor) } catch {
+        for id in schedulingScopes {
+            do { try await actions.executor.finish(scope: id, source: scope.executor) } catch {
                 if succeeded { throw error }
                 try Task.checkCancellation()
             }
@@ -537,7 +542,8 @@ public actor OutputGateway {
                 scope, executor: owner.agent, incarnation: owner.incarnation)
         else { return }
         do {
-            try await joinTaskCompletion(scope, executionIDs: completion.executionIDs, succeeded: status == .succeeded)
+            try await joinTaskCompletion(
+                scope, schedulingScopes: completion.schedulingScopes, succeeded: status == .succeeded)
             if await manager.retireTask(scope.id, admissionID: completion.admissionID) {
                 await requests.recordTaskRetirement(evidence, owner: owner)
             }
@@ -555,8 +561,8 @@ public actor OutputGateway {
             let events = try await manager.failTask(
                 scope, executor: owner.agent, incarnation: owner.incarnation, reason: reason, admissionID: admissionID)
             for event in events {
-                for id in event.executionIDs {
-                    await actions.executor.cancel(inputID: id, source: event.scope.executor)
+                for id in event.schedulingScopes {
+                    await actions.executor.cancel(scope: id, source: event.scope.executor)
                 }
                 await cancelTaskCalls(event.scope.id)
                 let outcome = await requests.deliverTaskTermination(event)
@@ -633,7 +639,9 @@ public actor OutputGateway {
         cancelledScopes.formUnion(outputScopes.filter { $0.source == id && $0.session == sessionID })
         let owner = ExecutionOwner(agent: id, incarnation: incarnation, sessionID: sessionID)
         let rounds = openRounds.values.filter { $0.source == id && $0.sessionID == sessionID }
-        let ending = endingRounds.values.filter { $0.scope.source == id && $0.scope.session == sessionID }
+        let ending = endingRounds.filter { key, transition in
+            transition.scope.source == id && transition.scope.session == sessionID && openRounds[key] == nil
+        }.values
         async let started: Void = publishInterruptionStart(interruptionID, owner: owner)
         let direct = directExecutions.values.filter {
             $0.scope.source == id && $0.scope.session == sessionID && !$0.interruption
@@ -684,43 +692,79 @@ public actor OutputGateway {
         try await requests.deliverExecutionFeedback(.interruptionStarted(id), owner: owner, causality: .root(id: id))
     }
 
+    private func settleRoundBranch(
+        _ boundary: CallRoundBoundary, lane: CallLane, owner: ExecutionOwner
+    ) async -> ExecutionEnd {
+        do {
+            let existing = branchSettlements[boundary.roundID]?[lane]
+            let settlement: CallRoundSettlement?
+            if let existing {
+                settlement = existing
+            } else {
+                settlement = try await execution.roundBoundary(boundary, lane: lane, owner: owner)
+            }
+            guard let settlement else { throw CommunicationError.invalidPayload }
+            try await settlement.wait()
+            return .init(id: boundary.roundID)
+        } catch {
+            await execution.cancel(scope: .round(boundary.roundID), source: owner.endpoint)
+            return .init(
+                id: boundary.roundID, reason: .failed, cleanupConfirmed: false, failure: String(describing: error))
+        }
+    }
+
     private func closeRound(
         _ id: String, envelope: OutputEnvelope, owner: ExecutionOwner, reason: ExecutionEnd.Reason,
         alreadyCancelled: Bool = false
     ) async throws {
-        if let ending = endingRounds[id] { return try await ending.task.value }
+        if let ending = endingRounds[id] {
+            guard reason != .completed, ending.reason == .completed, openRounds[id] != nil else {
+                return try await ending.task.value
+            }
+            ending.task.cancel()
+            endingRounds[id] = nil
+        }
         guard openRounds[id] != nil else { return }
         if reason == .completed, isCancelled(OutputScope(envelope)) { throw CancellationError() }
-        var failure = roundFailures.removeValue(forKey: id)
-        var deliveryFailure: (any Error)?
-        if !alreadyCancelled {
-            do {
-                if reason == .completed { try await actions.finish(envelope) } else { await actions.cancel(envelope) }
-            } catch {
-                try Task.checkCancellation()
-                if isCancelled(OutputScope(envelope)) { throw CancellationError() }
-                await actions.cancel(envelope)
-                failure = String(describing: error)
+        let token = UUID()
+        let task = Task {
+            var failure = roundFailures.removeValue(forKey: id)
+            var cleanupConfirmed = true
+            var branchOutcomes: [(CallLane, ExecutionEnd)] = []
+            let boundary = CallRoundBoundary(roundID: id, scope: .end)
+            if reason == .completed {
+                async let action = settleRoundBranch(boundary, lane: .action, owner: owner)
+                async let tool = settleRoundBranch(boundary, lane: .tool, owner: owner)
+                branchOutcomes = await [(.action, action), (.tool, tool)]
+                failure = failure ?? branchOutcomes.compactMap { $0.1.failure }.first
+                cleanupConfirmed = branchOutcomes.allSatisfy { $0.1.cleanupConfirmed }
+            } else {
+                if !alreadyCancelled { await actions.cancel(envelope) }
+                do {
+                    try await actions.executor.finishRoundDelivery(id)
+                } catch {
+                    cleanupConfirmed = false
+                    failure = String(describing: error)
+                }
+            }
+            branchSettlements[id] = nil
+            if reason == .completed, Task.isCancelled || isCancelled(OutputScope(envelope)) { return }
+            guard openRounds.removeValue(forKey: id) != nil else { return }
+            let causality = SignalCausality(envelope: envelope)
+            for (lane, outcome) in branchOutcomes {
+                try await requests.deliverExecutionFeedback(
+                    .roundBranchFinished(lane, outcome), owner: owner, causality: causality)
+            }
+            let end = ExecutionEnd(
+                id: id, reason: reason == .completed && failure != nil ? .failed : reason,
+                cleanupConfirmed: cleanupConfirmed, failure: failure)
+            try await requests.deliverExecutionFeedback(.roundFinished(end), owner: owner, causality: causality)
+            if !cleanupConfirmed {
+                throw AgentExecutionCleanupError(reason: failure ?? "Round cleanup unconfirmed")
             }
         }
-        do { try await actions.executor.finishRoundDelivery(id) } catch {
-            try Task.checkCancellation()
-            deliveryFailure = error
-            failure = String(describing: error)
-        }
-        if reason == .completed, isCancelled(OutputScope(envelope)) { throw CancellationError() }
-        if let ending = endingRounds[id] { return try await ending.task.value }
-        guard openRounds.removeValue(forKey: id) != nil else { return }
-        let end = ExecutionEnd(
-            id: id, reason: reason == .completed && failure != nil ? .failed : reason,
-            cleanupConfirmed: deliveryFailure == nil, failure: failure)
-        let task = Task {
-            try await requests.deliverExecutionFeedback(
-                .roundFinished(end), owner: owner, causality: SignalCausality(envelope: envelope))
-            if let deliveryFailure { throw deliveryFailure }
-        }
-        endingRounds[id] = (OutputScope(envelope), task)
-        defer { endingRounds[id] = nil }
+        endingRounds[id] = (token, OutputScope(envelope), reason, task)
+        defer { if endingRounds[id]?.token == token { endingRounds[id] = nil } }
         try await task.value
     }
 
@@ -761,6 +805,7 @@ public actor OutputGateway {
         endingRounds.removeAll()
         openRounds.removeAll()
         roundFailures.removeAll()
+        branchSettlements.removeAll()
         for observer in failureObservers.values { observer.finish() }
         failureObservers.removeAll()
         for descriptor in await manager.descriptors() {
@@ -825,6 +870,7 @@ public actor OutputGateway {
         let failure: String?
         var code: ActionExecutionFailureCode?
         var tool: ToolResponse?
+        var unconfirmedActionAdmission = false
         let scope = OutputScope(envelope)
         let terminal = Self.isTerminal(envelope.output)
         defer {
@@ -849,7 +895,10 @@ public actor OutputGateway {
         } catch {
             try Task.checkCancellation()
             if case .roundFinished = envelope.output, error is CancellationError { throw error }
-            if error is CancellationError || ActionReport.failureReport(for: error).isCancellationOnly {
+            if error as? SignalTransportError == .expired {
+                code = .deliveryFailed
+                if case .actionCall = envelope.output { unconfirmedActionAdmission = true }
+            } else if error is CancellationError || ActionReport.failureReport(for: error).isCancellationOnly {
                 code = .cancelled
             } else if let producer = error as? any ActionExecutionFailureProviding {
                 code = producer.executionFailureCode
@@ -869,7 +918,7 @@ public actor OutputGateway {
             failure = String(
                 ((error as? any LocalizedError)?.errorDescription ?? String(describing: error)).prefix(512))
         }
-        if let roundID = envelope.roundID, let failure, !isCancelled(scope),
+        if let roundID = envelope.roundID, let failure, !unconfirmedActionAdmission, !isCancelled(scope),
             openRounds[roundID] != nil || envelope.callID != nil
         {
             guard roundFailures.count < 128 || roundFailures[roundID] != nil else { throw HarnessError.queueFull }
@@ -888,7 +937,7 @@ public actor OutputGateway {
                                 details: ["failureDescription": failure])
                         ])
                         let receipt = ActionResult(
-                            executionID: UUID().uuidString, owner: owner, path: call.actionPath,
+                            executionID: nil, owner: owner, path: call.actionPath,
                             causality: SignalCausality(envelope: envelope),
                             status: cancelled ? .cancelled : .failed, effect: .notStarted,
                             completion: .report(report.agentValue), failure: cancelled ? .cancelled : .handlerFailed,
@@ -1028,12 +1077,22 @@ public actor OutputGateway {
         case .action(let token):
             do {
                 try Task.checkCancellation()
+                if envelope.standaloneAction {
+                    guard envelope.roundID == nil, envelope.taskScope == nil,
+                        envelope.callID != nil
+                    else { throw ActionExecutionError.invalidInvocation }
+                }
                 let owner = try await executionOwner(envelope)
                 if let scope = envelope.taskScope {
-                    try await manager.registerExecution(envelope.schedulingID, scope: scope, agent: envelope.source)
+                    try await manager.registerExecution(envelope.schedulingScope, scope: scope, agent: envelope.source)
                 }
-                let required = try await actions.executor.requiredResources(for: token)
-                let lease = await execution.lease(for: owner, resources: required)
+                let lease: ResourceLease?
+                if token.isWait {
+                    lease = nil
+                } else {
+                    let required = try await actions.executor.requiredResources(for: token)
+                    lease = await execution.lease(for: owner, resources: required)
+                }
                 try Task.checkCancellation()
                 guard !isCancelled(OutputScope(envelope)) else { throw CancellationError() }
                 if let round = envelope.roundID, descriptor.inputs.contains(.executionFeedback),
@@ -1041,11 +1100,34 @@ public actor OutputGateway {
                 {
                     throw CancellationError()
                 }
-                try await actions.dispatch(
-                    token, envelope: envelope, owner: owner,
-                    feedback: descriptor.inputs.contains(.actionResult)
-                        || descriptor.inputs.contains(.executionFeedback)
-                        ? (envelope.roundID != nil ? .terminal : actionFeedback) : .none, lease: lease)
+                let feedback: ActionFeedback
+                if descriptor.inputs.contains(.executionFeedback) {
+                    feedback = .terminal
+                } else if descriptor.inputs.contains(.actionResult) {
+                    feedback = envelope.roundID == nil ? actionFeedback : .terminal
+                } else {
+                    feedback = .none
+                }
+                do {
+                    try await actions.dispatch(
+                        token, envelope: envelope, owner: owner, feedback: feedback, lease: lease)
+                } catch {
+                    if envelope.standaloneAction {
+                        let report = ActionReport.failureReport(for: error)
+                        _ = await requests.deliverActionResult(
+                            .init(
+                                executionID: nil, owner: owner, path: token.actionPath,
+                                causality: SignalCausality(envelope: envelope),
+                                status: report.isCancellationOnly ? .cancelled : .failed,
+                                effect: error as? SignalTransportError == .expired ? .unknown : .notStarted,
+                                completion: .report(report.agentValue),
+                                failure: report.isCancellationOnly ? .cancelled : .handlerFailed,
+                                callID: envelope.callID))
+                        await actions.cancel(envelope)
+                    }
+                    throw error
+                }
+                if envelope.standaloneAction { try await actions.finish(envelope) }
             } catch {
                 // Invocation/availability failures reject only this call. Lifecycle and
                 // structural scheduling failures still close the owning Action tree.
@@ -1054,10 +1136,14 @@ public actor OutputGateway {
                 }
                 throw error
             }
-        case .scheduling(let directive):
-            do { try await actions.schedule(directive, envelope: envelope) } catch {
-                await actions.cancel(envelope)
-                throw error
+        case .actionControl(let control):
+            guard envelope.roundID == nil, !envelope.standaloneAction else {
+                throw CommunicationError.unauthorized
+            }
+            let owner = try await executionOwner(envelope)
+            if let receipt = try await execution.control(control, owner: owner) {
+                try await requests.deliverExecutionFeedback(
+                    .actionControlReceipt(receipt), owner: owner, causality: SignalCausality(envelope: envelope))
             }
         case .tool(let call):
             let owner = try await executionOwner(envelope)
@@ -1085,6 +1171,17 @@ public actor OutputGateway {
             } else {
                 toolResult = try await tools.dispatch(call, envelope: envelope, owner: owner)
             }
+        case .roundBranchSealed(let lane, let id):
+            guard envelope.roundID == id, openRounds[id] != nil, !isCancelled(OutputScope(envelope)) else {
+                throw CancellationError()
+            }
+            let owner = try await executionOwner(envelope)
+            if branchSettlements[id]?[lane] == nil {
+                let settlement = try await execution.roundBoundary(
+                    .init(roundID: id, scope: .end), lane: lane, owner: owner)
+                guard openRounds[id] != nil, !isCancelled(OutputScope(envelope)) else { throw CancellationError() }
+                branchSettlements[id, default: [:]][lane] = settlement
+            }
         case .roundStarted:
             guard let id = envelope.roundID, case .roundStarted(let startedID) = envelope.output,
                 id == startedID, descriptor.inputs.contains(.executionFeedback)
@@ -1092,6 +1189,21 @@ public actor OutputGateway {
             guard openRounds[id] == nil, openRounds.count < 128 else { throw HarnessError.queueFull }
             let owner = try await executionOwner(envelope)
             guard !isCancelled(OutputScope(envelope)) else { throw CancellationError() }
+            let boundary = CallRoundBoundary(roundID: id, scope: .start)
+            do {
+                async let action = execution.roundBoundary(boundary, lane: .action, owner: owner)
+                async let tool = execution.roundBoundary(boundary, lane: .tool, owner: owner)
+                _ = try await (action, tool)
+                guard !isCancelled(OutputScope(envelope)) else { throw CancellationError() }
+            } catch {
+                await actions.cancel(envelope)
+                let terminal = ExecutionEnd(
+                    id: id, reason: error is CancellationError ? .cancelled : .failed,
+                    failure: String(describing: error))
+                try await requests.deliverExecutionFeedback(
+                    .roundFinished(terminal), owner: owner, causality: SignalCausality(envelope: envelope))
+                throw error
+            }
             openRounds[id] = envelope
             try await requests.deliverExecutionFeedback(
                 .roundStarted(id), owner: owner, causality: SignalCausality(envelope: envelope))
@@ -1118,15 +1230,15 @@ public actor OutputGateway {
                 recordFailure(envelope, message: value, code: nil)
                 reason = .failed
             }
-            if let roundID = envelope.roundID, let ending = endingRounds[roundID] {
-                try await ending.task.value
-            } else if let roundID = envelope.roundID, openRounds[roundID] != nil {
+            if let roundID = envelope.roundID, openRounds[roundID] != nil {
                 let scope = OutputScope(envelope)
                 let producer = ProducerSession(source: scope.source, session: scope.session)
                 cancelledScopes.insert(scope)
                 try await closeRound(
                     roundID, envelope: envelope, owner: executionOwner(envelope),
                     reason: cancellingProducers[producer] ?? reason)
+            } else if let roundID = envelope.roundID, let ending = endingRounds[roundID] {
+                try await ending.task.value
             } else {
                 await actions.cancel(envelope)
             }

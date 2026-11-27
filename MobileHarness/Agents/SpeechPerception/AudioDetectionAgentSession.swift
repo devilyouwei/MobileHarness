@@ -129,7 +129,9 @@ public typealias AudioDetectionConnections = DetectionConnections<any AudioCaptu
             let consumer = try await output.consumer(for: speech)
             outputTask = Task {
                 do {
-                    try await IndependentOutputWorkflow.consumeSignals(speech.outputs) { envelope in
+                    try await IndependentOutputWorkflow.consumeSignals(
+                        speech.outputs, contracts: AgentContracts.communication
+                    ) { envelope in
                         try Task.checkCancellation()
                         try await consumer.execute(envelope)
                     }

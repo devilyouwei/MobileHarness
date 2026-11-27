@@ -19,16 +19,12 @@ struct ActionDispatcher: Sendable {
             invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: feedback, lease: lease))
     }
 
-    func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {
-        try await executor.schedule(directive, envelope: envelope)
-    }
-
     func finish(_ envelope: OutputEnvelope) async throws {
-        try await executor.finish(inputID: envelope.schedulingID, source: envelope.source)
+        try await executor.finish(scope: envelope.schedulingScope, source: envelope.source)
     }
 
     func cancel(_ envelope: OutputEnvelope) async {
-        await executor.cancel(inputID: envelope.schedulingID, source: envelope.source)
+        await executor.cancel(scope: envelope.schedulingScope, source: envelope.source)
     }
 
     func cancel(sessionID: String) async { await executor.cancel(sessionID: sessionID) }

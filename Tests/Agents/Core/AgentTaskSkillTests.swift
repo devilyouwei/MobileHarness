@@ -433,9 +433,17 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
     let scheduler = ChannelScheduler(registry: try ActionRegistry(definitions: [express, close])) {
         await input.deliverActionResult($0)
     }
+    let emittedErrors = Mutex<[String]>([])
     let gateway = await OutputGateway(
-        manager: manager, requests: input, tools: assembly.tools, actions: scheduler, sink: { _ in })
-    let runtime = AssistantExecutionSession(agent: agent, manager: manager, output: gateway)
+        manager: manager, requests: input, tools: assembly.tools, actions: scheduler,
+        sink: { envelope in
+            if case .control(let value) = envelope.output, value.hasPrefix("agent.error:") {
+                emittedErrors.withLock { $0.append(envelope.inputID + " " + value) }
+            }
+        })
+    let runtime = AssistantExecutionSession(agent: agent, manager: manager, output: gateway) { error in
+        emittedErrors.withLock { $0.append(error) }
+    }
     try await runtime.start()
 
     let session = UUID().uuidString
@@ -464,7 +472,18 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
     let turns = try await raw.read(dialog).turns
     let old = try #require(turns.first { $0.id == "photo-old-reply" })
     #expect(old.error == "CancellationError()")
-    let end = try #require(turns.first { $0.id == "photo-end" })
+    let interruption = await agent.activeInterruption
+    let queued = await agent.status().queuedInputs
+    let pending = await agent.pendingRounds.mapValues { ($0.cancelled, $0.receipt?.reason.rawValue) }
+    let failures = await gateway.terminationFailures()
+    let diagnostic = [
+        "interruption=\(String(describing: interruption)); queued=\(queued); pending=\(pending); failures=\(failures)",
+        "active=\(await agent.activeInput?.id ?? "nil"); blocked=\(await agent.blockedSessions)",
+        "barrier=\(await agent.executionCancellationBarrier); host=\(await agent.hostCancellationInProgress)",
+        "admitting=\(await agent.admittingInputs); settling=\(await agent.settlementAdmissions)",
+        "errors=\(emittedErrors.withLock { $0 })",
+    ].joined(separator: "; ")
+    let end = try #require(turns.first { $0.id == "photo-end" }, Comment(rawValue: diagnostic))
     #expect(end.coordination?.interrupt == true)
     #expect(end.modelRequests?.first?.historyTaskID == task)
 

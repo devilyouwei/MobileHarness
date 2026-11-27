@@ -72,6 +72,14 @@ Macros emit canonical declarations and factories. CapabilityModules explicitly b
 
 Agents alone checks roles, Skills, Tasks and decision snapshots. Actions checks service availability, current session/generation, media/native ownership, business preconditions and permits; it does not authorize role names. Already-admitted work never re-queries Skill permissions.
 
+### Action 编写规范
+
+业务 Action 通过 `@Action` 或 `ActionBinding` 注册，声明输入、资源、预算与完成条件。处理器返回实际结果或抛出业务异常，在返回前等候自己启动的原生工作完成或清理。执行 Shell 负责执行实例、调度、取消和反馈，业务处理器通过已注入的能力接口操作具体服务。
+
+变量、协议和文件沿用所属模块的领域术语，并写明具体职责。调用消息使用 `ActionCall`。`callID`、`executionID` 和 `roundID` 分别标识调用、实际执行和模型轮次。
+
+生命周期控制的 Swift 接口模板、Send 契约及迁移验收见 [Action 实例生命周期与控制](../../docs/requirements/technical/Action-Execution-Lifecycle.md#action-实例生命周期与控制)。
+
 ## Lifecycle, bounds and failures
 
 Construction is inert. App configures after foundations and starts Actions before Gateway/Agents. States are cold, configured, running, suspended, stopping, stopped and failed. Reconfiguration fails. The configured catalog may be read before start, but execution requires running state.

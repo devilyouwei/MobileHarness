@@ -128,7 +128,7 @@ ApplicationActionAssembly collects configured Assistant, Writer, Decision, speec
 
 Settings owners report affected roles and incoming model IDs before persisting. App closes home preparation, cancels dependent work through AgentContainer, and unloads affected resources through ModelKit. The home worker reads the committed settings before preparing a new generation. Active role admissions reopen after readiness. Effective locale changes enter the same barrier, coalesce to the newest locale, and cover recognition, synthesis and language-sensitive agent prompts. See [model lifecycle](../../ModelKit/README.md#managed-model-resources).
 
-语音宿主桥透传 playbackChanged(audioID, active, time) 的单调原生播放时刻，不在组合根推断播放开始或执行 ASR 冷却。
+语音宿主桥透传 `preparePlayback(audioID)` 的句柄登记和 `playbackChanged(audioID, active, time)` 的逻辑播放生命周期。Agents 选定档位后通过 Gateway 发送独立音量 Action 或向当前 `speak` 实例发送生命周期命令。Actions 拥有播报控制器和原生状态确认。
 
 ModelContainer 自行构造模型文件与下载能力；ApplicationContainer 不计算模型路径、不注入 Storage 文件接口。模型生命周期只依赖 diagnostics。下载偏好只从 Settings/download-source.json 读取，不搬迁旧位置的文件。
 

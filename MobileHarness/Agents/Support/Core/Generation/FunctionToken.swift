@@ -1,4 +1,5 @@
 import Foundation
+import FunctionContracts
 
 /// Protocol-level events for natural text, self-closing XML Actions and wait boundaries.
 /// Not model tokenizer tokens; text events may contain one or many characters.
@@ -6,7 +7,7 @@ import Foundation
 public enum FunctionToken: Equatable, Sendable {
     case text(String)
     case action(name: String, parameters: [String: String])
-    case scheduling(SchedulingDirective)
+    case scope(name: String, boundary: CallScope)
 }
 
 public enum GenerationError: Error, Equatable, Sendable {
@@ -48,7 +49,6 @@ public enum GenerationEvent: Equatable, Sendable {
     case tool(ToolCall)
     /// Control request run by the owning Agent (`self` or `peer`); never forwarded to Actions.
     case control(ControlCall)
-    case scheduling(SchedulingDirective)
 
     public var actionCall: ActionCall? {
         switch self {

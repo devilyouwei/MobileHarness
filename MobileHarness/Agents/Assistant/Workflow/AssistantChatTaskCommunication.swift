@@ -68,15 +68,24 @@ extension AssistantChatWorker {
 
     public func ownsFeedback(_ input: AgentInput) -> Bool {
         switch input.payload {
-        case .executionFeedback(.roundFinished(let value)):
+        case .executionFeedback(.roundFinished(let value)), .executionFeedback(.roundBranchFinished(_, let value)):
             return executionRoundSources[value.id] != nil
-        case .executionFeedback(.roundStarted(let id)), .executionFeedback(.actionStarted(let id, _)):
+        case .executionFeedback(.roundStarted(let id)):
             return executionRoundSources[id] != nil
+        case .executionFeedback(.actionStarted(let id, _, _, _, _)):
+            return id.map { executionRoundSources[$0] != nil } ?? (decisionTurn?.sessionID == input.sessionID)
+        case .executionFeedback(.actionStateChanged(let change)):
+            return change.executionID == activePlaybackExecutionID
+        case .executionFeedback(.actionControlReceipt(let receipt)):
+            return receipt.executionID == activePlaybackExecutionID
         case .executionFeedback(.interruptionStarted(let id)):
             return activeInterruption?.id == id
         case .executionFeedback(.interruptionFinished(let value)):
             return activeInterruption?.id == value.id
         case .executionFeedback(.actionFinished(let value)):
+            if value.roundID == nil, value.path == Self.playbackVolume.path {
+                return value.owner.agent == descriptor.id && value.owner.sessionID == input.sessionID
+            }
             return value.roundID.map { ownsExecutionRound($0, input: input) } == true
         case .toolResult(let value):
             return roundCalls.contains { $0.id == value.callID }

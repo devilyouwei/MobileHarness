@@ -38,7 +38,8 @@ extension SpeechPerceptionAgent {
             else { continue }
             do {
                 try Task.checkCancellation()
-                try await communicate(.soundSource(publication.value), parent: publication.parent)
+                try await communicate(
+                    .soundSource(publication.value), parent: publication.parent, evidence: .beforePublication)
                 try Task.checkCancellation()
             } catch is CancellationError {
                 return

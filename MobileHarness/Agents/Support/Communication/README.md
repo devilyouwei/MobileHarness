@@ -9,7 +9,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | [PerceptionMessage.swift](PerceptionMessage.swift) | 感知业务枚举，AgentMessage 工厂与类型化读取，按消息类型验证内容和字节上限 |
-| [SpeechActivityMessage.swift](SpeechActivityMessage.swift) | `perception.speech.activity.v1` 的采集代、起声、语句关联与 VAD 进度。 |
+| [SpeechActivityMessage.swift](SpeechActivityMessage.swift) | `perception.speech.activity.v1` 的采集代、起声、语句关联、VAD 进度与能量档位变化。 |
 | [SpeechRecognitionMessage.swift](SpeechRecognitionMessage.swift) | `user.input.speech.v1` 的片段和终稿，终稿包含正文、空或失败。 |
 | [SpeechKeywordMessage.swift](SpeechKeywordMessage.swift) | `perception.speech.keyword.v1` 的关键词标签、文本、采集时刻与检测元数据。 |
 | [PoseObservation.swift](PoseObservation.swift) | COCO-17 姿态、几何／置信度与观测新鲜度 |
@@ -35,6 +35,8 @@ flowchart LR
 PerceptionMessage 包含 user.input.speech.v1（partial）、user.input.speech.v1（final）、perception.audio.source.v1 和 perception.vision.pose.v1。语音片段与最终文本共用 user.input.speech 频道，订阅按契约、主题和来源匹配。AgentMessage 持有类型化内容及验证闭包。编码上限通常为 16 KiB，姿态为 256 KiB；最终文本非空且最多 4096 UTF-8 字节，片段最多 16300 字节。
 
 三类语音事实由 SpeechPerception 单向发布到各自频道。Assistant 订阅 VAD、ASR 终稿和关键词命中。采集代、语句和进程单调时钟用于相关性校验。起声和 ASR 终稿携带起声前 64 窗的最早采集时刻，供 Assistant 确定第 64 窗的接纳边界。参见 [Assistant 输入](../../Assistant/Input/README.md#speech-activity-and-listening-signals)。
+
+`energyChanged` 携带 `low`、`medium` 或 `high`、已确认语句 ID 和采集代。档位变化与起声、采集终态和 VAD 进度在同一个频道发布，各自可以独立消费。VAD 进度携带采集时刻证明，窗口计数可用于观测。发送端按注册频道分配独立 FIFO，频道内按业务生成顺序串行提交。语音活动、ASR、关键词和声音定位频道独立并行。Gateway 按各频道管理投递，订阅端以采集代和语句身份处理收到的独立事实。
 
 关键词观察保留 PCM 末端时刻，另携带可选的检测完成时刻、模型身份和非负的累计推理耗时。名称和模型 ID 各限制在 128 UTF-8 字节内，整个观察最多 1,024 字节。旧消息可省略检测元数据。
 

@@ -55,7 +55,9 @@ public actor PhotographerExecutionSession {
                 started = true
                 pump = Task.detached { [agent] in
                     do {
-                        try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
+                        try await IndependentOutputWorkflow.consumeGeneration(
+                            agent.outputs, contracts: AgentContracts.communication
+                        ) { envelope in
                             await self.consume(envelope)
                         }
                     } catch is CancellationError {} catch {

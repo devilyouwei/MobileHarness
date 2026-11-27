@@ -1,14 +1,16 @@
 import AgentCore
+import FunctionContracts
 
 /// Classifies the current AgentCore output without executing side effects.
 enum ExecutionRouter {
     enum Route {
         case communication(CommunicationAction)
+        case roundBranchSealed(CallLane, String)
         case roundStarted
         case roundFinished
         case action(ActionCall)
+        case actionControl(ActionControl)
         case tool(ToolCall)
-        case scheduling(SchedulingDirective)
         case finish
         case cancel
         case observe
@@ -18,10 +20,11 @@ enum ExecutionRouter {
         switch output {
         case .communication(let call): .communication(call)
         case .rejectedCall(let rejection): throw rejection
+        case .roundBranchSealed(let lane, let id): .roundBranchSealed(lane, id)
         case .roundStarted: .roundStarted
         case .roundFinished: .roundFinished
         case .actionCall(let token): .action(token)
-        case .scheduling(let directive): .scheduling(directive)
+        case .actionControl(let control): .actionControl(control)
         case .toolCall(let call): .tool(call)
         case .control("assistant.finished"), .control("agent.finished"): .finish
         case .control("agent.cancelled"): .cancel
@@ -43,7 +46,8 @@ public enum OutputValidator {
         guard descriptor.outputs.contains(output.kind) else { throw HarnessError.forbiddenOutput }
         switch output {
         case .actionCall(let token):
-            guard descriptor.capabilities.permits(token) else { throw HarnessError.forbiddenFunction }
+            guard (token.isWait && descriptor.capabilities.supportsWait) || descriptor.capabilities.permits(token)
+            else { throw HarnessError.forbiddenFunction }
         case .toolCall(let call):
             guard descriptor.capabilities.permits(call) else { throw HarnessError.forbiddenTool }
         default: break

@@ -855,6 +855,29 @@ public enum VoiceReplyCancellation {
             traceListening("resume.committed")
             runtime.endpoints.presentation.homeEffects.replyDidFinish()
         }
+        private struct ActiveSpeechPlayback {
+            let invocation: any FunctionInput
+            let control: SpeechPlaybackControl
+            var volumeSequence: UInt64?
+        }
+
+        private var activeSpeechPlayback: ActiveSpeechPlayback?
+
+        public func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) throws {
+            try Task.checkCancellation()
+            guard let active = activeSpeechPlayback, acceptsPlayback(active.invocation.context),
+                executionID == nil || executionID?.uuidString == active.invocation.executionID
+            else { throw ActionHostError.scopeClosed }
+            guard let owner = invocation.executionOwner, owner == active.invocation.executionOwner else {
+                throw ActionHostError.unauthorized
+            }
+            if let lastSequence = active.volumeSequence, invocation.context.sequence <= lastSequence {
+                throw ActionHostError.outOfOrder
+            }
+            try active.control.setVolume(volume)
+            activeSpeechPlayback?.volumeSequence = invocation.context.sequence
+        }
+
         public func play(audioID: String, invocation: any FunctionInput) async throws {
             guard !videoAudioHeld else { throw AudioIOError.busy }
             guard let speechPlayback else { throw ActionHostError.scopeClosed }
@@ -877,10 +900,19 @@ public enum VoiceReplyCancellation {
                 handlingTurn = true
                 // Playback admission already suppresses VAD/ASR; retain the native capture generation.
                 guard acceptsPlayback(invocation.context), !videoAudioHeld else { throw CancellationError() }
+                guard activeSpeechPlayback == nil else { throw AudioIOError.busy }
+                let playbackControl = SpeechPlaybackControl()
+                activeSpeechPlayback = .init(invocation: invocation, control: playbackControl)
+                defer {
+                    activeSpeechPlayback = nil
+                    playbackControl.audioControl.close()
+                }
+                if let register = ActionControlRegistration.register { try await register(playbackControl) }
                 try await speechPlayback.play(audioID: audioID, invocation: invocation) {
                     [weak self] stream, invocation in
                     guard let self else { throw CancellationError() }
-                    try await self.play(stream, audioID: audioID, envelope: invocation.context)
+                    try await self.play(
+                        stream, audioID: audioID, envelope: invocation.context, control: playbackControl.audioControl)
                 }
             } catch {
                 playbackFailure = error
@@ -909,11 +941,13 @@ public enum VoiceReplyCancellation {
             }
         }
 
-        private func play(_ stream: AudioStream, audioID: String, envelope: ActionExecutionContext) async throws {
+        private func play(
+            _ stream: AudioStream, audioID: String, envelope: ActionExecutionContext, control: AudioPlaybackControl
+        ) async throws {
             try await runtime.preparePlayback(audioID)
             var started = false
             try await nativeEffects.play(
-                stream, context: envelope,
+                stream, context: envelope, control: control,
                 validate: { [weak self] in
                     guard let self, self.acceptsPlayback(envelope), !self.videoAudioHeld else {
                         throw CancellationError()
@@ -926,6 +960,7 @@ public enum VoiceReplyCancellation {
                     await self.runtime.playbackChanged(audioID, active, time)
                 })
         }
+
         private func accepts(session: String) -> Bool {
             session == runtime.interactionSessionID || session == voiceGeneration
         }

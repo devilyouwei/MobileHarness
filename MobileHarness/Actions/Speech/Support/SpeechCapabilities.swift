@@ -5,6 +5,13 @@ import StorageCore
 /// Session-owned playback of an already decoded handle, including checkout, drain and cleanup.
 public protocol SpeechPlaybackCapability: Sendable {
     func play(audioID: String, invocation: any FunctionInput) async throws
+    func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) async throws
+}
+
+extension SpeechPlaybackCapability {
+    public func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) async throws {
+        throw ActionHostError.unsupportedContract
+    }
 }
 
 public protocol SpeechListeningCapability: Sendable {

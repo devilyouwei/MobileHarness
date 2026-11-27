@@ -34,6 +34,8 @@ AudioCaptureContext 区分输入、空间支持和接纳前回退；原生读buf
 
 NativePlaybackGraph 私有actor拥有输出引擎、播放器、格式、mixer tap及原生连接／启动／PCM提交／停止，避免这些同步原生调用阻塞MainActor。AppleAudioIO只持有主线程接纳、token和完成等待。
 
+调用方可为单条流传入 `AudioPlaybackControl`。队列保留最新通知，播放器增益按当前值到目标值的线性过渡更新，每 5 ms 一步，满程 120 ms。暂停先淡到零再暂停节点，保留游标、待播缓冲并结束有声区间；续播从原位置以零增益起播后淡入，开启新的有声区间。新目标替换在途过渡，调度新缓冲时复用同一控制并保持三缓冲背压。播放终止取消并加入观察与过渡任务，控制受播放 token 约束。控制器等待节点报告实际暂停或已起播；两秒内无法确认时播放器以超时失败结束该流。
+
 最多三个已调度PCM buffer、一个串行提交；单包非空、最多262144样本、有限数值、8…192kHz、mono。消费端保持同一次流的采样率，真实dataPlayedBack回调释放容量并确认排空。onStarted仅在首块提交且player启动成功后回调，不代表声音已到达用户。
 
 stopPlayback同步失效token并唤醒等待，单个清理任务加入原生停止；waitForPlaybackStop、根stop及下一次播放加入清理。旧取消不能停止新播放，未完成原生调用返回前不伪造停机。

@@ -2,6 +2,7 @@ import Foundation
 
 /// Protocol-neutral callable function and intrinsic execution constraints.
 public struct ActionFunction: Sendable {
+    public private(set) var controlCapabilities: Set<String> = []
     public let timeout: Duration
     public let declaration: ActionDeclaration?
     public enum Kind: String, Sendable {
@@ -64,6 +65,12 @@ public struct ActionFunction: Sendable {
         self.handler = handler
         self.inputValidator = validatingInput
     }
+    public func supportingControls(_ commands: Set<ActionControl.Command>) -> Self {
+        var function = self
+        function.controlCapabilities = Set(commands.map(\.rawValue))
+        return function
+    }
+
     /// Canonical wire-level checks. Domain decoders enforce their tighter constraints before effects.
     public func validateInput(_ call: FunctionRequest) throws {
         guard call.actionPath == path else { throw ActionExecutionError.invalidInvocation }

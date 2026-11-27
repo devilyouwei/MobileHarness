@@ -77,7 +77,7 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     #expect(snapshot.records.first { $0.id == queuedID }?.phase == .queued)
     await arm.release()
     await speech.release()
-    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(input.id), source: AgentID(rawValue: "assistant"))
     // Even if intermediate notifications coalesce, the full latest snapshot retains every terminal record.
     let latest = try #require(await iterator.next())
     #expect(latest.records.count == 3)
@@ -105,9 +105,13 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     await gate.waitForEntry()
     let queuedID = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
     let stream = try await scheduler.observeExecutions()
-    let cancel = Task { await scheduler.cancel(inputID: input.id, source: AgentID(rawValue: "assistant")) }
+    let cancel = Task { await scheduler.cancel(scope: .input(input.id), source: AgentID(rawValue: "assistant")) }
     for await snapshot in stream {
-        if snapshot.records.first(where: { $0.id == activeID })?.phase == .cancelling { break }
+        if snapshot.records.contains(where: { $0.id == activeID && $0.phase == .cancelling }),
+            snapshot.records.contains(where: { $0.id == queuedID && $0.phase == .cancelled })
+        {
+            break
+        }
     }
     let pending = await scheduler.executionSnapshot()
     #expect(pending.records.first { $0.id == activeID }?.endedAt == nil)
@@ -162,7 +166,7 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("failure"))
     try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Robot"))
-    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(input.id), source: AgentID(rawValue: "assistant"))
     let result = try #require(await scheduler.executionSnapshot().records.first)
     #expect(result.phase == .failed)
     #expect(result.failure?.rawValue == "feedbackTimeout")
@@ -205,7 +209,7 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("metadata fixture"))
     let id = try await scheduler.enqueue(
         invocation: observationCall(path, input: input, channel: "CustomLane", parameters: parameters))
-    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(input.id), source: AgentID(rawValue: "assistant"))
     let snapshot = await scheduler.executionSnapshot()
     let deadline = ContinuousClock.now.advanced(by: .seconds(2))
     while state.revision != snapshot.revision, ContinuousClock.now < deadline { await Task.yield() }
@@ -264,7 +268,7 @@ func actionObservationTracksParallelChannelsAndQueuedWorkWithoutFeedbackOptIn()
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .event("fixture"))
     _ = try await scheduler.enqueue(invocation: observationCall(path, input: input, channel: "Fixture"))
-    try await scheduler.finish(inputID: input.id, source: .assistant)
+    try await scheduler.finish(scope: .input(input.id), source: .assistant)
     let record = try #require(await scheduler.executionSnapshot().records.first)
     #expect(record.phase == .failed)
     #expect(record.failureDescription == "Fixture transport cause")

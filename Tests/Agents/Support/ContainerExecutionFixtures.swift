@@ -105,10 +105,12 @@ private struct FixtureExecutionEngine: ActionExecutionEngine {
     func schedule(_ directive: ExecutionSchedulingDirective, envelope: ExecutionEnvelope) async throws {
         try await scheduler.schedule(directive, envelope: envelope)
     }
-    func finish(inputID: String, source: String) async throws {
-        try await scheduler.finish(inputID: inputID, source: source)
+    func finish(scope: ActionSchedulingScope, source: String) async throws {
+        try await scheduler.finish(scope: scope, source: source)
     }
-    func cancel(inputID: String, source: String) async { await scheduler.cancel(inputID: inputID, source: source) }
+    func cancel(scope: ActionSchedulingScope, source: String) async {
+        await scheduler.cancel(scope: scope, source: source)
+    }
     func cancel(sessionID: String) async { await scheduler.cancel(sessionID: sessionID) }
     func cancel(endpoint: String, incarnation: String, sessionID: String?) async -> Bool {
         await scheduler.cancel(endpoint: endpoint, incarnation: incarnation, sessionID: sessionID)

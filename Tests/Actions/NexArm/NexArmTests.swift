@@ -302,7 +302,12 @@ struct NexArmAssistantUIModule: ActionModule {
             ActionBinding(
                 path: ActionPath(domain: "Speech", module: "Playback", function: "speak"), displayName: "测试动作",
                 kind: .finite,
-                completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") })
+                completion: "Test must never request speech.", handler: { _ in Issue.record("Unexpected speech") }),
+            ActionBinding(
+                path: ActionPath(domain: "Speech", module: "Playback", function: "setVolume"), displayName: "测试动作",
+                kind: .state,
+                completion: "Test must never change speech volume.",
+                handler: { _ in Issue.record("Unexpected speech volume change") }),
         ]
 
     }

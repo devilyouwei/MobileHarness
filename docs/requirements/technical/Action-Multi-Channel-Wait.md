@@ -192,3 +192,7 @@ UI.B
 已实施：`pause(milliseconds:)` 调度指令（Agents → Gateway → Shell）、生成器解析/校验/注册门控、ChannelScheduler 主轨道定时暂停（取消即结束、累计上限）、Basic Interaction 的 Skill.json 注册与中英文教学（revision 2）、ActionCatalog 删除 wait 教程、OutputProtocol 语法说明、校验脚本及相关 README。回归：解析器/生成器（秒与小数、非法形式、累计、未注册）、调度器（暂停不等待已启动 Action、取消、预算）、Skill 教学示例可解析、目录不再暴露 wait。
 
 验证记录与限制见 [Action wait 验证](../../validation/Action-Multi-Channel-Wait.md)。真实模型是否按教学生成标签、真机体验属于独立验收，尚未执行，因此本需求保留在 requirements。
+
+## Wait 调用协议
+
+保留模型的成对标签和 `time` 语法。普通 `ActionCall` 增加可选 `scope`，`start` 与 `end` 分别承载开闭边界，缺省承载自闭调用。标签匹配属于解析器。Wait 通过 `action.call.v1` 交给 Actions 的调度入口，再复用原有等待树、计时和取消算法。其余 Action 的开闭边界在执行入口拒绝。Wait 不额外生成业务结果或 ReACT 输入。

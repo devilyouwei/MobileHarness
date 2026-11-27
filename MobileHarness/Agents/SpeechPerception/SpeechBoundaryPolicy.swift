@@ -1,6 +1,40 @@
 import Foundation
 import ModelKit
 
+/// Hysteresis over confirmed VAD windows. Initial calibration thresholds are in dBFS.
+struct SpeechEnergyBands {
+    private(set) var energy: SpeechActivity.Energy = .low
+    private var candidate: SpeechActivity.Energy = .low
+    private var windows = 0
+    private var loudWindows = 0
+
+    mutating func observe(_ samples: [Float], hasVoice: Bool) -> SpeechActivity.Energy? {
+        guard !samples.isEmpty else { return nil }
+        let level: Double
+        if hasVoice {
+            let power = samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(samples.count)
+            level = 10 * log10(max(power, 1e-12))
+        } else {
+            level = -.infinity
+        }
+        loudWindows = level >= -20 ? min(6, loudWindows + 1) : 0
+        let high = loudWindows == 6 || (energy == .high && level > -25)
+        let medium = level >= -34 || (energy != .low && level > -39)
+        let next: SpeechActivity.Energy = high ? .high : medium ? .medium : .low
+        if candidate != next {
+            candidate = next
+            windows = 0
+        }
+        guard next != energy else { return nil }
+        windows += 1
+        let required = energy == .high ? 5 : next == .high ? 1 : next == .low ? 3 : 2
+        guard windows >= required else { return nil }
+        energy = next
+        windows = 0
+        return next
+    }
+}
+
 /// Segmentation policy is independent of neural VAD state. Endpoint silence counts consecutive VAD windows.
 struct SpeechBoundaryPolicy {
     private static let preRollSamples = 4096

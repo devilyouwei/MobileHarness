@@ -64,7 +64,7 @@ SpeechPerception 的 Zipformer 词表使用 `Resources/Agents/SpeechPerception/Z
 | SpeechPerception | 采集、VAD 门槛和端点、Zipformer、语音事件发布 |
 | PlatformKit 与语音会话 | 原生播放观测、配对终态、采集准入和装配 |
 | ModelKit | InferenceSession 公开累计接纳事件计数，通过现有单消费者流继续投递 |
-| Agents 通信适配 | 带来源的语音契约、生产发布与订阅，以及复用 Gateway 的同频道顺序与投递诊断 |
+| Agents 通信适配 | 带来源的语音契约、生产发布与订阅，以及使用 Gateway 的独立事件投递和诊断 |
 
 在现有目录内完成。实现后同步整体设计及各所有者 README，清理旧信号、状态枚举、测试替身和陈旧引用。
 

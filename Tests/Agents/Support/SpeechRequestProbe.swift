@@ -133,6 +133,7 @@ struct FixtureGenerationOutputs: AsyncSequence {
 
 extension AssistantChatWorker {
     func holdDispatchForFixture() { executionCancellationBarrier = true }
+    func hasReadyRoundSettlementForFixture() -> Bool { !readyRoundSettlements.isEmpty }
 
     func bindFixtureInputInterruption(_ work: @escaping @Sendable (String) async throws -> Void) {
         bindInputInterruption { [weak self] session, id in

@@ -209,7 +209,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     #expect(await agent.status().queuedInputs == 0)
     #expect(await agent.manualResults().first?.report?.executionFailure?.rawValue == "device.unavailable")
     let publicState = String(decoding: try JSONEncoder().encode(await agent.applicationState()), as: UTF8.self)
-    #expect(!publicState.contains(result.executionID) && !publicState.contains("lastDeviceResult"))
+    #expect(!publicState.contains(try #require(result.executionID)) && !publicState.contains("lastDeviceResult"))
     let forged = AgentInput(
         id: UUID().uuidString,
         sessionID: session, payload: payload,

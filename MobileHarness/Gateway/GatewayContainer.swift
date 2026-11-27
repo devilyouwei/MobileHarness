@@ -17,15 +17,18 @@ public final class GatewayAdmission: Sendable {
 public struct GatewayConfiguration: Sendable {
     public let engine: any ActionExecutionEngine
     public let deliverResult: @Sendable (ExecutionResult) async -> ActionResultDelivery
+    public let deliverControl: @Sendable (ActionControlFeedback) async -> ActionResultDelivery
     public let deliverStart: @Sendable (ExecutionStart) async -> ActionResultDelivery
     public init(
         engine: any ActionExecutionEngine,
         deliverResult: @escaping @Sendable (ExecutionResult) async -> ActionResultDelivery = { _ in .closed },
-        deliverStart: @escaping @Sendable (ExecutionStart) async -> ActionResultDelivery = { _ in .closed }
+        deliverStart: @escaping @Sendable (ExecutionStart) async -> ActionResultDelivery = { _ in .closed },
+        deliverControl: @escaping @Sendable (ActionControlFeedback) async -> ActionResultDelivery = { _ in .closed }
     ) {
         self.engine = engine
         self.deliverResult = deliverResult
         self.deliverStart = deliverStart
+        self.deliverControl = deliverControl
     }
 }
 public struct GatewayCapabilities: Sendable {
@@ -136,10 +139,11 @@ public struct GatewayObservationAccess: Sendable {
         try configuration.engine.bindSignals(
             ActionSignalBinding(
                 validate: { try await signals.validateExecution($0, owner: $1) },
-                deliver: configuration.deliverResult, deliverStart: configuration.deliverStart))
+                deliver: configuration.deliverResult, deliverStart: configuration.deliverStart,
+                deliverControl: configuration.deliverControl))
         return GatewayCapabilities(
             admission: admission, signals: signals,
-            execution: GatewayExecution(engine: configuration.engine, admission: admission))
+            execution: GatewayExecution(engine: configuration.engine, admission: admission, signals: signals))
     }
     fileprivate func openObservationSession(_ configuration: GatewayConfiguration) throws -> GatewayObservationSession {
         try admission.check()

@@ -84,8 +84,9 @@ public enum AgentChatContextBuilder {
     ) -> [String: Any] {
         let report: AgentActionReport?
         if case .report(let value) = result.completion { report = value } else { report = nil }
+        let rejected = rejection != nil || action?.wasRejected == true
         let status =
-            rejection != nil
+            rejected
             ? "rejected"
             : action?.status.rawValue
                 ?? (result.hasFailure
@@ -100,14 +101,14 @@ public enum AgentChatContextBuilder {
         } else if case .value = result.completion {
             value["value"] = business
         }
-        if rejection != nil {
+        if rejected {
             value["executed"] = false
         } else if let action, action.effect != .contractCompleted || action.status != .succeeded {
             value["effect"] = action.effect.rawValue
         } else if result.hasFailure && action == nil {
             value["effect"] = "unknown"
         }
-        if result.hasFailure || rejection != nil {
+        if result.hasFailure || rejected {
             var error: [String: Any] = [:]
             if let code = rejection.map({ String(describing: $0.reason) }) ?? result.failureCode
                 ?? report?.executionFailure?.rawValue ?? action?.failure?.rawValue

@@ -178,7 +178,7 @@ func taskFixtureConfiguration(parent: Bool) throws -> AgentConfiguration {
             "version": 9, "category": "cognition", "id": id, "actions": actions, "tools": [],
             "signals": [
                 "requests": parent ? [] : ["agent.task.v1"],
-                "feedback": parent ? [] : ["action.result.v1", "action.execution.feedback.v1"],
+                "feedback": parent ? [] : ["action.result.v1", "action.execution.event.v1"],
                 "subscriptions": [],
                 "publications": [["channel": "agent.task", "protocol": "agent.task.events.v1"]],
             ],
@@ -303,6 +303,10 @@ private actor TaskFixtureAgent: Agent {
             try await context.update { $0.state.effects.append(value) }
         case .executionFeedback(.roundStarted(let id)):
             guard input.metadata.origin == .runtime, id == round?.id else { throw CommunicationError.unauthorized }
+        case .executionFeedback(.roundBranchFinished(_, let result)):
+            guard input.metadata.origin == .runtime, result.id == round?.id, result.reason == .completed else {
+                throw CommunicationError.unauthorized
+            }
         case .executionFeedback(.roundFinished(let result)):
             guard input.metadata.origin == .runtime, result.id == round?.id, result.reason == .completed,
                 round?.complete == true, let active
@@ -607,7 +611,7 @@ extension LiveRuntimeTests {
             try await manager.validateTaskInput(scope, agent: child.descriptor.id)
         }
         await #expect(throws: CommunicationError.scopeClosed) {
-            try await manager.registerExecution(UUID().uuidString, scope: scope, agent: child.descriptor.id)
+            try await manager.registerExecution(.input(UUID().uuidString), scope: scope, agent: child.descriptor.id)
         }
         let gateway = await OutputGateway(
             manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),

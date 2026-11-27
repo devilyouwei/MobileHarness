@@ -8,17 +8,21 @@ import StorageTasks
 import UI
 
 extension AssistantChatWorker {
-    func generate(_ text: String, input: AgentInput, using chat: any ChatCapability) async {
+    func generate(
+        _ text: String, input: AgentInput, using chat: any ChatCapability, settlingRoundID: String? = nil
+    ) async {
         let selected =
             continuationRounds[input.id]?.language
-            ?? pendingRounds.values.first { $0.input.id == input.id && $0.queued }?.language
+            ?? settlingRoundID.flatMap { pendingRounds[$0]?.language }
             ?? AgentPrompts.normalizedLanguage(language())
         await AgentPrompts.$language.withValue(selected) {
-            await generateInLanguage(text, input: input, using: chat)
+            await generateInLanguage(text, input: input, using: chat, settlingRoundID: settlingRoundID)
         }
     }
 
-    func generateInLanguage(_ text: String, input: AgentInput, using chat: any ChatCapability) async {
+    func generateInLanguage(
+        _ text: String, input: AgentInput, using chat: any ChatCapability, settlingRoundID: String?
+    ) async {
         await publishInputQueue()
         defer {
             if continuationRounds[input.id] == nil && !pendingRounds.values.contains(where: { $0.input.id == input.id })
@@ -46,9 +50,8 @@ extension AssistantChatWorker {
         var cancelledParkedRound = false
         do {
             let promptTemplates = try AgentPrompts.load(named: State.configurationName)
-            if let key = pendingRounds.first(where: { $0.value.input.id == input.id && $0.value.queued })?.key,
-                let parked = pendingRounds.removeValue(forKey: key)
-            {
+            if let key = settlingRoundID {
+                guard var parked = pendingRounds.removeValue(forKey: key) else { throw CommunicationError.scopeClosed }
                 cancelledParkedRound = parked.cancelled
                 recorded = true
                 roundID = key
@@ -58,6 +61,7 @@ extension AssistantChatWorker {
                 modelCapabilities = parked.capabilities
                 requestSkillIDs = parked.skillIDs
                 roundCoordinator = parked.coordinator
+                if parked.cancelled { try await settleCancelledCalls(&parked, roundID: key) }
                 roundCalls = parked.calls
                 roundReceipt = parked.receipt
                 resultBytes = parked.resultBytes
@@ -334,15 +338,14 @@ extension AssistantChatWorker {
             try budget?.reserveRequest()
             if let budget { try await contextRepository.update { try $0.recordBudget(budget, for: input.id) } }
             retireRound()
-            let decisionID = UUID().uuidString
-            roundID = decisionID
+            let roundID = UUID().uuidString
+            self.roundID = roundID
             roundReceipt = nil
-            roundCoordinator = AgentRoundCoordinator(id: decisionID, taskID: input.id)
-            let requestID = decisionID
+            roundCoordinator = AgentRoundCoordinator(id: roundID, taskID: input.id)
             guard executionRoundSources.count < 128 else { throw HarnessError.queueFull }
-            executionRoundSources[decisionID] = input.context
-            guard emit(.roundStarted(decisionID), for: input) else {
-                executionRoundSources[decisionID] = nil
+            executionRoundSources[roundID] = input.context
+            guard emit(.roundStarted(roundID), for: input) else {
+                executionRoundSources[roundID] = nil
                 throw HarnessError.queueFull
             }
             generationFinishReason = nil
@@ -427,7 +430,7 @@ extension AssistantChatWorker {
                 tools: usesSkills ? requestTools : request.tools
             )
             var historyRequest = AssistantModelRequest(
-                id: requestID, input: inputText,
+                id: roundID, input: inputText,
                 requestJSON: try Self.historyRequest(providerRequest.messages, imageScopes: imageScopes),
                 decisionMetadata: try decisionMetadata(
                     skills: decisionContext.state.skillState, states: requestedStates),
@@ -440,7 +443,7 @@ extension AssistantChatWorker {
             var generationError: (any Error)?
             let text: String
             do {
-                text = try await collect(providerRequest, input: input, invocationID: requestID, using: chat)
+                text = try await collect(providerRequest, input: input, roundID: roundID, using: chat)
             } catch {
                 try Task.checkCancellation()
                 guard !(error is CancellationError), lifecycle == .running else { throw error }
@@ -464,7 +467,7 @@ extension AssistantChatWorker {
                 if let completedBudget { try $0.recordBudget(completedBudget, for: input.id) }
                 try $0.transitionWork(input.id, to: .awaitingFeedback)
             }
-            guard let roundID, emit(.roundFinished(roundID), for: input) else { throw HarnessError.queueFull }
+            guard emit(.roundFinished(roundID), for: input) else { throw HarnessError.queueFull }
             if fullDuplex {
                 guard pendingRounds.count < 32 else { throw HarnessError.queueFull }
                 pendingRounds[roundID] = PendingRound(
@@ -476,7 +479,7 @@ extension AssistantChatWorker {
                     finishReason: generationFinishReason,
                     bindings: resourceBindings, imageScopes: imageScopes, imageIDs: ephemeralImageIDs,
                     language: AgentPrompts.language)
-                try await publishPendingResults(roundID)
+                await publishPendingResults(roundID)
                 throw RoundSuspended()
             }
             while roundReceipt == nil {

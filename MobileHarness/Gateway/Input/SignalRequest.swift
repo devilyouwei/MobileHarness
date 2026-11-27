@@ -136,7 +136,7 @@ extension SignalTransport {
         let timeout = ContinuousClock.now.advanced(by: descriptor.timeout)
         let deadline = metadata.expiresAt.map { min($0, timeout) } ?? timeout
         let requestEnvelope = SignalEnvelope(
-            id: metadata.id, sessionID: metadata.sessionID, contract: descriptor.id,
+            id: metadata.id, sessionID: metadata.sessionID, contract: descriptor.id, channel: metadata.channel,
             version: metadata.version, hops: metadata.hops, payloadBytes: size + descriptor.maximumReplyBytes,
             expiresAt: deadline, cleanup: metadata.cleanup, control: metadata.control)
         let invocation = SignalRequestInvocation {
@@ -150,20 +150,9 @@ extension SignalTransport {
             box.store(reply)
         }
         try await SignalRequestChain.$endpoints.withValue(chain + [target.address]) {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    try await self.send(
-                        source: source, target: target,
-                        envelope: requestEnvelope, payload: invocation
-                    )
-                }
-                group.addTask {
-                    try await Task.sleep(until: deadline, clock: .continuous)
-                    throw SignalTransportError.expired
-                }
-                defer { group.cancelAll() }
-                _ = try await group.next()
-            }
+            try await self.send(
+                source: source, target: target, envelope: requestEnvelope, payload: invocation,
+                timeout: descriptor.timeout)
         }
         try Task.checkCancellation()
         try validateRequestEndpoint(source)

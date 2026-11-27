@@ -1,10 +1,11 @@
 import Foundation
+import FunctionContracts
 
 public struct AgentTaskTermination: Sendable {
     public let scope: AgentTaskScope
     public let recipient: ExecutionOwner
     public let requesterStopped: Bool
-    public let executionIDs: Set<String>
+    public let schedulingScopes: Set<ActionSchedulingScope>
     public let reason: String
 }
 
@@ -14,7 +15,7 @@ public actor AgentManager {
         let admissionID = UUID().uuidString
         let requester: String
         let executor: String
-        var executionIDs: Set<String> = []
+        var schedulingScopes: Set<ActionSchedulingScope> = []
         var cancelling = false
         var finishing = false
     }
@@ -58,7 +59,7 @@ public actor AgentManager {
         }
     }
     public func beginTaskCompletion(_ scope: AgentTaskScope, executor: AgentID) throws
-        -> (admissionID: String, executionIDs: Set<String>)
+        -> (admissionID: String, schedulingScopes: Set<ActionSchedulingScope>)
     {
         try validateTask(scope, agent: executor, sessionID: scope.sessionID)
         guard scope.executor == executor, let grant = taskGrants[scope.id] else {
@@ -68,10 +69,10 @@ public actor AgentManager {
             throw CommunicationError.scopeClosed
         }
         taskGrants[scope.id]?.finishing = true
-        return (grant.admissionID, grant.executionIDs)
+        return (grant.admissionID, grant.schedulingScopes)
     }
     public func beginTaskCompletionIfPresent(_ scope: AgentTaskScope, executor: AgentID, incarnation: String) throws
-        -> (admissionID: String, executionIDs: Set<String>)?
+        -> (admissionID: String, schedulingScopes: Set<ActionSchedulingScope>)?
     {
         guard scope.executor == executor else { throw CommunicationError.unauthorized }
         try validate(executor, incarnation: incarnation, sessionID: scope.sessionID)
@@ -92,18 +93,20 @@ public actor AgentManager {
         guard requester == scope.requester else { throw CommunicationError.unauthorized }
         taskGrants[scope.id]?.cancelling = true
     }
-    public func taskExecutions(_ scope: AgentTaskScope) throws -> Set<String> {
+    public func taskExecutions(_ scope: AgentTaskScope) throws -> Set<ActionSchedulingScope> {
         let grant = try validatedGrant(scope.id, agent: scope.executor, sessionID: scope.sessionID)
         guard grant.scope == scope else { throw CommunicationError.unauthorized }
-        return grant.executionIDs
+        return grant.schedulingScopes
     }
-    public func registerExecution(_ id: String, scope: AgentTaskScope, agent: AgentID) throws {
+    public func registerExecution(_ schedulingScope: ActionSchedulingScope, scope: AgentTaskScope, agent: AgentID)
+        throws
+    {
         try validateTaskInput(scope, agent: agent)
         guard agent == scope.executor, var grant = taskGrants[scope.id] else { throw CommunicationError.unauthorized }
-        guard grant.executionIDs.contains(id) || grant.executionIDs.count < 32 else {
+        guard grant.schedulingScopes.contains(schedulingScope) || grant.schedulingScopes.count < 32 else {
             throw CommunicationError.capacityExceeded
         }
-        grant.executionIDs.insert(id)
+        grant.schedulingScopes.insert(schedulingScope)
         taskGrants[scope.id] = grant
     }
     public func failTask(
@@ -131,7 +134,7 @@ public actor AgentManager {
                 recipient: ExecutionOwner(
                     agent: child ? grant.scope.executor : grant.scope.requester,
                     incarnation: child ? grant.executor : grant.requester, sessionID: grant.scope.sessionID),
-                requesterStopped: child, executionIDs: grant.executionIDs, reason: String(reason.prefix(512)))
+                requesterStopped: child, schedulingScopes: grant.schedulingScopes, reason: String(reason.prefix(512)))
         }
         for id in ids { taskGrants[id] = nil }
         return events
@@ -210,7 +213,7 @@ public actor AgentManager {
                 recipient: ExecutionOwner(
                     agent: requesterStopped ? grant.scope.executor : grant.scope.requester,
                     incarnation: requesterStopped ? grant.executor : grant.requester, sessionID: grant.scope.sessionID),
-                requesterStopped: requesterStopped, executionIDs: grant.executionIDs,
+                requesterStopped: requesterStopped, schedulingScopes: grant.schedulingScopes,
                 reason: requesterStopped ? "Requesting task or Agent ended" : "Executing Agent stopped")
         }
         for grant in ending { taskGrants[grant.scope.id] = nil }

@@ -9,8 +9,10 @@ enum SpeechSignalClock {
 /// Voice-activity facts from one capture generation.
 public struct SpeechActivity: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
-        case captureStarted, captureStopped, onsetStarted, onsetCleared, onsetConfirmed, vadProgress
+        case captureStarted, captureStopped, onsetStarted, onsetCleared, onsetConfirmed, vadProgress, energyChanged
     }
+
+    public enum Energy: String, Codable, Sendable { case low, medium, high }
 
     public static let contract = "perception.speech.activity.v1"
     public static let channel = "perception.speech.activity"
@@ -20,7 +22,7 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
     public let generation: String
     public let utterance: String?
     public let sequence: UInt64?
-    public let onsetRevision: UInt64?
+    public let energy: Energy?
     /// Capture time of the oldest of the latest 64 complete VAD windows.
     public let oldestWindow: Duration?
     /// For an onset, the oldest of the 64 complete windows preceding its first candidate.
@@ -28,14 +30,14 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
 
     public init(
         _ kind: Kind, generation: String, utterance: String? = nil,
-        sequence: UInt64? = nil, oldestWindow: Duration? = nil, onsetRevision: UInt64? = nil,
-        oldestWindowBeforeOnset: Duration? = nil
+        sequence: UInt64? = nil, oldestWindow: Duration? = nil,
+        oldestWindowBeforeOnset: Duration? = nil, energy: Energy? = nil
     ) {
         self.kind = kind
         self.generation = generation
         self.utterance = utterance
         self.sequence = sequence
-        self.onsetRevision = onsetRevision
+        self.energy = energy
         self.oldestWindow = oldestWindow
         self.oldestWindowBeforeOnset = oldestWindowBeforeOnset
     }
@@ -43,12 +45,10 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
     func validate() throws {
         guard (1...128).contains(generation.utf8.count),
             utterance.map({ (1...128).contains($0.utf8.count) }) ?? true,
-            (kind == .onsetConfirmed) == (utterance != nil),
-            (kind == .vadProgress) == (sequence != nil),
-            oldestWindow == nil || (sequence ?? 0) >= Self.progressWindowCount,
-            ([.captureStarted, .captureStopped].contains(kind)) == (onsetRevision == nil),
-            oldestWindowBeforeOnset == nil || kind == .onsetStarted || kind == .onsetConfirmed,
-            sequence != 0
+            (kind == .onsetConfirmed || kind == .energyChanged) == (utterance != nil),
+            (kind == .energyChanged) == (energy != nil),
+            (sequence == nil && oldestWindow == nil) || kind == .vadProgress,
+            oldestWindowBeforeOnset == nil || kind == .onsetStarted || kind == .onsetConfirmed
         else { throw CommunicationError.invalidPayload }
     }
 

@@ -86,17 +86,20 @@ private func generator() throws -> AgentGenerator {
     actual += try bytewise.finish()
     #expect(normalizeToolIDs(actual) == normalizeToolIDs(expected))
     #expect(
-        expected.compactMap(\.actionCall).map(\.channel) == [
+        expected.compactMap(\.actionCall).filter { !$0.isWait }.map(\.channel) == [
             "Speech", "Display", "Speech", "Display", "Display", "Display", "Speech", "Display", "Speech", "Display",
         ])
-    #expect(expected.compactMap(\.actionCall)[2].parameters["text"] == "你好 & 世界")
-    #expect(expected.compactMap(\.actionCall)[5].parameters["emotion"] == "a>b \"引号\"")
+    #expect((expected.compactMap(\.actionCall).filter { !$0.isWait })[2].parameters["text"] == "你好 & 世界")
+    #expect((expected.compactMap(\.actionCall).filter { !$0.isWait })[5].parameters["emotion"] == "a>b \"引号\"")
 }
 
 @Test(.actionCatalog) func functionTokenParserStreamsCompleteActionsWithoutWaitingForWaitClose() throws {
     var parser = try generator()
     #expect(try parser.append("<wa").isEmpty)
-    #expect(try parser.append("it><express emotion='smile'") == [.scheduling(.beginWait)])
+    #expect(
+        try parser.append("it><express emotion='smile'") == [
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start))
+        ])
     let early = try parser.append("/>")
     #expect(early.count == 1)
     #expect(early.first?.actionCall?.channel == "Display")
@@ -307,7 +310,7 @@ private func generationTrace() throws -> GenerationTrace {
     #expect(trace.fragments == fragments)
     #expect(normalizeToolIDs(trace.events) == normalizeToolIDs(calls))
     #expect(
-        trace.calls.filter { $0.actionPath.module != "Caption" }.map(\.channel) == [
+        trace.calls.filter { $0.actionPath.module != "Caption" && !$0.isWait }.map(\.channel) == [
             "Speech", "Display", "Speech", "Speech",
         ])
     #expect(trace.parserError == nil)
@@ -368,10 +371,13 @@ private func generationTrace() throws -> GenerationTrace {
             "前 &amp; 👨‍👩‍👧。", "前 &amp; 👨‍👩‍👧。", "甲", "甲", "<express emotion='smile'/>", "乙", "乙", "丙", "丙", "后。", "后。",
         ])
     #expect(
-        expected.filter { if case .scheduling = $0 { true } else { false } } == [
-            .scheduling(.beginWait), .scheduling(.beginWait), .scheduling(.endWait), .scheduling(.endWait),
+        expected.filter { $0.actionCall?.isWait == true } == [
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
         ])
-    let calls = expected.compactMap(\.actionCall).filter { $0.actionPath.module != "Caption" }
+    let calls = expected.compactMap(\.actionCall).filter { $0.actionPath.module != "Caption" && !$0.isWait }
     #expect(
         calls.map(\.channel) == [
             "Speech", "Speech", "Display", "Speech", "Speech", "Speech",
@@ -402,15 +408,28 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     #expect(throws: GenerationError.malformedMarkup) { try parser.append(source) }
 }
 
+@Test func parserMatchesRegisteredScopeNames() throws {
+    var parser = FunctionTokenParser(scopedActions: ["wait", "fixture"])
+    let tokens = try parser.append("<fixture><wait></wait></fixture>") + parser.finish()
+    #expect(
+        tokens == [
+            .scope(name: "fixture", boundary: .start), .scope(name: "wait", boundary: .start),
+            .scope(name: "wait", boundary: .end), .scope(name: "fixture", boundary: .end),
+        ])
+    var mismatch = FunctionTokenParser(scopedActions: ["wait", "fixture"])
+    #expect(throws: GenerationError.malformedMarkup) { _ = try mismatch.append("<fixture></wait>") }
+}
+
 @Test(.actionCatalog) func timedWaitResolvesDecimalSecondsAndRejectsInvalidForms() throws {
     var timed = try generator()
     let events =
         try timed.append("<express emotion='happy'/><wait time='1.5'/><wait time='2'/><wait time='0.001'/>")
         + timed.finish()
     #expect(
-        events.filter { if case .scheduling = $0 { true } else { false } } == [
-            .scheduling(.pause(milliseconds: 1500)), .scheduling(.pause(milliseconds: 2000)),
-            .scheduling(.pause(milliseconds: 1)),
+        events.filter { $0.actionCall?.isWait == true } == [
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "1.5"])),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "2.0"])),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "0.001"])),
         ])
     // A pause is not a scope: it neither nests nor requires a closing tag.
     var parser = FunctionTokenParser()
@@ -429,7 +448,8 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     var budget = try generator()
     #expect(
         try budget.append("<wait time='60'/><wait time='60'/><wait time='1'/>") + budget.finish() == [
-            .scheduling(.pause(milliseconds: 60_000)), .scheduling(.pause(milliseconds: 60_000)),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "60.0"])),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "60.0"])),
             .rejected(CallRejection(kind: .action, alias: "wait", reason: .limitExceeded)),
         ])
 }
@@ -452,7 +472,11 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
 
 @Test(.actionCatalog) func waitLimitsEmptyScopesAndReservedAlias() throws {
     var empty = try generator()
-    #expect(try empty.append("<wait></wait>") == [.scheduling(.beginWait), .scheduling(.endWait)])
+    #expect(
+        try empty.append("<wait></wait>") == [
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
+        ])
     #expect(try empty.finish().isEmpty)
     var depth = FunctionTokenParser()
     #expect(throws: GenerationError.limitExceeded) {
@@ -492,12 +516,14 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
     }
     #expect(
         received == [
-            .scheduling(.beginWait),
+            .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
             .actionCall(expectedActionCall(name: "say", parameters: ["text": "你好。"])),
             expectedPrint("你好。"),
-            .scheduling(.endWait), .scheduling(.beginWait),
+            .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
+            .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
             .actionCall(expectedActionCall(name: "express", parameters: ["emotion": "smile"])),
-            .scheduling(.endWait), .control("agent.finished"),
+            .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
+            .control("agent.finished"),
         ])
     await agent.stop()
 }
@@ -509,9 +535,9 @@ func invalidWaitSyntaxIsRejected(_ source: String) throws {
             "<wait><express emotion='smile'/><unknown/><express/><express emotion='sad'/></wait>")
         + parser.finish()
     #expect(events.count == 6)
-    #expect(events.first == .scheduling(.beginWait))
-    #expect(events.last == .scheduling(.endWait))
-    #expect(events.compactMap(\.actionCall).count == 2)
+    #expect(events.first == .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)))
+    #expect(events.last == .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)))
+    #expect(events.compactMap(\.actionCall).filter { !$0.isWait }.count == 2)
     #expect(events[2] == .rejected(CallRejection(kind: .action, alias: "unknown", reason: .unknownCapability)))
     #expect(events[3] == .rejected(CallRejection(kind: .action, alias: "express", reason: .invalidParameters)))
 }

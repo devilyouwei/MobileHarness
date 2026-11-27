@@ -307,7 +307,7 @@ extension LiveRuntimeTests {
                 #expect(envelope.source == .visionPerception)
                 try await output.dispatch(envelope)
                 if case .actionCall = envelope.output {
-                    try await actions.finish(inputID: envelope.inputID, source: envelope.source)
+                    try await actions.finish(scope: .input(envelope.inputID), source: envelope.source)
                 }
             }
             if withSubscribers {

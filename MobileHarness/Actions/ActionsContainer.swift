@@ -321,7 +321,8 @@ import Foundation
         ActionExecutionDescriptor(
             path: binding.path, declaration: binding.function.declaration,
             displayName: binding.displayName, kind: binding.kind, protocols: binding.protocols,
-            executionPolicy: binding.executionPolicy, directResultPolicy: binding.directResultPolicy)
+            executionPolicy: binding.executionPolicy, directResultPolicy: binding.directResultPolicy,
+            controlCapabilities: binding.function.controlCapabilities)
     }
     private func failure(_ operation: String, _ error: any Error) -> ActionsFailure {
         let value = (error as? ActionsFailure) ?? ActionsFailure(operation: operation, underlying: error)

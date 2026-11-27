@@ -7,6 +7,7 @@ public struct ActionExecutionDescriptor: Sendable {
     }
     public enum CallProtocol: String, Sendable { case action, tool }
     public enum DirectResultPolicy: Sendable { case completionOnly, returning }
+    public let controlCapabilities: Set<String>
     public let path: ActionIdentifier
     public let declaration: ActionDeclaration?
     public let displayName: String
@@ -17,9 +18,10 @@ public struct ActionExecutionDescriptor: Sendable {
     public init(
         path: ActionIdentifier, declaration: ActionDeclaration?, displayName: String,
         kind: ActionFunction.Kind, protocols: Set<CallProtocol>, executionPolicy: ExecutionPolicy,
-        directResultPolicy: DirectResultPolicy
+        directResultPolicy: DirectResultPolicy, controlCapabilities: Set<String> = []
     ) {
         self.path = path
+        self.controlCapabilities = controlCapabilities
         self.declaration = declaration
         self.displayName = displayName
         self.kind = kind

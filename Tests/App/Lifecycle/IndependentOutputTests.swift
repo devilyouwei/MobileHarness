@@ -151,7 +151,7 @@ private actor ProtocolDispatchGate {
     }
 }
 
-@Test(.timeLimit(.minutes(1))) func saturatedToolsDoNotBlockActionOrWaitAdmission() async throws {
+@Test(.timeLimit(.minutes(1))) func busyToolRequestsDoNotBlockActionOrWaitAdmission() async throws {
     let input = AgentInput(
         id: UUID().uuidString, sessionID: UUID().uuidString,
         payload: .text("independent protocols"))
@@ -159,14 +159,15 @@ private actor ProtocolDispatchGate {
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
     let gate = ProtocolDispatchGate()
     for sequence in UInt64(1)...5 {
+        let path = sequence == 5 ? "Fixture.IO.operation1" : "Fixture.IO.operation\(sequence)"
         outputs.continuation.yield(
             OutputEnvelope(
                 source: .assistant, context: input.context,
-                output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.read")),
+                output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: path)),
                 sequence: sequence, roundID: round, taskScope: input.taskScope))
     }
     for (sequence, output) in [
-        (UInt64(6), AgentOutput.scheduling(.beginWait)),
+        (UInt64(6), AgentOutput.actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start))),
         (
             7,
             .actionCall(
@@ -174,7 +175,7 @@ private actor ProtocolDispatchGate {
                     actionPath: ActionPath(domain: "UI", module: "Expression", function: "express"), channel: "Display")
             )
         ),
-        (8, .scheduling(.endWait)),
+        (8, .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end))),
         (9, .roundFinished(round)),
         (10, .control("agent.finished")),
     ] {
@@ -191,11 +192,10 @@ private actor ProtocolDispatchGate {
     }
     var events = gate.events.stream.makeAsyncIterator()
     var seen: Set<UInt64> = []
-    while seen.intersection([1, 2, 3, 4, 6, 7, 8]).count < 7 {
+    while seen.intersection([1, 2, 3, 4, 5, 6, 7, 8]).count < 8 {
         seen.insert(try #require(await events.next()))
     }
     #expect(await gate.active == 4)
-    #expect(!(await gate.accepted).contains(5))
     #expect(!(await gate.accepted).contains(9))
     #expect((await gate.accepted).filter { (6...8).contains($0) } == [6, 7, 8])
     await gate.release()

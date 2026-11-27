@@ -53,6 +53,11 @@ public final class SpeechExecutionEndpoint: SpeechPlaybackCapability, SpeechList
         guard let voice else { throw ActionHostError.scopeClosed }
         try await voice.play(audioID: audioID, invocation: invocation)
     }
+    public func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) async throws {
+        guard let voice else { throw ActionHostError.scopeClosed }
+        try voice.setVolume(volume, executionID: executionID, invocation: invocation)
+    }
+
     public func runDetection(invocation: any FunctionInput) async throws {
         try Task.checkCancellation()
         guard invocation.context.sessionID == rootSessionID,

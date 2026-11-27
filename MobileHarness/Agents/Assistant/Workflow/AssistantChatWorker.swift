@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import ModelKit
 import OSLog
 import StorageChat
@@ -252,6 +253,9 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var keywordCleanup: (id: String, task: Task<Void, Never>)?
     func beginDecisionTurn(_ input: AgentInput) {
         guard decisionTurn?.inputID != input.id else { return }
+        activePlaybackExecutionID = nil
+        pendingPlaybackVolume = nil
+        playbackNeedsResume = false
         decisionTurn = .init(id: UUID(), inputID: input.id, sessionID: input.sessionID)
     }
     let speechSessionID: String?
@@ -269,8 +273,12 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     // Retained through the first speech batch dispatch to separate later finals from that batch.
     var interruptionBatchStartedAt: Duration?
     private var speechCaptureGeneration: String?
-    private var speechWindowSequence: UInt64 = 0
-    private var speechOnsetRevision: UInt64 = 0
+    var activePlaybackExecutionID: String?
+    var playbackStateVersion: UInt64 = 0
+    private var playbackControlSequence: UInt64 = 0
+    private var playbackNeedsResume = false
+    private var pendingPlaybackVolume: (callID: String, executionID: String)?
+    private var speechEnergy: (utterance: String, energy: SpeechActivity.Energy)?
     private var continuationWatchdog: Task<Void, Never>?
 
     func noteSpeechTerminal(_ input: AgentInput) -> Bool {
@@ -353,33 +361,43 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             || (recognition.generation != nil && recognition.generation == speechCaptureGeneration)
     }
 
-    /// VAD is ordered within its channel. ASR and keyword events correlate via the utterance ID.
+    /// Each activity message carries its own fact. Capture identity fences messages from a retired microphone stream.
     func receiveSpeechActivity(_ input: AgentInput, _ activity: SpeechActivity) throws {
-        guard input.sessionID == speechSessionID, lifecycle != .stopped else { return }
-        if activity.kind == .captureStarted {
+        guard input.sessionID == speechSessionID, lifecycle != .stopped,
+            !retiredSpeechGenerations.contains(activity.generation)
+        else { return }
+        if activity.kind != .captureStopped, speechCaptureGeneration != activity.generation {
             speechCaptureStarted(activity.generation)
-            return
+            try releaseSpeechEnergy(sessionID: input.sessionID)
         }
-        guard activity.generation == speechCaptureGeneration else { return }
         switch activity.kind {
         case .captureStarted:
             break
         case .captureStopped:
-            speechCaptureStopped(activity.generation)
+            if speechCaptureGeneration == activity.generation {
+                speechCaptureStopped(activity.generation)
+                try releaseSpeechEnergy(sessionID: input.sessionID)
+            } else {
+                retireSpeechGeneration(activity.generation)
+            }
+        case .energyChanged:
+            guard let utterance = activity.utterance, let energy = activity.energy else { return }
+            if energy == .low {
+                if speechEnergy?.utterance == utterance { try releaseSpeechEnergy(sessionID: input.sessionID) }
+            } else if !speechTerminals.contains(utterance) {
+                speechEnergy = (utterance, energy)
+                try applySpeechEnergy(energy, sessionID: input.sessionID)
+            }
         case .vadProgress:
-            guard let sequence = activity.sequence, sequence > speechWindowSequence else { return }
-            speechWindowSequence = sequence
-            guard let observation = continuationObservation, activity.onsetRevision == speechOnsetRevision,
-                let oldest = activity.oldestWindow, oldest >= observation.since
+            guard let observation = continuationObservation, let oldest = activity.oldestWindow,
+                oldest >= observation.since
             else { return }
             continuationReady = true
             continuationWatchdog?.cancel()
             continuationWatchdog = nil
             finishInterruptionWaitIfReady()
         case .onsetStarted, .onsetCleared, .onsetConfirmed:
-            guard let revision = activity.onsetRevision, revision == speechOnsetRevision + 1 else { return }
             if let utterance = activity.utterance { try speechStarted(utterance) }
-            speechOnsetRevision = revision
             onsetCandidateActive = activity.kind == .onsetStarted
             if let observation = continuationObservation {
                 let inWindow = activity.oldestWindowBeforeOnset.map { $0 < observation.since } ?? !continuationReady
@@ -394,23 +412,100 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
     }
 
+    private func applySpeechEnergy(_ energy: SpeechActivity.Energy, sessionID: String) throws {
+        guard lifecycle == .running, !executionCancellationBarrier, !hostCancellationInProgress,
+            let turn = decisionTurn, turn.sessionID == sessionID
+        else { return }
+        try adjustSpeechPlayback(energy, sessionID: turn.sessionID, inputID: turn.inputID)
+    }
+
+    private func releaseSpeechEnergy(sessionID: String) throws {
+        guard speechEnergy != nil else { return }
+        speechEnergy = nil
+        try applySpeechEnergy(.low, sessionID: sessionID)
+    }
+
+    func settleSpeechEnergy(_ input: AgentInput, recognition: SpeechRecognition) throws {
+        guard input.metadata.origin == .agent, input.metadata.source == AgentID.speechPerception.rawValue,
+            recognition.generation == speechCaptureGeneration, let utterance = speechEnergy?.utterance,
+            input.turn?.id == utterance
+        else { return }
+        try releaseSpeechEnergy(sessionID: input.sessionID)
+    }
+
+    private func adjustSpeechPlayback(_ energy: SpeechActivity.Energy, sessionID: String, inputID: String) throws {
+        guard let executionID = activePlaybackExecutionID else { return }
+        let input = AgentInput(id: inputID, sessionID: sessionID, payload: .event("assistant.playback"))
+        switch energy {
+        case .high:
+            pendingPlaybackVolume = nil
+            playbackNeedsResume = true
+            try emitPlaybackControl(.pause, executionID: executionID, input: input)
+        case .low, .medium:
+            let volume = energy == .low ? "1" : "0.35"
+            let call = try Self.playbackVolume.call(["volume": volume, "executionID": executionID])
+            let callID = UUID().uuidString
+            guard emit(.actionCall(call), for: input, callID: callID, standaloneAction: true)
+            else { throw HarnessError.queueFull }
+            pendingPlaybackVolume = (callID, executionID)
+        }
+    }
+
+    private func emitPlaybackControl(
+        _ command: ActionControl.Command, executionID: String, input: AgentInput
+    ) throws {
+        playbackControlSequence &+= 1
+        let control = ActionControl(
+            executionID: executionID, controlSequence: playbackControlSequence, command: command)
+        guard emit(.actionControl(control), for: input) else { throw HarnessError.queueFull }
+    }
+
+    func settlePlaybackVolume(_ result: ActionResult) throws {
+        guard let pending = pendingPlaybackVolume, pending.callID == result.callID else { return }
+        pendingPlaybackVolume = nil
+        guard playbackNeedsResume, result.status == .succeeded, result.effect == .contractCompleted,
+            activePlaybackExecutionID == pending.executionID,
+            !executionCancellationBarrier, !hostCancellationInProgress,
+            let turn = decisionTurn, turn.inputID == result.inputID, turn.sessionID == result.owner.sessionID
+        else { return }
+        let input = AgentInput(id: turn.inputID, sessionID: turn.sessionID, payload: .event("assistant.playback"))
+        try emitPlaybackControl(.resume, executionID: pending.executionID, input: input)
+        playbackNeedsResume = false
+    }
+
+    func bindPlaybackExecution(_ executionID: String, input: AgentInput) throws {
+        guard !executionCancellationBarrier, !hostCancellationInProgress,
+            let turn = decisionTurn, turn.sessionID == input.sessionID, turn.inputID == input.metadata.parentID,
+            activePlaybackExecutionID != executionID
+        else { return }
+        activePlaybackExecutionID = executionID
+        pendingPlaybackVolume = nil
+        playbackNeedsResume = false
+        playbackStateVersion = 0
+        if input.sessionID == speechSessionID, let speechEnergy {
+            try applySpeechEnergy(speechEnergy.energy, sessionID: input.sessionID)
+        }
+    }
+
     private func speechCaptureStarted(_ generation: String) {
         guard speechCaptureGeneration != generation, !retiredSpeechGenerations.contains(generation) else { return }
         if let previous = speechCaptureGeneration { speechCaptureStopped(previous) }
         speechCaptureGeneration = generation
-        speechWindowSequence = 0
-        speechOnsetRevision = 0
         resetContinuationProgress()
     }
 
     private func speechCaptureStopped(_ generation: String) {
         guard speechCaptureGeneration == generation else { return }
         speechCaptureGeneration = nil
-        retiredSpeechGenerations.append(generation)
-        if retiredSpeechGenerations.count > 32 { retiredSpeechGenerations.removeFirst() }
+        retireSpeechGeneration(generation)
         if continuationObservation != nil { reportInterruptionFailure("Speech capture stopped during interruption") }
         resetContinuationProgress()
         clearSpeechUtterances()
+    }
+
+    private func retireSpeechGeneration(_ generation: String) {
+        retiredSpeechGenerations.append(generation)
+        if retiredSpeechGenerations.count > 32 { retiredSpeechGenerations.removeFirst() }
     }
 
     private func resetContinuationProgress() {
@@ -747,11 +842,12 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let imageScopes: [String: String]
         let imageIDs: Set<String>
         let language: String
-        var queued = false
         var cancelled = false
         var publishing = false
+        var settling = false
     }
     var pendingRounds: [String: PendingRound] = [:]
+    var readyRoundSettlements: [String] = []
     var settlementAdmissions: Set<String> = []
     var batchMembers: [String: [AgentInput]] = [:]
     var batchTexts: [String: String] = [:]
@@ -788,7 +884,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         InternalAction(
             domain: "UI", module: "Caption", function: "beginReplyTurn", channel: "Display")
     }
-    var replyWaitingRequest: String?
+    var activeReplyWaitingID: String?
     var replyPresentation: (@Sendable (Bool) async -> Void)?
     /// Generic request-latency facts. The role owns content and calls its own presentation tools.
     func bindReplyWaiting(_ callback: @escaping @Sendable (Bool) async -> Void) { replyPresentation = callback }
@@ -800,6 +896,11 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     static var playback: InternalAction {
         InternalAction(
             domain: "Speech", module: "Playback", function: "speak", channel: "Speech", required: ["audioID"])
+    }
+    static var playbackVolume: InternalAction {
+        InternalAction(
+            domain: "Speech", module: "Playback", function: "setVolume", channel: "SpeechVolume",
+            required: ["volume"], optional: ["executionID"])
     }
     static var caption: InternalAction {
         InternalAction(
@@ -862,7 +963,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         skillContinuation = skillStream.continuation
         self.stateContext = stateContext
         self.presentsReply = presentsReply
-        queue = try SignalInbox(capacity: capacity + (fullDuplex ? 33 : 1))
+        queue = try SignalInbox(capacity: capacity + 1)
         self.contextRepository = context
         guard contextRepository.agentID == State.agentID else { throw AgentConfigurationError.identityMismatch }
         let configuration = try configuration ?? AgentConfigurations.load(named: State.configurationName)
@@ -871,8 +972,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: configuration.agentID, name: State.configurationName,
-            inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
+            inputs: configuration.communication.inputKinds.subtracting([.actionResult]),
+            outputs: [.communication, .actionCall, .toolCall, .control],
             capabilities: runtimeCapabilities)
         self.capacity = capacity
         self.chatProvider =
@@ -952,7 +1053,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     /// Speech and caption grants shared by every chat State; States add their own on top.
     nonisolated static func chatRuntimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(
-            internalActions: [playback, beginReply, caption, replyWaiting]
+            internalActions: [playback, playbackVolume, beginReply, caption, replyWaiting]
                 .filter { grant in
                     !model.internalActions.contains { $0.path == grant.path }
                 })

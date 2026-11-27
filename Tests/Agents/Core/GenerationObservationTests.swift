@@ -69,7 +69,8 @@ func compactPartialFailureRetainsActualEffectAndAllLeafOutcomes(effect: ActionRe
     #expect(leaves[2]["status"] as? String == "notStarted" && leaves[2]["details"] == nil)
     #expect(details["executionFailure"] == nil && details["status"] == nil)
     #expect(
-        !String(decoding: try JSONSerialization.data(withJSONObject: value), as: UTF8.self).contains(action.executionID)
+        !String(decoding: try JSONSerialization.data(withJSONObject: value), as: UTF8.self).contains(
+            try #require(action.executionID))
     )
 }
 
@@ -85,4 +86,32 @@ func compactPartialFailureRetainsActualEffectAndAllLeafOutcomes(effect: ActionRe
     let text = String(decoding: body, as: UTF8.self)
     #expect(text.contains("cancelled") && text.contains("handlerFailed") == mixed)
     #expect(!text.contains(":null") && !text.contains("\"details\":{}"))
+}
+
+@Test func rejectedActionsKeepCallIdentityWithoutAnExecutionInstance() {
+    let owner = ExecutionOwner(agent: .assistant, incarnation: "incarnation", sessionID: "session")
+    let path = ActionPath(domain: "Camera", module: "Capture", function: "takePhoto")
+    let causality = SignalCausality.root(id: "input")
+    let rejected = ActionResult(
+        executionID: nil, owner: owner, path: path, causality: causality, status: .failed, effect: .notStarted,
+        failure: .handlerFailed, callID: "first", roundID: "round")
+    let another = ActionResult(
+        executionID: nil, owner: owner, path: path, causality: causality, status: .failed, effect: .notStarted,
+        failure: .handlerFailed, callID: "second", roundID: "round")
+    let unconfirmed = ActionResult(
+        executionID: nil, owner: owner, path: path, causality: causality, status: .failed, effect: .unknown,
+        failure: .handlerFailed, callID: "first", roundID: "round")
+    var inbox = ActionResultInbox()
+    let admitted = inbox.accept(rejected)
+    let duplicate = inbox.accept(rejected)
+    let admittedAnother = inbox.accept(another)
+    #expect(admitted && !duplicate && admittedAnother)
+
+    let error = ToolResult(callID: "first", value: "failed", isError: true)
+    let observation = AgentChatContextBuilder.compactResult(error, action: rejected)
+    #expect(observation["status"] as? String == "rejected")
+    #expect(observation["executed"] as? Bool == false)
+    let uncertainObservation = AgentChatContextBuilder.compactResult(error, action: unconfirmed)
+    #expect(uncertainObservation["status"] as? String == "failed")
+    #expect(uncertainObservation["effect"] as? String == "unknown")
 }

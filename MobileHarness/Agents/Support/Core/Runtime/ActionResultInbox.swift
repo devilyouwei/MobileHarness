@@ -13,7 +13,12 @@ public struct ActionResultInbox: Sendable {
 
     @discardableResult
     public mutating func accept(_ result: ActionResult) -> Bool {
-        guard !values.contains(where: { $0.executionID == result.executionID }) else { return false }
+        let duplicate = values.contains { existing in
+            if let executionID = result.executionID { return existing.executionID == executionID }
+            return existing.executionID == nil && result.callID != nil && existing.callID == result.callID
+                && existing.roundID == result.roundID && existing.owner == result.owner
+        }
+        guard !duplicate else { return false }
         if values.count == capacity {
             values.removeFirst()
             evictedCount &+= 1

@@ -40,7 +40,9 @@ public actor ApplicationControlExecutionSession {
                 started = true
                 pump = Task {
                     do {
-                        try await IndependentOutputWorkflow.consumeGeneration(agent.outputs) { envelope in
+                        try await IndependentOutputWorkflow.consumeGeneration(
+                            agent.outputs, contracts: AgentContracts.communication
+                        ) { envelope in
                             do { _ = try await consumer.execute(envelope) } catch {
                                 await self.recordFailure(error)
                             }

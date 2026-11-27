@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import FunctionContracts
 import ModelKit
 import OSLog
 import StorageChat
@@ -68,6 +69,62 @@ extension AssistantChatWorker {
             throw error
         }
     }
+    private func observation(_ result: ActionResult, callID: String, roundID: String) throws -> ToolResult {
+        .init(
+            callID: callID, value: try Self.completionText(result.completion),
+            isError: result.status != .succeeded, failureCode: result.failure?.rawValue,
+            completion: result.completion ?? .completed, roundID: roundID)
+    }
+
+    func acceptActionTerminal(_ result: ActionResult, input: AgentInput) async throws {
+        guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
+            input.metadata.contract == ExecutionFeedback.actionResultContract,
+            result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID
+        else { throw CommunicationError.unauthorized }
+
+        if result.roundID == nil, result.path == Self.playbackVolume.path {
+            try await persistFeedback(input)
+            try settlePlaybackVolume(result)
+            return
+        }
+        guard let callID = result.callID else {
+            try await persistFeedback(input)
+            resultInbox.accept(result)
+            return
+        }
+        guard let id = result.roundID else { throw CommunicationError.unauthorized }
+        if try await acceptPendingFeedback(input) { return }
+        if hasClosedExecutionRound(id) { return }
+        guard ownsExecutionRound(id, input: input) else { throw CommunicationError.unauthorized }
+
+        if id == roundID, activeInput != nil {
+            guard let call = roundCalls.first(where: { $0.id == callID && !$0.tool }),
+                call.path == result.path.description
+            else { throw CommunicationError.unauthorized }
+            if let previous = call.actionResult {
+                guard previous == result else { throw CommunicationError.unauthorized }
+                return
+            }
+        }
+        recordReplyActionCompletion(result)
+        try await persistFeedback(input)
+        // The running generation can park while history persists the feedback.
+        if try await acceptPendingFeedback(input, persisted: true) { return }
+        if id == roundID, activeInput != nil, let index = roundCalls.firstIndex(where: { $0.id == callID && !$0.tool })
+        {
+            if let previous = roundCalls[index].actionResult {
+                guard previous == result else { throw CommunicationError.unauthorized }
+                return
+            }
+            try acceptResult(observation(result, callID: callID, roundID: id), at: index)
+            roundCalls[index].actionResult = result
+        }
+        if let executionID = result.executionID, executionID == activePlaybackExecutionID {
+            activePlaybackExecutionID = nil
+        }
+        resultInbox.accept(result)
+    }
+
     func acceptPendingFeedback(_ input: AgentInput, persisted: Bool = false, toolOutcomeRecorded: Bool = false)
         async throws -> Bool
     {
@@ -87,10 +144,15 @@ extension AssistantChatWorker {
         else {
             throw CommunicationError.unauthorized
         }
-        if case .executionFeedback(.actionFinished(let result)) = input.payload,
-            result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID,
-            pending.calls.contains(where: { !$0.tool && $0.id == result.callID && $0.path == result.path.description })
-        {
+        if case .executionFeedback(.actionFinished(let result)) = input.payload {
+            guard result.owner.agent == descriptor.id, result.owner.sessionID == input.sessionID,
+                let call = pending.calls.first(where: { !$0.tool && $0.id == result.callID }),
+                call.path == result.path.description
+            else { throw CommunicationError.unauthorized }
+            if let previous = call.actionResult {
+                guard previous == result else { throw CommunicationError.unauthorized }
+                return true
+            }
             recordReplyActionCompletion(result)
         }
         if !persisted { try await persistFeedback(input) }
@@ -98,10 +160,6 @@ extension AssistantChatWorker {
         switch input.payload {
         case .executionFeedback(.roundFinished(let value)):
             guard current.receipt == nil else { return true }
-            if current.cancelled {
-                try await settleCancelledCalls(&current, roundID: key)
-                guard pendingRounds[key] != nil else { return true }
-            }
             current.receipt = value
             retireExecutionFeedback(key)
         case .toolResult(let value):
@@ -120,14 +178,14 @@ extension AssistantChatWorker {
             current.calls[index].result = value
             current.calls[index].completedAt = Date()
         case .executionFeedback(.actionFinished(let value)):
-            guard value.owner.agent == descriptor.id, value.owner.sessionID == input.sessionID,
-                let index = current.calls.firstIndex(where: { !$0.tool && $0.id == value.callID && $0.result == nil }),
-                current.calls[index].path == value.path.description
-            else { throw CommunicationError.unauthorized }
-            let result = ToolResult(
-                callID: current.calls[index].id, value: try Self.completionText(value.completion),
-                isError: value.status != .succeeded, failureCode: value.failure?.rawValue,
-                completion: value.completion ?? .completed, roundID: key)
+            guard let index = current.calls.firstIndex(where: { !$0.tool && $0.id == value.callID }) else {
+                throw CommunicationError.unauthorized
+            }
+            if let previous = current.calls[index].actionResult {
+                guard previous == value else { throw CommunicationError.unauthorized }
+                return true
+            }
+            let result = try observation(value, callID: current.calls[index].id, roundID: key)
             try current.coordinator?.accept(result, roundID: key)
             current.calls[index].result = result
             current.calls[index].actionResult = value
@@ -140,7 +198,7 @@ extension AssistantChatWorker {
         }
         if current.resultBytes > 65_536 { throw CommunicationError.invalidPayload }
         pendingRounds[key] = current
-        try await publishPendingResults(key)
+        await publishPendingResults(key)
         if lifecycle == .running { drain() }
         return true
     }
@@ -154,21 +212,45 @@ extension AssistantChatWorker {
 
     func acceptExecutionLifecycle(_ feedback: ExecutionFeedback, input: AgentInput) async throws -> Bool {
         guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-            input.metadata.contract == ExecutionFeedback.contract
+            input.metadata.contract == feedback.protocolID
         else { throw CommunicationError.unauthorized }
         switch feedback {
-        case .roundStarted(let id), .actionStarted(let id, _):
+        case .roundStarted(let id):
             guard ownsExecutionRound(id, input: input) else { return hasClosedExecutionRound(id) }
-            if case .actionStarted(_, let callID) = feedback {
-                if executionStartedCalls[id]?.contains(callID) == true { return true }
-                guard executionStartedCalls[id, default: []].count < 128 else {
+            try await persistFeedback(input)
+        case .actionStarted(let roundID, let callID, let executionID, let controlCapabilities, let path):
+            if let roundID {
+                guard ownsExecutionRound(roundID, input: input) else { return hasClosedExecutionRound(roundID) }
+                if let callID, executionStartedCalls[roundID]?.contains(callID) == true { return true }
+                guard executionStartedCalls[roundID, default: []].count < 128 else {
                     throw CommunicationError.capacityExceeded
                 }
+            } else if decisionTurn?.inputID != input.metadata.parentID || decisionTurn?.sessionID != input.sessionID {
+                return true
+            }
+            if let executionID, path == Self.playback.path,
+                controlCapabilities?.contains(ActionControl.Command.pause.rawValue) == true,
+                controlCapabilities?.contains(ActionControl.Command.resume.rawValue) == true
+            {
+                try bindPlaybackExecution(executionID, input: input)
             }
             try await persistFeedback(input)
-            if case .actionStarted(_, let callID) = feedback, executionRoundSources[id] != nil {
-                executionStartedCalls[id, default: []].insert(callID)
+            if let roundID, let callID, executionRoundSources[roundID] != nil {
+                executionStartedCalls[roundID, default: []].insert(callID)
             }
+        case .actionStateChanged(let change):
+            guard change.executionID == activePlaybackExecutionID, change.stateVersion > playbackStateVersion else {
+                return true
+            }
+            try await persistFeedback(input)
+            if change.executionID == activePlaybackExecutionID {
+                playbackStateVersion = max(playbackStateVersion, change.stateVersion)
+            }
+        case .actionControlReceipt:
+            try await persistFeedback(input)
+        case .roundBranchFinished(_, let end):
+            guard ownsExecutionRound(end.id, input: input) else { return hasClosedExecutionRound(end.id) }
+            try await persistFeedback(input)
         case .roundFinished(let end):
             if hasClosedExecutionRound(end.id) { return true }
             guard ownsExecutionRound(end.id, input: input) else { return false }
@@ -199,8 +281,8 @@ extension AssistantChatWorker {
 
     /// Per-call Action results are ready independently of other output channels.
     /// The flag owns publication across suspension points and prevents settlement from overtaking it.
-    func publishPendingResults(_ key: String) async throws {
-        guard var pending = pendingRounds[key], !pending.publishing else { return }
+    func publishPendingResults(_ key: String) async {
+        guard var pending = pendingRounds[key], !pending.publishing, !pending.settling else { return }
         pending.publishing = true
         pendingRounds[key] = pending
         do {
@@ -231,13 +313,12 @@ extension AssistantChatWorker {
             // Admission/attachment failure is explicit. The result remains unforwarded for settlement.
             emitFailure(error, for: pending.input)
         }
-        guard var current = pendingRounds[key] else { return }
-        current.publishing = false
-        if current.receipt != nil, !current.queued {
-            try queue.admit(current.input, disposition: .enqueue(priority: 100))
-            current.queued = true
+        guard let current = pendingRounds[key] else { return }
+        pendingRounds[key]?.publishing = false
+        if current.receipt != nil, !readyRoundSettlements.contains(key) {
+            // There is at most one entry for each bounded pending round.
+            readyRoundSettlements.append(key)
         }
-        pendingRounds[key] = current
     }
 
     func enqueueActionResult(

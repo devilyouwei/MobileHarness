@@ -197,11 +197,13 @@ actor QwenEffects {
             nextWait = 0
         }
         switch output.output {
-        case .scheduling(.beginWait):
-            nextWait += 1
-            waitPath.append(nextWait)
-        case .scheduling(.endWait):
-            if !waitPath.isEmpty { waitPath.removeLast() }
+        case .actionCall(let call) where call.isWait:
+            if call.scope == .start {
+                nextWait += 1
+                waitPath.append(nextWait)
+            } else if call.scope == .end, !waitPath.isEmpty {
+                waitPath.removeLast()
+            }
         case .actionCall(let call):
             let path = call.actionPath.description
             var parameters = call.parameters

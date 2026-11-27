@@ -17,7 +17,7 @@
 已完成：[Tests 分层与维护优化](../../completed/Tests-Optimization-Plan.md)，保留模块目录，明确单元/集成/UI 测试、整理混合文件与命名，并通过工程检查及五个 Simulator 构建。
 
 - [全双工播放期间的语音接纳优化](Full-Duplex-Playback-Admission.md)：动态起声门槛、起播 ASR 保护窗口、采样时间对齐与真机误触发/打断延迟验收。
-- [统一执行反馈与续说等待](Action-Execution-Lifecycle.md)：Action、模型轮次和会话打断的起止反馈，打断后按实际 VAD 窗口观测。
+- [Action 执行反馈、生命周期控制与续说等待](Action-Execution-Lifecycle.md) 覆盖起止反馈、打断后 VAD 窗口观测，以及独立控制通道和 Speech 暂停／继续接入。
 - [空转写的语音端点](Speech-No-Transcript-Endpoint.md)：按已送达 ASR 的音频窗口封口，重置 VAD 和识别轮，并等待重新起声。
 
 - [拍照倒计时与显式打开相机](Photo-Countdown-And-Explicit-Open.md)：单次倒计时、独立打开、同轮多 Action 与验证。

@@ -73,14 +73,16 @@ import Testing
             .toolCall(ToolCall(id: UUID().uuidString, toolPath: "Fixture.Control.deletePhotos")),
             descriptor: descriptor)
     }
-    try OutputValidator.validate(.scheduling(.beginWait), descriptor: descriptor)
+    try OutputValidator.validate(
+        .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)), descriptor: descriptor)
     let restricted = AgentDescriptor(
         category: .cognition, id: .assistant, name: "restricted", inputs: [.text], outputs: [])
     #expect(throws: HarnessError.forbiddenOutput) {
         try OutputValidator.validate(.control("start"), descriptor: restricted)
     }
     #expect(throws: HarnessError.forbiddenOutput) {
-        try OutputValidator.validate(.scheduling(.beginWait), descriptor: restricted)
+        try OutputValidator.validate(
+            .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)), descriptor: restricted)
     }
 }
 
@@ -133,14 +135,22 @@ private struct StatusRoundTripChat: ChatCapability {
             ActionPath(domain: "UI", module: "Caption", function: "print"): { _ in },
         ]))
     let responses = await OutputGateway(manager: manager, requests: requests, tools: tools, actions: actions) {
-        await recorder.record($0)
+        switch $0.output {
+        case .toolCall, .actionCall: await recorder.record($0)
+        default: break
+        }
     }
     let session = UUID().uuidString
     let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("query"))
     _ = try await manager.receiveLocally(input, to: .assistant)
-    // Tool results now asynchronously admit synthesis before emitting playback.
-    var iterator = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
-    let first = try #require(try await iterator.next())
+    var iterator = fixtureOutputs(agent).makeAsyncIterator()
+    let start = try #require(await iterator.next())
+    guard case .roundStarted = start.output else {
+        Issue.record("Expected round admission before the Tool call")
+        return
+    }
+    try await responses.dispatch(start)
+    let first = try #require(await iterator.next())
     guard case .toolCall(let call) = first.output else {
         Issue.record("Expected tool call")
         return
@@ -152,7 +162,19 @@ private struct StatusRoundTripChat: ChatCapability {
     #expect(delivered.isError == fails)
     #expect(delivered.failureCode?.rawValue == (fails ? "busy" : nil))
     #expect(delivered.deliveryFailure == nil)
-    let reply = try #require(try await iterator.next())
+    let seal = try #require(await iterator.next())
+    guard case .roundFinished = seal.output else {
+        Issue.record("Expected round settlement after the Tool call")
+        return
+    }
+    try await responses.dispatch(seal)
+    let nextStart = try #require(await iterator.next())
+    guard case .roundStarted = nextStart.output else {
+        Issue.record("Expected round admission before reply playback")
+        return
+    }
+    try await responses.dispatch(nextStart)
+    let reply = try #require(await iterator.next())
     #expect(reply.sessionID == session)
     #expect(
         await speechRequests.restored(reply.output)
@@ -292,7 +314,9 @@ private struct StatusRoundTripChat: ChatCapability {
     for _ in 0..<2 {
         try await gateway.dispatch(
             OutputEnvelope(
-                source: .assistant, context: input.context, output: .scheduling(.beginWait), taskScope: input.taskScope)
+                source: .assistant, context: input.context,
+                output: .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
+                taskScope: input.taskScope)
         )
         try await gateway.dispatch(
             OutputEnvelope(
@@ -308,7 +332,9 @@ private struct StatusRoundTripChat: ChatCapability {
         #expect(rejection.isError)
         try await gateway.dispatch(
             OutputEnvelope(
-                source: .assistant, context: input.context, output: .scheduling(.endWait), taskScope: input.taskScope))
+                source: .assistant, context: input.context,
+                output: .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
+                taskScope: input.taskScope))
     }
     try await gateway.dispatch(
         OutputEnvelope(
@@ -318,7 +344,8 @@ private struct StatusRoundTripChat: ChatCapability {
         id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("malformed"))
     try await gateway.dispatch(
         OutputEnvelope(
-            source: .assistant, context: malformed.context, output: .scheduling(.beginWait),
+            source: .assistant, context: malformed.context,
+            output: .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
             taskScope: malformed.taskScope))
     await #expect(throws: ActionSchedulingError.invalidSchedule) {
         try await gateway.dispatch(
@@ -591,7 +618,7 @@ private actor SignalFeedbackRecorder: Agent {
         data: Data(
             #"""
             {"version":9,"category":"cognition","id":"assistant","actions":{},"tools":[],"signals":{
-            "requests":[],"feedback":["action.result.v1"],
+            "requests":[],"feedback":["tool.result.v1"],
             "subscriptions":[],"publications":[]}}
             """#.utf8))
     let policy = try CommunicationPolicy(configurations: [configuration])
@@ -615,6 +642,7 @@ private actor SignalFeedbackRecorder: Agent {
     #expect(result.tool?.isError == fails)
     #expect(result.tool?.deliveryFailure == nil)
     let feedback = try #require(await agent.inputs.first)
+    #expect(feedback.metadata.contract == "tool.result.v1")
     #expect(feedback.metadata.origin == .runtime)
     #expect(feedback.metadata.source == "runtime")
     #expect(feedback.metadata.incarnation == nil)

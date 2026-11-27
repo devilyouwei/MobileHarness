@@ -17,9 +17,12 @@ public struct SpeechModule: CapabilityModule {
     }
     public var definitions: [ActionFunction] {
         var values = [
-            SpeechActions.speakDefinition(handler: { [playback] invocation in
-                try await SpeechActions.speak(invocation: invocation) {
-                    try await playback.play(audioID: $0, invocation: $1)
+            SpeechActions.speakDefinition(completing: { [playback] invocation in
+                try await SpeechPlaybackExecution(playback: playback).execute(invocation)
+            }).supportingControls([.pause, .resume, .cancel]),
+            SpeechActions.setVolumeDefinition(handler: { [playback] invocation in
+                try await SpeechActions.setVolume(invocation: invocation) {
+                    try await playback.setVolume($0, executionID: $1, invocation: $2)
                 }
             }),
             SpeechActions.startListeningDefinition(handler: { [listening] invocation in

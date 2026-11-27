@@ -43,6 +43,8 @@
         private var configurationTask: Task<Void, Never>?
         private var echoCancellation = AudioCaptureContext.EchoCancellation.unavailable
         private var token: String?
+        private var adjustment: AudioPlaybackControl.Adjustment?
+        private var ramp: Task<Void, Never>?
         private let telemetry: PlaybackTelemetry
         init(telemetry: PlaybackTelemetry) { self.telemetry = telemetry }
         private func install() {
@@ -60,6 +62,8 @@
         func begin(_ id: String, configureSession: Bool) throws {
             guard token == nil else { throw AudioIOError.busy }
             token = id
+            adjustment = nil
+            player.volume = 1
             if configureSession && !engine.isRunning { try configureNativeAudioSession() }
         }
         private func connect(_ sampleRate: Int) throws -> AVAudioFormat {
@@ -76,7 +80,11 @@
             }
             return format
         }
-        func schedule(_ pcm: PlaybackPCM, token id: String, completed: @escaping @Sendable () -> Void) throws {
+        func schedule(
+            _ pcm: PlaybackPCM, token id: String, control: AudioPlaybackControl?,
+            onPaused: @escaping @Sendable () -> Void,
+            completed: @escaping @Sendable () -> Void
+        ) throws -> Bool {
             guard token == id else { throw CancellationError() }
             guard !pcm.samples.isEmpty, pcm.samples.count <= 262_144, pcm.samples.allSatisfy(\.isFinite),
                 (8000...192000).contains(pcm.sampleRate)
@@ -122,7 +130,69 @@
             }
             if !engine.isRunning { try engine.start() }
             player.scheduleBuffer(rendered, completionCallbackType: .dataPlayedBack) { @Sendable _ in completed() }
-            if !player.isPlaying { player.play() }
+            return adjustPlayback(token: id, control: control, hasAudio: true, onPaused: onPaused)
+        }
+        func adjustPlayback(
+            token id: String, control: AudioPlaybackControl?, hasAudio: Bool, onPaused: @escaping @Sendable () -> Void
+        ) -> Bool {
+            guard token == id else { return false }
+            let target = control?.adjustment ?? .playing(volume: 1)
+            let previous = adjustment
+            let changed = previous != target
+            if changed {
+                adjustment = target
+                ramp?.cancel()
+            }
+            switch target {
+            case .playing(let volume):
+                let gain = volume.isFinite ? min(max(volume, 0), 1) : 1
+                if hasAudio && engine.isRunning && !player.isPlaying {
+                    if previous == nil { player.volume = gain }
+                    player.play()
+                    startRamp(to: gain, token: id)
+                } else if changed, player.isPlaying {
+                    startRamp(to: gain, token: id)
+                }
+                if player.isPlaying { control?.confirmPlaying(true) }
+            case .paused:
+                if changed, player.isPlaying {
+                    startRamp(to: 0, token: id) {
+                        control?.confirmPlaying(false)
+                        onPaused()
+                    }
+                } else if !player.isPlaying {
+                    player.volume = 0
+                    control?.confirmPlaying(false)
+                }
+            }
+            return player.isPlaying
+        }
+        private func startRamp(to gain: Float, token id: String, onPaused: (@Sendable () -> Void)? = nil) {
+            ramp?.cancel()
+            let volume = player.volume
+            if volume == gain {
+                if let onPaused {
+                    player.pause()
+                    onPaused()
+                }
+                return
+            }
+            ramp = Task {
+                do {
+                    let clock = ContinuousClock()
+                    let started = clock.now
+                    for step in 1...AudioPlaybackRamp.steps {
+                        try await clock.sleep(until: started + .milliseconds(step * AudioPlaybackRamp.stepMilliseconds))
+                        try Task.checkCancellation()
+                        guard token == id else { return }
+                        player.volume = AudioPlaybackRamp.volume(from: volume, to: gain, step: step)
+                    }
+                    if let onPaused {
+                        player.pause()
+                        onPaused()
+                    }
+                } catch { return }
+            }
         }
         func prepareCapture() throws -> AudioCaptureContext.EchoCancellation {
             engine.stop()
@@ -258,15 +328,27 @@
             capturing = false
             if token == nil { engine.stop() }
         }
-        func finish(_ id: String) { if token == id { token = nil } }
-        func stop(_ id: String?) {
+        func finish(_ id: String) async {
             guard token == id else { return }
             token = nil
+            let transition = ramp
+            ramp = nil
+            transition?.cancel()
+            if installed { player.stop() }
+            await transition?.value
+        }
+        func stop(_ id: String?) async {
+            guard token == id else { return }
+            token = nil
+            let transition = ramp
+            ramp = nil
+            transition?.cancel()
             if installed {
                 player.stop()
                 if !capturing { engine.stop() }
             }
             if !capturing { rate = nil }
+            await transition?.value
         }
 
         func prepareCaptureRetry() {
@@ -300,7 +382,8 @@
         func playbackSpectrum() async -> [Float]?
         func playClip(_ pcm: PlaybackPCM, onStarted: (@MainActor () -> Void)?) async throws
         func playStream(
-            onStarted: (@MainActor () -> Void)?, next: @escaping @MainActor () async throws -> PlaybackPCM?
+            control: AudioPlaybackControl?, onStarted: (@MainActor () -> Void)?,
+            next: @escaping @MainActor () async throws -> PlaybackPCM?
         ) async throws
         func stopPlayback()
         func waitForPlaybackStop() async
@@ -311,7 +394,12 @@
         }
         public func playClip(_ pcm: PlaybackPCM) async throws { try await playClip(pcm, onStarted: nil) }
         public func playStream(next: @escaping @MainActor () async throws -> PlaybackPCM?) async throws {
-            try await playStream(onStarted: nil, next: next)
+            try await playStream(control: nil, onStarted: nil, next: next)
+        }
+        public func playStream(
+            onStarted: (@MainActor () -> Void)?, next: @escaping @MainActor () async throws -> PlaybackPCM?
+        ) async throws {
+            try await playStream(control: nil, onStarted: onStarted, next: next)
         }
     }
 
@@ -427,6 +515,7 @@
         private let log = Logger(subsystem: "dev.mobileharness", category: "AudioCapture")
         private var playbackWaiter: CheckedContinuation<Void, Error>?
         private var playbackToken: String?
+        private var playbackControl: AudioPlaybackControl?
         private var playbackPeriods: [AudioPlaybackSnapshot.Period] = []
 
         public func playbackSnapshot() async -> AudioPlaybackSnapshot { .init(periods: playbackPeriods) }
@@ -479,6 +568,7 @@
         /// Nil means cancellation or replacement, so an old meter cannot submit stale bands.
         public func playbackSpectrum() async -> [Float]? {
             guard let token = playbackToken else { return AudioSpectrum.silence }
+            guard let period = playbackPeriods.last, period.end == nil else { return AudioSpectrum.silence }
             let value = telemetry.value.withLock { $0 }
             guard
                 let spectrum = try? await AudioSpectrum.measureOffMain(value.samples, sampleRate: value.sampleRate),
@@ -635,7 +725,7 @@
                 }
                 var sent = false
                 do {
-                    try await playStream(onStarted: onStarted) {
+                    try await playStream(control: nil, onStarted: onStarted) {
                         guard !sent else { return nil }
                         sent = true
                         return pcm
@@ -656,7 +746,8 @@
 
         /// At most three PCM buffers scheduled; wait for hardware capacity, not each individual packet.
         public func playStream(
-            onStarted: (@MainActor () -> Void)? = nil, next: @escaping @MainActor () async throws -> PlaybackPCM?
+            control: AudioPlaybackControl?, onStarted: (@MainActor () -> Void)?,
+            next: @escaping @MainActor () async throws -> PlaybackPCM?
         ) async throws {
             do {
                 try claim()
@@ -664,13 +755,16 @@
                 guard playbackToken == nil else { throw AudioIOError.busy }
                 let token = UUID().uuidString
                 playbackToken = token
+                playbackControl = control
                 playbackFailure = nil
+                var adjustments: Task<Void, Never>?
                 do {
                     await playbackCleanup?.value
                     playbackCleanup = nil
                     try checkPlayback(token)
                     try await playback.begin(token, configureSession: captureToken == nil)
                     try checkPlayback(token)
+                    adjustments = control.map { observePlaybackControl($0, token: token) }
                     try await withTaskCancellationHandler {
                         var streamRate: Int?
                         var started = false
@@ -685,9 +779,9 @@
                                 throw AudioIOError.invalidFormat
                             }
                             streamRate = pcm.sampleRate
-                            try await schedule(pcm, token: token)
+                            let playing = try await schedule(pcm, token: token, control: control)
                             try checkPlayback(token)
-                            if !scheduled.isEmpty { recordPlaybackStarted() }
+                            if playing, !scheduled.isEmpty { recordPlaybackStarted() }
                             if !started {
                                 started = true
                                 onStarted?()
@@ -700,13 +794,19 @@
                     } onCancel: {
                         Task { @MainActor [weak self] in self?.failPlayback(token: token, error: CancellationError()) }
                     }
+                    adjustments?.cancel()
+                    await adjustments?.value
+                    try checkPlayback(token)
                     recordPlaybackEnded()
                     await playback.finish(token)
                     try checkPlayback(token)
                     playbackToken = nil
+                    playbackControl = nil
                     telemetry.value.withLock { $0.samples.removeAll() }
                 } catch {
                     failPlayback(token: token, error: error)
+                    adjustments?.cancel()
+                    await adjustments?.value
                     let cleanup = playbackCleanup
                     await cleanup?.value
                     throw error
@@ -726,12 +826,40 @@
                 throw error
             }
         }
-        private func schedule(_ pcm: PlaybackPCM, token: String) async throws {
+        private func observePlaybackControl(_ control: AudioPlaybackControl, token: String) -> Task<Void, Never> {
+            Task { [weak self] in
+                for await _ in control.changes {
+                    guard let self, !Task.isCancelled, self.playbackToken == token else { return }
+                    if let failure = control.failure {
+                        self.failPlayback(token: token, error: failure)
+                        return
+                    }
+                    let playing = await self.playback.adjustPlayback(
+                        token: token, control: control, hasAudio: !self.scheduled.isEmpty,
+                        onPaused: self.playbackPausedCallback(token: token))
+                    guard !Task.isCancelled, self.playbackToken == token else { return }
+                    if playing, !self.scheduled.isEmpty { self.recordPlaybackStarted() }
+                }
+            }
+        }
+        private func playbackPausedCallback(token: String) -> @Sendable () -> Void {
+            { [weak self] in
+                Task { @MainActor in
+                    guard let self, self.playbackToken == token, self.playbackControl?.adjustment == .paused else {
+                        return
+                    }
+                    self.recordPlaybackEnded()
+                }
+            }
+        }
+        private func schedule(_ pcm: PlaybackPCM, token: String, control: AudioPlaybackControl?) async throws -> Bool {
 
             let id = UUID().uuidString
             scheduled.insert(id)
             do {
-                try await playback.schedule(pcm, token: token) { @Sendable [weak self] in
+                return try await playback.schedule(
+                    pcm, token: token, control: control, onPaused: playbackPausedCallback(token: token)
+                ) { @Sendable [weak self] in
                     Task { @MainActor in self?.played(id, token: token) }
                 }
             } catch {
@@ -758,6 +886,7 @@
             playbackFailure = error
             recordPlaybackEnded()
             playbackToken = nil
+            playbackControl = nil
             let previous = playbackCleanup
             playbackCleanup = Task { [playback] in
                 await previous?.value

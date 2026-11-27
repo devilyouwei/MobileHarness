@@ -12,7 +12,8 @@
       "agent.task.v1"
     ],
     "feedback": [
-      "action.result.v1"
+      "action.result.v1",
+      "tool.result.v1"
     ],
     "publications": [
       {

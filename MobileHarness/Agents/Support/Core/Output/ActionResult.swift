@@ -56,7 +56,7 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public let invocation: ActionInvocationSnapshot?
     public let callID: String?
     public let roundID: String?
-    public let executionID: String
+    public let executionID: String?
     public let owner: ExecutionOwner
     public let causality: SignalCausality
     public var inputID: String { causality.inputID }
@@ -66,13 +66,14 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public let effect: Effect
     public let completion: AgentActionCompletion?
     public let failure: Failure?
+    public var wasRejected: Bool { executionID == nil && status == .failed && effect == .notStarted }
     public var report: AgentActionReport? {
         if case .report(let report) = completion { return report }
         return nil
     }
 
     public init(
-        executionID: String, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
+        executionID: String?, owner: ExecutionOwner, path: ActionPath, causality: SignalCausality,
         status: Status, effect: Effect, completion: AgentActionCompletion? = nil, failure: Failure? = nil,
         callID: String? = nil, roundID: String? = nil, invocation: ActionInvocationSnapshot? = nil
     ) {

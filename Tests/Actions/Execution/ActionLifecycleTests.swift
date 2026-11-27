@@ -330,7 +330,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
             source: .assistant, context: parent.context,
             output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Ordered")), taskScope: parent.taskScope)
     )
-    try await scheduler.finish(inputID: parent.id, source: .assistant)
+    try await scheduler.finish(scope: .input(parent.id), source: .assistant)
     #expect(await actions.value == 1)
     #expect(await scheduler.diagnosticSnapshot().records.last?.phase == .succeeded)
     #expect(await resources.snapshot()[armResource] == .unlocked)
@@ -509,7 +509,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let scheduler = ChannelScheduler(registry: registry) { await input.deliverActionResult($0) }
     let invocation = try lifecycleInvocation(owner: owner)
     let execution = try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.envelope.inputID, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(invocation.envelope.inputID), source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     let results = await agent.results()
     #expect(results.count == 1 && results.first?.executionID == execution)
@@ -549,7 +549,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
             output: .actionCall(ActionCall(actionPath: lifecyclePath, channel: "Ordered")), roundID: roundID),
         owner: owner, feedback: .terminal)
     try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: roundID, source: owner.agent)
+    try await scheduler.finish(scope: .round(roundID), source: owner.agent)
     await scheduler.finishResultDelivery()
     #expect(await counter.value == 1)
     #expect(await attempts.value > 1)
@@ -617,14 +617,14 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let owner = lifecycleOwner()
     let first = try lifecycleInvocation(owner: owner)
     try await scheduler.enqueue(invocation: first)
-    try await scheduler.finish(inputID: first.envelope.inputID, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(first.envelope.inputID), source: AgentID(rawValue: "assistant"))
     await deliveryStarted.wait()
     await #expect(throws: ActionSchedulingError.resultCapacityExceeded) {
         try await scheduler.enqueue(invocation: lifecycleInvocation(owner: owner))
     }
     let noFeedback = try lifecycleInvocation(owner: owner, feedback: .none)
     try await scheduler.enqueue(invocation: noFeedback)
-    try await scheduler.finish(inputID: noFeedback.envelope.inputID, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(noFeedback.envelope.inputID), source: AgentID(rawValue: "assistant"))
     #expect(await counter.value == 2)
     await releaseDelivery.release()
     await scheduler.finishResultDelivery()
@@ -642,7 +642,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let scheduler = ChannelScheduler(registry: registry) { _ in .accepted }
     let invocation = try lifecycleInvocation(owner: lifecycleOwner())
     try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.envelope.inputID, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(invocation.envelope.inputID), source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     #expect(await scheduler.resultSnapshot().last?.result?.completion == .activityStarted(activityID))
 }
@@ -900,7 +900,7 @@ private actor RevocationDevice {
     let scheduler = ChannelScheduler(registry: registry) { await input.deliverActionResult($0) }
     let invocation = try lifecycleInvocation(owner: owner)
     _ = try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: invocation.envelope.inputID, source: owner.agent)
+    try await scheduler.finish(scope: .input(invocation.envelope.inputID), source: owner.agent)
     await scheduler.finishResultDelivery()
     let results = await agent.results()
     #expect(results.count == 1 && results.first?.status == .failed)
@@ -945,7 +945,7 @@ private struct DynamicResourceToolFixture: ToolModule { let definitions: [Action
     ])
     let scheduler = ChannelScheduler(registry: registry) { await inputGateway.deliverActionResult($0) }
     _ = try await scheduler.enqueue(invocation: invocation)
-    try await scheduler.finish(inputID: input.id, source: .assistant)
+    try await scheduler.finish(scope: .input(input.id), source: .assistant)
     await scheduler.finishResultDelivery()
     let received = try #require(await agent.lastInput)
     #expect(received.metadata.rootID == root && received.metadata.parentID == input.id)
@@ -1048,7 +1048,7 @@ func hostProducerCancellationPreservesOtherSessionAndOtherAgent() async throws {
     #expect(await probe.cleaned == ["current"])
     let cancelled = try #require(original)
     await #expect(throws: CancellationError.self) {
-        try await scheduler.finish(inputID: cancelled.schedulingID, source: .assistant)
+        try await scheduler.finish(scope: cancelled.schedulingScope, source: .assistant)
     }
     await gateway.shutdown()
     #expect(await probe.cleaned == ["current", "otherSession", "otherAgent"])

@@ -6,8 +6,8 @@ import Gateway
 extension OutputEnvelope {
     public var schedulingEnvelope: ExecutionEnvelope {
         .init(
-            source: source.rawValue, sessionID: sessionID, inputID: inputID, schedulingID: schedulingID,
-            sequence: sequence, roundID: roundID, callID: callID, context: executionContext,
+            source: source.rawValue, sessionID: sessionID, inputID: inputID, schedulingScope: schedulingScope,
+            sequence: sequence, callID: callID, context: executionContext,
             correlation: SignalCausality(envelope: self), orderingScope: source == .assistant ? "conversation" : nil,
             invocationSnapshot: invocation)
     }
@@ -69,28 +69,34 @@ extension ScheduledAction {
         guard case .actionCall(let call) = envelope.output else { throw ActionExecutionError.invalidInvocation }
         try self.init(
             envelope: envelope.schedulingEnvelope, call: call.executionRequest.functionRequest,
-            channel: call.channel, owner: owner, feedback: feedback, lease: lease)
+            channel: call.channel, owner: owner, feedback: feedback, lease: lease, scope: call.scope)
     }
 
 }
 extension ActionExecutionEngine {
-    public func finish(inputID: String, source: AgentID) async throws {
-        try await finish(inputID: inputID, source: source.rawValue)
+    public func finish(scope: ActionSchedulingScope, source: AgentID) async throws {
+        try await finish(scope: scope, source: source.rawValue)
     }
-    public func cancel(inputID: String, source: AgentID) async {
-        await cancel(inputID: inputID, source: source.rawValue)
+    public func cancel(scope: ActionSchedulingScope, source: AgentID) async {
+        await cancel(scope: scope, source: source.rawValue)
     }
     @discardableResult public func cancel(agent: AgentID, incarnation: String, sessionID: String? = nil) async -> Bool {
         await cancel(endpoint: agent.rawValue, incarnation: incarnation, sessionID: sessionID)
     }
-    public func schedule(_ directive: SchedulingDirective, envelope: OutputEnvelope) async throws {
+    public func schedule(
+        _ directive: SchedulingDirective, envelope: OutputEnvelope, owner: ExecutionOwner? = nil
+    ) async throws {
         let projected: ExecutionSchedulingDirective =
             switch directive {
             case .beginWait: .beginWait
             case .endWait: .endWait
             case .pause(let milliseconds): .pause(milliseconds: milliseconds)
             }
-        try await schedule(projected, envelope: envelope.schedulingEnvelope)
+        if let owner {
+            try await schedule(projected, envelope: envelope.schedulingEnvelope, owner: owner)
+        } else {
+            try await schedule(projected, envelope: envelope.schedulingEnvelope)
+        }
     }
     public func requiredResources(for call: ActionCall) async throws -> Set<ResourceID> {
         try await requiredResources(for: call.executionRequest.functionRequest)

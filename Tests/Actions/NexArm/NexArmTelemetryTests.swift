@@ -387,7 +387,7 @@ extension LiveRuntimeTests {
                                 ? "Motion" : "Gesture", function: function),
                         channel: channel, parameters: ["cycles": "1"])))
         }
-        try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+        try await scheduler.finish(scope: .input(input.id), source: AgentID(rawValue: "assistant"))
         #expect(await link.writes == 14)
         #expect(await link.queries == 0)
         #expect(await controller.lockedMotors.isEmpty)

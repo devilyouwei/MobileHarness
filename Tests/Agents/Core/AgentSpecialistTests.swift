@@ -236,27 +236,30 @@ extension LiveRuntimeTests {
             #expect(await effects.failures.isEmpty)
             let snapshot = try await context.snapshot()
             #expect(snapshot.state.taskViews?.isEmpty != false)
-            let receipts = try snapshot.records.filter { $0.kind == ExecutionFeedback.contract }.compactMap {
-                let signal = try JSONDecoder().decode(SignalEvidence.self, from: $0.data)
-                return try signal.content.map { try JSONDecoder().decode(ExecutionFeedback.self, from: $0) }
-            }
+            let receipts = try snapshot.records
+                .filter { [ExecutionFeedback.contract, ExecutionFeedback.actionResultContract].contains($0.kind) }
+                .compactMap {
+                    let signal = try JSONDecoder().decode(SignalEvidence.self, from: $0.data)
+                    return try signal.content.map { try JSONDecoder().decode(ExecutionFeedback.self, from: $0) }
+                }
             var events: [String] = []
             for receipt in receipts {
                 switch receipt {
                 case .roundStarted(let id): events.append("round-start:" + id)
-                case .actionStarted(let round, let call): events.append("action-start:" + round + "/" + call)
+                case .actionStarted(let round?, let call?, let executionID, _, _):
+                    #expect(executionID != nil)
+                    events.append("action-start:" + round + "/" + call)
                 case .actionFinished(let result):
                     events.append("action-end:" + (result.roundID ?? "") + "/" + (result.callID ?? ""))
                 case .roundFinished(let end): events.append("round-end:" + end.id)
                 default: break
                 }
             }
-            let callStart = try #require(
-                receipts.compactMap { (receipt: ExecutionFeedback) -> (String, String)? in
-                    if case .actionStarted(let round, let call) = receipt { return (round, call) }
-                    return nil
-                }.first)
-            let (round, call) = callStart
+            let actionStarts = receipts.compactMap { (receipt: ExecutionFeedback) -> (String, String)? in
+                if case .actionStarted(let round?, let call?, _, _, _) = receipt { return (round, call) }
+                return nil
+            }
+            let (round, call) = try #require(actionStarts.first)
             #expect(
                 events.filter { $0.contains(round) } == [
                     "round-start:" + round, "action-start:" + round + "/" + call,

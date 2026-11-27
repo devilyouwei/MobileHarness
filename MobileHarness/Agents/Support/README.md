@@ -67,6 +67,8 @@ InputGateway registers neutral endpoints. Broadcast requires exact subscription;
 
 OutputGateway correlates model-round start and terminal events with the initiating input. It joins session-scoped cancellation with action admission, direct work, scheduled cleanup, and per-round delivery before sending the interruption terminal. The Assistant declares the unified execution feedback contract. InputGateway preserves the per-call legacy projection for roles declaring it.
 
+The output adapter projects round, standalone call, Task and input scopes to the Actions engine. A standalone Action uses its call ID as the scope key. Task grants retain their typed scheduling scopes for completion and cancellation. A definite pre-admission rejection carries the original call identity and has no execution ID. A Send timeout records a delivery failure, leaving execution status unconfirmed.
+
 AgentGatewayAssembly receives SignalTransport and GatewayAdmission, prepares communication and a neutral GatewayConfiguration, then binds returned execution/observation capabilities. App alone configures GatewayContainer. No adapter searches or configures an upstream root. Camera/device ports exclude scene, root shutdown and native idle-join controls.
 
 ## Lifetime, capacity and failures
@@ -75,7 +77,7 @@ AgentContainerLifecycle retains at most one startup, transition, cleanup and shu
 
 consumeUI defaults to one ordinary worker, supports at most four explicitly selected concurrent workers, and retains one separate control worker/slot. Requests carry cancellation handles and a 120-second deadline. Shutdown cancels/joins every child and closes only the matching consumer token. AgentUIExecution bounds active requests and retained outputs per request to 64 each; outputs belong to their transaction or stream, never both.
 
-Communication output is consumed independently of round barriers through a 16-item queue with at most four concurrent deliveries. Other output uses a 256-item bounded queue. Overflow fails explicitly and closure cancels/joins consumers. Bound direct requests return replies independently from Action round completion.
+IndependentOutputWorkflow submits publications to Gateway in producer order with a 16-item buffer per publication channel. SpeechPerception declares separate channels for voice activity, ASR, keyword matches and sound location. Directed communication, ActionControl and Tool dispatch use concurrent Gateway requests. The producer work pool bounds active requests to 128. Action round and wait boundaries join their own work. Overflow fails explicitly and closure cancels and joins consumers. [Gateway ordering](../../Gateway/README.md#signal-channel-ordering)
 
 ContainerFailureChannel retains 128 records, 64 pending deliveries and eight latest-snapshot observers. Oldest eviction has explicit counters. One worker preserves delivery failure without recursive reporting; stop joins delivery before closing observers. First/latest occurrence and repeat count are historical evidence, not current health authority. NativeFailureClassification handles model/platform lifecycle admission failures; suppression retains evidence and cleanup failures stay publishable. OutputGateway classifies cognitive execution failures; the Actions Shell owns neutral execution and result-ledger evidence. Pure cancellation is distinct from mixed or real failure.
 
@@ -91,7 +93,7 @@ Writer may request execution authorization after admitting a new ordinary messag
 
 ## Shared Island transport
 
-IndependentOutputWorkflow also owns AgentIslandPublication. Roles provide IslandContent or an end intent. One immutable in-flight command and one replaceable latest pending command use stable activity/session identity and increasing revisions. Failed publication retains bounded evidence and retries latest state every 500 ms. Stop closes admission, cancels/joins the worker, then joins the final registered end call before producer retirement; Gateway supplies its deadline and cleanup failure remains visible.
+IndependentOutputWorkflow owns AgentIslandPublication. Roles provide IslandContent or an end intent. One immutable in-flight command and one replaceable latest pending command use stable activity/session identity and increasing revisions. Failed publication retains bounded evidence and retries latest state every 500 ms. Stop closes admission, cancels/joins the worker, then joins the final registered end call before producer retirement; Gateway supplies its deadline and cleanup failure remains visible.
 
 Shared permissions/bind helpers own internal-tool declarations, trusted identity and result checking. Content, timing, terminal fences and response handling remain role-owned. SpeechPerception, Assistant, Photographer and ApplicationControl do not publish for each other. App-bound audio callbacks report actual audioID start/end facts only. UI owns selection/layout/animation.
 

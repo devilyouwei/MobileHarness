@@ -177,7 +177,8 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     let registry = agent.descriptor.capabilities
     #expect(
         Set(registry.internalActions.map { $0.path.description }) == [
-            "Speech.Playback.speak", "UI.Caption.beginReplyTurn", "UI.Caption.print", "UI.Expression.setReplyWaiting",
+            "Speech.Playback.speak", "Speech.Playback.setVolume", "UI.Caption.beginReplyTurn", "UI.Caption.print",
+            "UI.Expression.setReplyWaiting",
         ])
     #expect(Set(registry.internalTools.map(\.path)) == ["UI.Island.present", "UI.Island.end"])
     #expect(registry.tools.isEmpty)
@@ -283,9 +284,12 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     var generator = AgentGenerator(
         capabilities: registry, textMapping: AssistantAgent.mapText, segmentation: try AssistantAgent.textSegmentation)
     let events = try generator.append("<wait>Hello.</wait><express emotion='smile'/>") + generator.finish()
-    #expect(events.compactMap(\.actionCall).map(\.actionPath.function) == ["speak", "print", "express"])
-    #expect(events[0] == .scheduling(.beginWait))
-    #expect(events[3] == .scheduling(.endWait))
+    #expect(
+        events.compactMap(\.actionCall).filter { !$0.isWait }.map(\.actionPath.function) == [
+            "speak", "print", "express",
+        ])
+    #expect(events[0] == .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)))
+    #expect(events[3] == .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)))
 }
 
 private func nativeTool() -> [String: Any] {
@@ -578,7 +582,7 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
 @Test(.actionCatalog) func writerDeclaresOnlyConsumedInputsAndPeerReports() throws {
     let communication = try AgentConfigurations.load(named: "Writer").communication
     #expect(communication.requests == ["agent.task.v1"])
-    #expect(communication.feedback == ["action.result.v1"])
+    #expect(communication.feedback == ["action.result.v1", "tool.result.v1"])
     #expect(communication.publications == [.init(channel: "agent.task", protocol: "agent.task.events.v1")])
     #expect(communication.subscriptions.isEmpty)
 }

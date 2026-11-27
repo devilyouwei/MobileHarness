@@ -852,3 +852,20 @@ extension AssistantHistoryStore {
         ModelTokenUsage.self, from: Data(#"{"input":12,"generated":2,"total":14}"#.utf8))
     #expect(legacy.cachedInput == nil && legacy.cacheWriteInput == nil)
 }
+
+@Test func admittedInputPreparationSurvivesOtherWritesInTheSameDialog() async throws {
+    let store = AssistantHistoryStore()
+    _ = try await store.admitUserInput(id: "queued", user: "next", model: "pending")
+    let snapshot = try await store.readCurrent()
+    _ = try await store.admitUserInput(id: "later", user: "another", model: "pending")
+    await #expect(throws: AssistantHistoryError.conflict) {
+        _ = try await store.begin(id: "queued", user: "next", request: [], expecting: snapshot.token, model: "fixture")
+    }
+    let prepared = try await store.prepareAdmittedInput(
+        id: "queued", dialogID: snapshot.current.id, user: "next", request: [], model: "fixture")
+    #expect(!prepared.awaitingModel && prepared.id == "queued")
+    await #expect(throws: AssistantHistoryError.conflict) {
+        _ = try await store.prepareAdmittedInput(
+            id: "later", dialogID: "another-dialog", user: "another", request: [], model: "fixture")
+    }
+}

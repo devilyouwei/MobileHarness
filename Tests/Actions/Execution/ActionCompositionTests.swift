@@ -81,7 +81,7 @@ private actor CompositionCounter {
             taskScope: input.taskScope)
         try await scheduler.enqueue(invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
     }
-    try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+    try await scheduler.finish(scope: .input(input.id), source: AgentID(rawValue: "assistant"))
     await scheduler.finishResultDelivery()
     #expect(await counter.count == 1)
     let results = await scheduler.resultSnapshot().compactMap(\.result)

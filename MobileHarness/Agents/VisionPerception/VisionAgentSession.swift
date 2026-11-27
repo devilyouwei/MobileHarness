@@ -88,7 +88,7 @@ public enum VisionPipelineWorkflow {
                     inputFailed: { error in await vision.failInput(error) },
                     output: {
                         try await IndependentOutputWorkflow.consumeSignals(
-                            vision.outputs,
+                            vision.outputs, contracts: AgentContracts.communication,
                             replacementKey: { VisionPerceptionAgent.outputReplacementKey($0.output) },
                             onMediaExpired: { envelope in
                                 await vision.presentationFinished(

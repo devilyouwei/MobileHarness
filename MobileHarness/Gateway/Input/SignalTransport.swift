@@ -6,6 +6,7 @@ public struct SignalEnvelope: Sendable {
     public let id: String
     public let sessionID: String
     public let contract: String
+    public let channel: String
     public let version: Int
     public let hops: Int
     public let payloadBytes: Int
@@ -13,12 +14,13 @@ public struct SignalEnvelope: Sendable {
     public let control: Bool
     public let cleanup: Bool
     public init(
-        id: String, sessionID: String, contract: String, version: Int = 1, hops: Int = 0,
+        id: String, sessionID: String, contract: String, channel: String? = nil, version: Int = 1, hops: Int = 0,
         payloadBytes: Int, expiresAt: ContinuousClock.Instant? = nil, cleanup: Bool = false, control: Bool = false
     ) {
         self.id = id
         self.sessionID = sessionID
         self.contract = contract
+        self.channel = channel ?? contract
         self.version = version
         self.hops = hops
         self.payloadBytes = payloadBytes
@@ -42,11 +44,13 @@ public enum SignalTransportError: Error, Sendable {
     case unsupportedProtocol, duplicateProtocol, schemaMismatch, invalidReply, cyclicRequest
 }
 
-private enum SignalDispatchOwnership { @TaskLocal static var current: UUID? }
+private enum SignalDispatchOwnership {
+    @TaskLocal static var current: UUID?
+}
 
 /// Internal Signal (Agent–Agent) transport. Opaque endpoint delivery: payload contracts and receiver policy belong to the endpoint owner.
 public actor SignalTransport {
-    private struct Endpoint {
+    private struct Endpoint: Sendable {
         let port: SignalEndpoint
         let receive: @Sendable (GatewaySignal) async throws -> Void
     }
@@ -83,6 +87,11 @@ public actor SignalTransport {
         let cleanup: Bool
         let task: Task<Void, any Error>
     }
+    private enum SendCompletion: Sendable {
+        case receiver(Result<Void, any Error>)
+        case deadline
+        case timerCancelled
+    }
     private var deliveries: [UUID: Delivery] = [:]
     private var active = 0
     private var bytes = 0
@@ -114,6 +123,13 @@ public actor SignalTransport {
         try validateRequestEndpoint(port)
         return port
     }
+    func executionEndpoint(address: String, incarnation: String? = nil) throws -> SignalEndpoint {
+        guard !closed, let endpoint = endpoints[address]?.port,
+            incarnation == nil || endpoint.incarnation == incarnation
+        else { throw SignalTransportError.staleEndpoint }
+        return endpoint
+    }
+
     public func validateExecution(_ input: FunctionInvocation, owner: ExecutionOwner?) throws {
         guard !closed else { throw SignalTransportError.closed }
         guard let owner, let endpoint = endpoints[owner.endpoint]?.port,
@@ -139,9 +155,31 @@ public actor SignalTransport {
         guard let endpoint = endpoints[address]?.port, endpoint.incarnation == incarnation else { return }
         await unregister(endpoint)
     }
+    /// Directed delivery acknowledges the receiver's return and bounds the whole request.
     public func send(
         source: SignalEndpoint?, target: SignalEndpoint, envelope: SignalEnvelope,
-        payload: any Sendable
+        payload: any Sendable, timeout: Duration = .seconds(30)
+    ) async throws {
+        guard timeout > .zero, timeout <= .seconds(120) else { throw SignalTransportError.invalidEnvelope }
+        let latest = ContinuousClock.now.advanced(by: timeout)
+        let deadline = envelope.expiresAt.map { min($0, latest) } ?? latest
+        let addressed = SignalEnvelope(
+            id: envelope.id, sessionID: envelope.sessionID, contract: envelope.contract, channel: envelope.channel,
+            version: envelope.version, hops: envelope.hops, payloadBytes: envelope.payloadBytes, expiresAt: deadline,
+            cleanup: envelope.cleanup, control: envelope.control)
+        try await deliver(source: source, target: target, envelope: addressed, payload: payload, deadline: deadline)
+    }
+
+    /// Pub/Sub tracks branch lifetime and expiry independently and does not wait for a reply.
+    func deliverEvent(
+        source: SignalEndpoint, target: SignalEndpoint, envelope: SignalEnvelope, payload: any Sendable
+    ) async throws {
+        try await deliver(source: source, target: target, envelope: envelope, payload: payload, deadline: nil)
+    }
+
+    private func deliver(
+        source: SignalEndpoint?, target: SignalEndpoint, envelope: SignalEnvelope,
+        payload: any Sendable, deadline: ContinuousClock.Instant?
     ) async throws {
         try Task.checkCancellation()
         try validateEnvelope(envelope)
@@ -157,32 +195,76 @@ public actor SignalTransport {
         }
         active += 1
         bytes += envelope.payloadBytes
+        let id = UUID()
         defer {
+            deliveries[id] = nil
             active -= 1
             bytes -= envelope.payloadBytes
         }
-        let id = UUID()
+
         let task = Task {
             try await SignalDispatchOwnership.$current.withValue(id) {
-                try Task.checkCancellation()
-                try self.validateEndpoint(source, target: target)
-                if let request = payload as? SignalRequestInvocation {
-                    try await request.operation()
+                if let deadline {
+                    try await withTaskGroup(of: SendCompletion.self) { group in
+                        group.addTask {
+                            do {
+                                try await self.deliverToEndpoint(
+                                    receiver, source: source, envelope: envelope, payload: payload, deadline: deadline)
+                                return .receiver(.success(()))
+                            } catch {
+                                return .receiver(.failure(error))
+                            }
+                        }
+                        group.addTask {
+                            do {
+                                try await Task.sleep(until: deadline, clock: .continuous)
+                                return .deadline
+                            } catch {
+                                return .timerCancelled
+                            }
+                        }
+                        defer { group.cancelAll() }
+                        for await completion in group {
+                            switch completion {
+                            case .receiver(let result): return result
+                            case .deadline: return .failure(SignalTransportError.expired)
+                            case .timerCancelled: continue
+                            }
+                        }
+                        return .failure(CancellationError())
+                    }.get()
                 } else {
-                    try await receiver.receive(GatewaySignal(source: source, envelope: envelope, payload: payload))
+                    try await deliverToEndpoint(
+                        receiver, source: source, envelope: envelope, payload: payload, deadline: nil)
                 }
-                try Task.checkCancellation()
-                try self.validateEndpoint(source, target: target)
             }
         }
         deliveries[id] = Delivery(source: source, target: target, cleanup: envelope.cleanup, task: task)
-        defer { deliveries[id] = nil }
         try await withTaskCancellationHandler {
             try await task.value
         } onCancel: {
             task.cancel()
         }
     }
+
+    private func deliverToEndpoint(
+        _ receiver: Endpoint, source: SignalEndpoint?, envelope: SignalEnvelope,
+        payload: any Sendable, deadline: ContinuousClock.Instant?
+    ) async throws {
+        try Task.checkCancellation()
+        try validateEndpoint(source, target: receiver.port)
+        try validateEnvelope(envelope)
+        if let deadline, deadline <= .now { throw SignalTransportError.expired }
+        if let request = payload as? SignalRequestInvocation {
+            try await request.operation()
+        } else {
+            try await receiver.receive(GatewaySignal(source: source, envelope: envelope, payload: payload))
+        }
+        try Task.checkCancellation()
+        try validateEndpoint(source, target: receiver.port)
+        if let deadline, deadline <= .now { throw SignalTransportError.expired }
+    }
+
     func validateEnvelope(_ envelope: SignalEnvelope) throws {
         guard !closed else { throw SignalTransportError.closed }
         if !envelope.cleanup { try admission?.check() }
@@ -190,6 +272,7 @@ public actor SignalTransport {
             !envelope.id.isEmpty, envelope.id.utf8.count <= 128,
             !envelope.sessionID.isEmpty, envelope.sessionID.utf8.count <= 128,
             !envelope.contract.isEmpty, envelope.contract.utf8.count <= 128,
+            !envelope.channel.isEmpty, envelope.channel.utf8.count <= 256,
             envelope.payloadBytes >= 0, envelope.payloadBytes <= 8 * 1024 * 1024
         else { throw SignalTransportError.invalidEnvelope }
         if let expiry = envelope.expiresAt, expiry <= .now { throw SignalTransportError.expired }
@@ -200,17 +283,81 @@ public actor SignalTransport {
     }
     func suspend() async {
         await eventFacility?.suspend()
-        let pending = deliveries.values.filter { !$0.cleanup }
-        for delivery in pending { delivery.task.cancel() }
-        for delivery in pending { _ = await delivery.task.result }
+        let pending = deliveries.filter { !$0.value.cleanup }
+        for delivery in pending.values { delivery.task.cancel() }
+        for (id, delivery) in pending where id != SignalDispatchOwnership.current { _ = await delivery.task.result }
     }
     func shutdown() async {
         closed = true
         await eventFacility?.shutdown()
-        let pending = Array(deliveries.values)
-        for delivery in pending { delivery.task.cancel() }
-        for delivery in pending { _ = await delivery.task.result }
+        let pending = deliveries
+        for delivery in pending.values { delivery.task.cancel() }
+        for (id, delivery) in pending where id != SignalDispatchOwnership.current { _ = await delivery.task.result }
         endpoints.removeAll()
         requestHandlers.removeAll()
+    }
+}
+
+/// Bounded producer admission before asynchronous authorization and publication.
+/// Each selected channel has one worker. The producer supplies its business channel and admission order.
+public struct SignalChannelDispatcher<Value: Sendable>: Sendable {
+    private let queues: [String: AsyncStream<Value>.Continuation]
+    private let streams: [AsyncStream<Value>]
+
+    public init(channels: Set<String>, capacities: [String: Int] = [:]) {
+        let entries = channels.sorted().map { channel in
+            let capacity = min(max(capacities[channel] ?? 16, 1), 256)
+            return (channel, AsyncStream<Value>.makeStream(bufferingPolicy: .bufferingOldest(capacity)))
+        }
+        queues = Dictionary(uniqueKeysWithValues: entries.map { ($0.0, $0.1.continuation) })
+        streams = entries.map { $0.1.stream }
+    }
+
+    public func enqueue(_ value: Value, channel: String) throws {
+        guard let queue = queues[channel] else { throw SignalTransportError.unsupportedProtocol }
+        switch queue.yield(value) {
+        case .enqueued: return
+        case .dropped: throw SignalTransportError.capacityExceeded
+        case .terminated: throw SignalTransportError.closed
+        @unknown default: throw SignalTransportError.closed
+        }
+    }
+
+    public func dispatch(_ delivery: @escaping @Sendable (Value) async throws -> Void) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for stream in streams {
+                group.addTask {
+                    for await value in stream {
+                        try Task.checkCancellation()
+                        try await delivery(value)
+                    }
+                }
+            }
+            while try await group.next() != nil {}
+        }
+    }
+
+    public func finish() {
+        for queue in queues.values { queue.finish() }
+    }
+}
+
+/// Gateway-owned admission for independent sends before asynchronous routing.
+public actor SignalWorkPool {
+    private var inFlight = 0
+
+    public init() {}
+
+    public func submit(
+        _ operation: @escaping @Sendable () async throws -> Void
+    ) throws -> Task<Void, any Error> {
+        try Task.checkCancellation()
+        guard inFlight < 128 else { throw SignalTransportError.capacityExceeded }
+        inFlight += 1
+        return Task {
+            defer { inFlight -= 1 }
+            try Task.checkCancellation()
+            try await operation()
+        }
     }
 }

@@ -78,7 +78,9 @@
             await value.bindPresentation(consumer)
             outputTask = Task {
                 do {
-                    try await IndependentOutputWorkflow.consumeSignals(value.outputs) { envelope in
+                    try await IndependentOutputWorkflow.consumeSignals(
+                        value.outputs, contracts: AgentContracts.communication
+                    ) { envelope in
                         do {
                             _ = try await consumer.execute(envelope)
                         } catch is CancellationError {

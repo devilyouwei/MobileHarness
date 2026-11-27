@@ -18,12 +18,16 @@ public struct FunctionTokenParser: Sendable {
     private var entityStart = 0
     private var text = ""
     private var textSources: [Range<Int>] = []
-    private var waitDepth = 0
-    private var waitCount = 0
+    private var scopes: [String] = []
+    private var scopeCount = 0
     private var totalBytes = 0
     private var tokenCount = 0
     private var closed = false
-    public init() {}
+    private let scopedActions: Set<String>
+
+    public init(scopedActions: Set<String> = ["wait"]) {
+        self.scopedActions = scopedActions
+    }
 
     public mutating func append(_ fragment: String) throws -> [FunctionToken] { try append(Data(fragment.utf8)) }
 
@@ -77,7 +81,7 @@ public struct FunctionTokenParser: Sendable {
     mutating func finishLocated() throws -> [LocatedToken] {
         guard !closed else { throw GenerationError.closed }
         closed = true
-        guard utf8.isEmpty, tag == nil, entity == nil, waitDepth == 0 else {
+        guard utf8.isEmpty, tag == nil, entity == nil, scopes.isEmpty else {
             throw GenerationError.incompleteDocument
         }
         var result: [LocatedToken] = []
@@ -139,18 +143,21 @@ public struct FunctionTokenParser: Sendable {
         tokenCount += 1
         guard tokenCount <= 1024 else { throw GenerationError.limitExceeded }
         let content = String(value.dropFirst().dropLast())
-        if content == "wait" {
-            guard waitCount < 32, waitDepth < 8 else { throw GenerationError.limitExceeded }
-            waitCount += 1
-            waitDepth += 1
-            return .scheduling(.beginWait)
+        if content.hasPrefix("/") {
+            let name = String(content.dropFirst())
+            guard scopes.last == name else { throw GenerationError.malformedMarkup }
+            scopes.removeLast()
+            return .scope(name: name, boundary: .end)
         }
-        if content == "/wait" {
-            guard waitDepth > 0 else { throw GenerationError.malformedMarkup }
-            waitDepth -= 1
-            return .scheduling(.endWait)
+        if !content.hasSuffix("/") {
+            guard CapabilityRegistry.validName(content), scopedActions.contains(content) else {
+                throw GenerationError.malformedMarkup
+            }
+            guard scopeCount < 32, scopes.count < 8 else { throw GenerationError.limitExceeded }
+            scopeCount += 1
+            scopes.append(content)
+            return .scope(name: content, boundary: .start)
         }
-        guard content.hasSuffix("/") else { throw GenerationError.malformedMarkup }
         let chars = Array(content.dropLast())
         var index = 0
         func whitespace(_ c: Character) -> Bool { c == " " || c == "\n" || c == "\r" || c == "\t" }

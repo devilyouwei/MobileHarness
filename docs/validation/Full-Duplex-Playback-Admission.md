@@ -130,3 +130,86 @@
 `./scripts/build-ios.sh` 的五个模拟器目标通过，App 的 Agent／Skill、Live Activity 和中英文资源校验通过。
 
 签名版 MobileHarness 0.1.0（2026112607）通过真机构建、严格签名和资源检查，在 iPhone 17 Pro 上从 2026112606 原位更新。安装回执序列为 8168，独立设备清单确认构建号。
+
+## 播报降音量、暂停和续播
+
+Swift 专项 41 项通过。确定性 PCM 回归覆盖已确认起声后的正常、降音及暂停档位、升降阈值的防抖、播报失去有声区间后继续感知、声学恢复早于 ASR 终稿，以及受限路由不发布能量档位。播放控制回归覆盖同一回复跨语音片段保留暂停、新回复隔离，以及关键词和模型打断胜出后拒绝迟到恢复。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过。最终源码的 App 复编译及 Agent／Skill、Live Activity、中英文本地化打包校验通过。
+
+`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。8 项 Python 工程工具测试、变更 Swift 严格格式、plist 和 `git diff --check` 通过。
+
+### 真机安装
+
+带全双工播报抑制的 MobileHarness 0.1.0（2026112612）通过 iPhoneOS Debug 构建、严格签名及三项资源检查。iPhone 17 Pro 从 2026112611 原位更新，安装回执序列 8208，设备清单确认构建号，系统启动成功。真实路由上的降音、暂停位置、续播听感和阈值仍待实测。
+
+## Gateway 调节与平滑起停
+
+最终 Swift 专项 65 项通过。Gateway 回归保持 `speak` 在途，验证独立的 `Speech.Playback.adjust` 能在另一通道执行并结算。回归覆盖同一回复跨片段继承、旧序号和旧回复拒绝、短促高能量不暂停、持续高能量和释放的缓冲、线性增益插值、有效打断后拒绝恢复。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过，最终源码的 App 复编译通过，Agent／Skill、Live Activity 与中英文本地化资源校验通过。`./scripts/check.sh` 仍在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。变更 Swift 严格格式、8 项 Python 工具测试、plist 和 `git diff --check` 通过。调整后的暂停缓冲和淡入淡出尚未在真机验收。
+
+### Gateway 调节版真机安装
+
+MobileHarness 0.1.0（2026112613）通过 iPhoneOS Debug 构建、严格签名和三项打包资源检查。iPhone 17 Pro 从 2026112612 原位更新，安装回执序列为 8216，设备应用清单确认构建号，系统启动成功。真机上的暂停缓冲与线性增益过渡仍待听感验证。
+
+### 逐窗 VAD 准入
+
+2026-11-27。7 项 Swift 专项通过。回归在已确认语句内分别注入 VAD 判为语音和非语音的高能量窗口。判为语音的连续高能量窗口触发暂停；同样响的非语音窗口使已降低的播报恢复原音量，未触发暂停。半双工用例未发送档位变化。
+
+`./scripts/build-ios.sh` 的五个模拟器目标及应用资源检查通过。`check.sh` 仍在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。变更 Swift 格式、8 项 Python 工具检查、plist 和 `git diff --check` 通过。本次修正尚未安装到真机。
+
+
+### ActionCall 和 ActionControl 迁移
+
+2026-11-27。最终 Swift 回归分开运行，共 84 项通过。独立控制的集成回归用替身播放器覆盖暂停后正常继续、暂停时取消、淡出尚未确认时继续取代暂停，并验证同一 `executionID`、跨会话拒绝、旧序号拒绝和唯一执行终态。Assistant 关键词与模型打断用例验证暂停指令绑定播报实例，以及打断后迟到的低能量事件不会续播。扩展回归第一次与 iOS 构建并行运行时，20 ms 的 Gateway Request/Reply 超时用例未观测到已启动处理器。该用例独立复测通过。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过。最终源码再次构建主 App，Agent／Skill、Live Activity 和中英文本地化资源校验通过。`./scripts/check.sh` 仍在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。8 项 Python 工程工具测试、变更 Swift 严格格式、工程 plist 和 `git diff --check` 通过。替身回归确认控制链路，真机外放和耳机的淡出、暂停位置及续播听感尚待验收。
+
+### 独立音量 Action 与通用生命周期命令
+
+2026-11-27。29 项 Swift 定向回归通过。Gateway 集成用替身播放器验证 `Speech.Playback.setVolume` 可在 `speak` 暂停时独立结算，播放保持暂停，之后可继续或按同一个 `executionID` 单独取消。Assistant 回归验证高档发 `pause`，回落时先发 `setVolume`，收到对应的成功终态后才发无音量参数的 `resume`，语义打断继续拦截迟到的恢复信号。
+
+`./scripts/build-ios.sh` 的五个模拟器目标、App 的 Agent／Skill、Live Activity 以及中英文本地化资源校验通过。`./scripts/check.sh` 仍在既有 State Value codec 和 Xcode 本地化文件归属检查处退出。变更 Swift 严格格式、8 项 Python 工程工具检查、工程 plist 与 `git diff --check` 通过。设备音量和起停听感尚待真机确认。
+
+### 独立语音能量上报与事件接纳
+
+2026-11-27。9 项 Swift 定向回归通过。PCM 替身覆盖空闲采集、半双工仍可采集、真实有声时段切换以及同样响的非语音窗。Assistant 用例先送能量更新，后送采集开始和播报开始，验证能量档位用于新登记的实例。续说用例使用不带进度序号的完整窗口快照，验证接收端按实际采集时刻放行。
+
+`./scripts/build-ios.sh` 的五个模拟器目标及 App 的 Agent／Skill、Live Activity、中英文本地化资源校验通过。`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。8 项 Python 工程工具测试、变更 Swift 严格格式、工程 plist 和 `git diff --check` 通过。真实扬声器与耳机路由上的声音效果待设备验收。
+
+### 语音信道内顺序与跨信道并行
+
+2026-11-27。语音 PCM 替身验证采集开始、起声候选、起声确认、能量变化、恢复和采集结束在 VAD 信道中的入队顺序。发送工作流回归分别阻塞 VAD 和 ASR 信道的第一条消息，验证各自后续消息保持 FIFO。解除 ASR 阻塞时，ASR 终稿在 VAD 信道仍被阻塞的情况下独立提交，关键词信道也独立提交。
+
+12 项 Swift 定向测试通过。8 项 Python 工程工具测试、变更 Swift 严格格式、工程 plist 与 `git diff --check` 通过。`./scripts/check.sh` 仍在既有的 State Value codec 和 Xcode 本地化资源归属检查处退出。
+
+主 App 模拟器复编译通过，Agent／Skill、Live Activity 和中英文本地化资源校验通过。
+
+### Gateway 定向请求与发布顺序回归
+
+2026-11-27。定向场景阻塞一笔 Send，在同一信道和目标上发出第二笔 Send 与一个类型化 Request。第二笔 Send 可确认接收，Request 可独立取得回复。超时用例验证接收端能读取截止时间，取消后 Gateway 回收容量。发布场景交错两个发布者，验证同一订阅者保持信道入队顺序、慢订阅者与其他订阅者隔离。语音用例分别阻塞 VAD 和 ASR，验证关键词快停仍可独立提交。Assistant 用例阻塞 ActionCall，验证 ActionControl 能送达，依赖前序 ActionCall 的 `wait` 仍保持业务顺序。
+
+341 项 Swift 扩展回归通过，Send 和类型化 Request 的两项计时回归分开通过。回归也验证了接收端的原始错误、同函数 Tool 并发、合法轮次内的 Tool 回执关联、播报控制和打断清理。`./scripts/check.sh` 在既有 State Value codec 和 Xcode 中文资源归属检查处退出。变更 Swift 严格格式、8 项 Python 工程工具测试、工程 plist 和 `git diff --check` 通过。未测量吞吐量或设备听感。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过。最终超时收尾代码完成后，主 App 模拟器复编译及 Agent／Skill、Live Activity、中英文本地化资源校验通过。
+
+### 调用身份与独立轮次结算
+
+2026-11-27。172 项 Swift 扩展回归通过。作用域回归用相同字符串建立模型轮次和独立调用，验证容量、封口和调用身份归属。拒绝回归验证没有执行实例时保留调用身份，确认拒绝与结果未知的投影不同。全双工容量回归在调度阻塞时分别检查语义输入队列和按轮次 ID 管理的结算队列。扩展回归同时覆盖原生 Tool、Action 反馈、语义结果融合和播放控制。
+
+最终 7 项 Swift 定向回归通过，覆盖同 ID 作用域隔离、无执行实例拒绝、全双工队列满载、ReACT、语义打断、结果重投和播报实例控制。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过，最终源码复编译主 App 后通过 Agent／Skill、Live Activity 和中英文本地化资源校验。`./scripts/check.sh` 在既有的 State Value codec 和 Xcode 中文资源归属检查处退出。变更 Swift 严格格式、8 项 Python 工具测试、工程 plist 和 `git diff --check` 通过。设备音频与真实模型行为未在本次回归采样。
+
+### Action 与 Tool 调用协议
+
+2026-11-27。Swift 扩展回归 284 项通过。补跑的两项 Gateway 计时回归通过。最终源码的六项定向回归覆盖 Action 和 Tool 独立封口、拒绝迟到调用、四类回包的协议映射、可扩展的标签配对，以及全双工打断与历史并发写入后继续处理已入队输入。
+
+`./scripts/build-ios.sh` 的五个模拟器目标通过。最终源码复编译主 App，通过 Agent／Skill 资源、Live Activity 和中英文本地化校验。`./scripts/check.sh` 仍在既有的 State Value codec 和 Xcode 中文资源归属检查处退出。变更 Swift 严格格式、8 项 Python 工程工具测试、工程 plist 和 `git diff --check` 通过。本轮验证使用自动化测试和模拟器构建，真机与真实模型验收尚未执行。
+
+#### 提交前业务兼容复核
+
+普通 Swift 回归的 IntegrationTests 报告 1,293 项通过，定向 Send 和 Request 的超时回归串行通过。原生集成首轮发现委派 Agent 同时订阅两类反馈时收不到独立的 Action 结果，以及声源证据写入失败后仍会发布。机械臂与蓝牙替身装配缺少内部音量 Action。修复后 29 项定向回归通过，覆盖声源写入失败、委派次轮、机械臂、蓝牙、回包关联、VAD 能量和 Gateway 超时。
+
+最终源码的五个模拟器目标构建通过，App 的 Agent／Skill、Live Activity 和中英文本地化资源校验通过。将静态检查结果与提交前的 HEAD 对照，两处检查类别的报错一致。原生呈现套件未给出完整结果。本轮未执行物理设备或真实模型验收。

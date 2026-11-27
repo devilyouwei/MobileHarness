@@ -1,5 +1,6 @@
 import AgentCore
 import Foundation
+import Gateway
 import OSLog
 import UI
 
@@ -7,25 +8,35 @@ import UI
 public enum IndependentOutputWorkflow {
     /// Independent protocol consumers; only a round/input boundary joins both branches.
     public static func consumeGeneration(
-        _ outputs: AsyncStream<OutputEnvelope>,
+        _ outputs: AsyncStream<OutputEnvelope>, contracts: CommunicationContracts? = nil,
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
     ) async throws {
         // Actions may emit communication after the model has already emitted roundFinished.
         // Keep that transport alive while the round consumer joins its scheduled work.
         let rounds = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
         let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+        let channels = contracts?.registered.compactMap(\.channel) ?? []
+        let signalDispatcher = SignalChannelDispatcher<OutputEnvelope>(channels: Set(channels))
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { try await consumeRounds(rounds.stream, dispatch: dispatch) }
-            group.addTask { try await consumeTools(communications.stream, dispatch: dispatch) }
+            group.addTask { try await consumeDirectSignals(communications.stream, dispatch: dispatch) }
+            group.addTask { try await signalDispatcher.dispatch(dispatch) }
             group.addTask {
                 defer {
                     rounds.continuation.finish()
                     communications.continuation.finish()
+                    signalDispatcher.finish()
                 }
                 for await envelope in outputs {
                     try Task.checkCancellation()
                     let destination: AsyncStream<OutputEnvelope>.Continuation
-                    if case .communication = envelope.output {
+                    if case .communication(let action) = envelope.output {
+                        if let channel = contracts?[action.message.contract]?.channel {
+                            try signalDispatcher.enqueue(envelope, channel: channel)
+                            continue
+                        }
+                        destination = communications.continuation
+                    } else if case .actionControl = envelope.output {
                         destination = communications.continuation
                     } else {
                         destination = rounds.continuation
@@ -38,6 +49,7 @@ public enum IndependentOutputWorkflow {
                 group.cancelAll()
                 rounds.continuation.finish()
                 communications.continuation.finish()
+                signalDispatcher.finish()
             }
             while (try await group.next()) != nil {}
         }
@@ -55,7 +67,7 @@ public enum IndependentOutputWorkflow {
                 of: BranchCompletion.self, returning: OutputEnvelope?.self
             ) { group in
                 group.addTask {
-                    try await consumeTools(tools.stream, dispatch: dispatch)
+                    try await consumeDirectSignals(tools.stream, dispatch: dispatch)
                     return .drained
                 }
                 group.addTask {
@@ -68,7 +80,7 @@ public enum IndependentOutputWorkflow {
                 }
                 group.addTask {
                     let boundary = try await reader.routeRound(
-                        tools: tools.continuation, actions: actions.continuation)
+                        tools: tools.continuation, actions: actions.continuation, dispatch: dispatch)
                     return .boundary(boundary)
                 }
                 defer {
@@ -115,11 +127,12 @@ public enum IndependentOutputWorkflow {
         case executed
     }
 
-    private static func consumeTools(
+    static func consumeDirectSignals(
         _ outputs: AsyncStream<OutputEnvelope>,
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
     ) async throws {
         let reader = OutputStreamReader(outputs)
+        let pool = SignalWorkPool()
         try await withThrowingTaskGroup(of: ToolCompletion.self) { group in
             var active = 0
             var reading = true
@@ -131,10 +144,14 @@ public enum IndependentOutputWorkflow {
                 case .next(let envelope):
                     reading = false
                     if let envelope {
+                        let delivery = try await pool.submit { try await dispatch(envelope) }
                         active += 1
                         group.addTask {
-                            try Task.checkCancellation()
-                            try await dispatch(envelope)
+                            try await withTaskCancellationHandler {
+                                try await delivery.value
+                            } onCancel: {
+                                delivery.cancel()
+                            }
                             return .executed
                         }
                     } else {
@@ -143,7 +160,7 @@ public enum IndependentOutputWorkflow {
                 case .executed:
                     active -= 1
                 }
-                if !closed, !reading, active < 4 {
+                if !closed, !reading, active < 128 {
                     reading = true
                     group.addTask { .next(try await reader.next()) }
                 }
@@ -182,6 +199,7 @@ public enum IndependentOutputWorkflow {
     /// Latest-state policy comes from the producer; discrete commands retain FIFO admission.
     public static func consumeSignals(
         _ outputs: AsyncStream<OutputEnvelope>,
+        contracts: CommunicationContracts? = nil,
         replacementKey: @escaping @Sendable (OutputEnvelope) -> String? = { _ in nil },
         onMediaExpired: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in },
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
@@ -189,10 +207,14 @@ public enum IndependentOutputWorkflow {
         let media = AgentOutputMailbox(capacity: 1)
         let latestTools = AgentOutputMailbox(capacity: 16)
         let latestCommunications = AgentOutputMailbox(capacity: 16)
-        let actions = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
-        let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+        let dynamicSignals = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+        let callChannel = GatewayExecution.actionCallChannel
+        let channels = (contracts?.registered.compactMap(\.channel) ?? []) + [callChannel]
+        let signalDispatcher = SignalChannelDispatcher<OutputEnvelope>(
+            channels: Set(channels), capacities: [callChannel: 256])
         try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { try await consumeTools(communications.stream, dispatch: dispatch) }
+            group.addTask { try await consumeDirectSignals(dynamicSignals.stream, dispatch: dispatch) }
+            group.addTask { try await signalDispatcher.dispatch(dispatch) }
             group.addTask {
                 for await envelope in latestCommunications.stream {
                     try Task.checkCancellation()
@@ -224,14 +246,17 @@ public enum IndependentOutputWorkflow {
                 }
             }
             group.addTask {
-                for await envelope in actions.stream {
-                    try Task.checkCancellation()
-                    try await dispatch(envelope)
-                }
-            }
-            group.addTask {
                 for await envelope in outputs {
                     try Task.checkCancellation()
+                    let channel: String?
+                    switch envelope.output {
+                    case .communication(let action):
+                        channel = contracts?[action.message.contract]?.channel
+                    case .toolCall, .actionControl:
+                        channel = nil
+                    default:
+                        channel = callChannel
+                    }
                     let key = try scopedStateKey(replacementKey(envelope), envelope: envelope)
                     if envelope.media != nil {
                         try admitState(envelope, key: "media", mailbox: media, queue: "media", capacity: 1)
@@ -243,21 +268,27 @@ public enum IndependentOutputWorkflow {
                         } else {
                             try admitState(envelope, key: key, mailbox: latestTools, queue: "latestTools", capacity: 16)
                         }
+                    } else if let channel {
+                        let queue = channel == callChannel ? "actions" : channel
+                        let capacity = channel == callChannel ? 256 : 16
+                        do {
+                            try signalDispatcher.enqueue(envelope, channel: channel)
+                        } catch SignalTransportError.capacityExceeded {
+                            throw QueueFailure(queue: queue, capacity: capacity, envelope: envelope, reason: "full")
+                        } catch SignalTransportError.closed {
+                            try Task.checkCancellation()
+                            throw QueueFailure(queue: queue, capacity: capacity, envelope: envelope, reason: "closed")
+                        }
                     } else {
-                        let communication: Bool
-                        if case .communication = envelope.output { communication = true } else { communication = false }
-                        let destination = communication ? communications.continuation : actions.continuation
-                        switch destination.yield(envelope) {
+                        switch dynamicSignals.continuation.yield(envelope) {
                         case .enqueued: break
                         case .dropped:
                             throw QueueFailure(
-                                queue: communication ? "communications" : "actions",
-                                capacity: communication ? 16 : 256, envelope: envelope, reason: "full")
+                                queue: "communications", capacity: 16, envelope: envelope, reason: "full")
                         case .terminated:
                             try Task.checkCancellation()
                             throw QueueFailure(
-                                queue: communication ? "communications" : "actions",
-                                capacity: communication ? 16 : 256, envelope: envelope, reason: "closed")
+                                queue: "communications", capacity: 16, envelope: envelope, reason: "closed")
                         @unknown default: throw HarnessError.queueFull
                         }
                     }
@@ -265,16 +296,16 @@ public enum IndependentOutputWorkflow {
                 media.close(discardingState: false)
                 latestTools.close(discardingState: false)
                 latestCommunications.close(discardingState: false)
-                communications.continuation.finish()
-                actions.continuation.finish()
+                dynamicSignals.continuation.finish()
+                signalDispatcher.finish()
             }
             defer {
                 group.cancelAll()
                 media.close()
                 latestTools.close()
                 latestCommunications.close()
-                communications.continuation.finish()
-                actions.continuation.finish()
+                dynamicSignals.continuation.finish()
+                signalDispatcher.finish()
             }
             // React to the first failing branch, then join cancellation in the scope cleanup.
             while (try await group.next()) != nil {}
@@ -354,8 +385,10 @@ private actor OutputStreamReader {
 
     func routeRound(
         tools: AsyncStream<OutputEnvelope>.Continuation,
-        actions: AsyncStream<OutputEnvelope>.Continuation
+        actions: AsyncStream<OutputEnvelope>.Continuation,
+        dispatch: @Sendable (OutputEnvelope) async throws -> Void
     ) async throws -> OutputEnvelope? {
+        var began = false
         while let envelope = try await next() {
             try Task.checkCancellation()
             if envelope.roundID != nil {
@@ -377,7 +410,17 @@ private actor OutputStreamReader {
                 inputID = nil
                 return envelope
             }
-            if case .roundFinished = envelope.output {
+            if case .roundStarted = envelope.output {
+                try await dispatch(envelope)
+                began = true
+                continue
+            }
+            if case .roundFinished(let id) = envelope.output {
+                if began, case .enqueued = actions.yield(envelope.replacingOutput(.roundBranchSealed(.action, id))) {
+                    // Action seals after its preceding calls, independently of Tool completion.
+                } else if began {
+                    throw HarnessError.queueFull
+                }
                 inputID = nil
                 return envelope
             }

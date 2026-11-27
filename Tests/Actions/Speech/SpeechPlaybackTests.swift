@@ -1,4 +1,3 @@
-import Actions
 import AgentCore
 import CallRuntime
 import ExecutionRuntime
@@ -12,6 +11,7 @@ import StorageCore
 import Synchronization
 import Testing
 
+@testable import Actions
 @testable import Agents
 
 private func pcm(_ sequence: UInt64 = 0) throws -> ModelKit.AudioFrame {
@@ -226,6 +226,185 @@ private actor ReplyCompletionGate {
         waiter?.resume()
         waiter = nil
     }
+}
+
+private actor PlaybackControlFixture: ActionPauseControl {
+    private(set) var commands: [ActionControl.Command] = []
+    private let delaysPause: Bool
+
+    init(delaysPause: Bool) { self.delaysPause = delaysPause }
+
+    func pause() async throws {
+        commands.append(.pause)
+        if delaysPause { try await Task.sleep(for: .seconds(10)) }
+    }
+
+    func resume() { commands.append(.resume) }
+}
+
+private struct PlaybackControlModule: CapabilityModule {
+    let definitions: [ActionFunction]
+}
+
+enum PlaybackControlScenario: CaseIterable, Sendable {
+    case resumeAfterPause, cancelWhilePaused, resumeDuringPause
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: PlaybackControlScenario.allCases) @MainActor
+func playbackControlUsesExecutionIdentityAndKeepsSpeakRunning(scenario: PlaybackControlScenario) async throws {
+    let actions = ActionsContainer()
+    let playback = PlaybackControlFixture(delaysPause: scenario == .resumeDuringPause)
+    let release = ReplyCompletionGate()
+    let feedback = Mutex([ActionControlFeedback.Event]())
+    let starts = Mutex([ExecutionStart]())
+    let results = Mutex([ExecutionResult]())
+    let requestedVolumes = Mutex([(Double, UUID?)]())
+    let definition = SpeechActions.speakDefinition(handler: { _ in
+        guard let register = ActionControlRegistration.register else { throw ActionHostError.unavailable }
+        try await register(playback)
+        await withTaskCancellationHandler {
+            await release.wait()
+        } onCancel: {
+            Task { await release.open() }
+        }
+    }).supportingControls([.pause, .resume, .cancel])
+    let volumeDefinition = SpeechActions.setVolumeDefinition(handler: { invocation in
+        try await SpeechActions.setVolume(invocation: invocation) { volume, executionID, _ in
+            requestedVolumes.withLock { $0.append((volume, executionID)) }
+        }
+    })
+    try actions.configure(
+        BehaviorAssembly(capabilityModules: [
+            PlaybackControlModule(definitions: [definition, volumeDefinition])
+        ]))
+    let engine = try actions.configureExecution(resources: [])
+    try actions.start()
+    let gateway = GatewayContainer()
+    let ports = try gateway.configureExecution(
+        .init(
+            engine: engine,
+            deliverResult: { result in
+                results.withLock { $0.append(result) }
+                return .accepted
+            },
+            deliverStart: { start in
+                starts.withLock { $0.append(start) }
+                return .accepted
+            },
+            deliverControl: { signal in
+                feedback.withLock { $0.append(signal.event) }
+                return .accepted
+            }))
+    let owner = ExecutionOwner(endpoint: "assistant", incarnation: "incarnation", sessionID: "session")
+    _ = try await ports.signals.register(address: owner.endpoint, incarnation: owner.incarnation) { _ in }
+    let context = ActionExecutionContext(source: owner.endpoint, sessionID: owner.sessionID, inputID: "reply")
+    let invocation = try ScheduledAction(
+        envelope: .init(
+            source: owner.endpoint, sessionID: owner.sessionID, inputID: "reply", schedulingScope: .input("reply"),
+            context: context),
+        call: .init(
+            actionPath: .init(domain: "Speech", module: "Playback", function: "speak"),
+            parameters: ["audioID": UUID().uuidString]),
+        channel: "Speech", owner: owner, feedback: .terminal)
+    do {
+        try await gateway.start()
+        let executionID = try await ports.execution.enqueue(invocation: invocation)
+        try await waitForPlaybackControl { starts.withLock { $0.first?.executionID == executionID } }
+        let pause = ActionControl(executionID: executionID, controlSequence: 2, command: .pause)
+        let wrongSession = ExecutionOwner(
+            endpoint: owner.endpoint, incarnation: owner.incarnation, sessionID: "other-session")
+        #expect(try await ports.execution.control(pause, owner: wrongSession)?.status == .unavailable)
+        #expect(try await ports.execution.control(pause, owner: owner) == nil)
+        let resume = ActionControl(executionID: executionID, controlSequence: 3, command: .resume)
+        if scenario == .resumeDuringPause {
+            try await waitForPlaybackControl { await playback.commands == [.pause] }
+            #expect(try await ports.execution.control(resume, owner: owner) == nil)
+        }
+        try await waitForPlaybackControl {
+            feedback.withLock {
+                $0.contains { event in
+                    if case .receipt(let receipt) = event { return receipt.controlID == pause.controlID }
+                    return false
+                }
+            }
+        }
+        let expectedPauseReceipt: ActionControlReceipt.Status = scenario == .resumeDuringPause ? .superseded : .applied
+        #expect(try await ports.execution.control(pause, owner: owner)?.status == expectedPauseReceipt)
+        let stale = ActionControl(executionID: executionID, controlSequence: 1, command: .resume)
+        #expect(try await ports.execution.control(stale, owner: owner)?.status == .superseded)
+        #expect(results.withLock { $0.isEmpty })
+        if scenario != .resumeDuringPause {
+            let volumeContext = ActionExecutionContext(
+                source: owner.endpoint, sessionID: owner.sessionID, inputID: "volume")
+            let volumeInvocation = try ScheduledAction(
+                envelope: .init(
+                    source: owner.endpoint, sessionID: owner.sessionID, inputID: "volume",
+                    schedulingScope: .input("volume"),
+                    context: volumeContext),
+                call: .init(
+                    actionPath: .init(domain: "Speech", module: "Playback", function: "setVolume"),
+                    parameters: ["volume": "0.42", "executionID": executionID]),
+                channel: "SpeechVolume", owner: owner)
+            _ = try await ports.execution.enqueue(invocation: volumeInvocation)
+            try await ports.execution.finish(scope: .input("volume"), source: owner.endpoint)
+            #expect(requestedVolumes.withLock { $0.first?.0 == 0.42 && $0.first?.1?.uuidString == executionID })
+            #expect(await playback.commands == [.pause])
+        }
+        if scenario == .cancelWhilePaused {
+            let cancel = ActionControl(executionID: executionID, controlSequence: 4, command: .cancel)
+            #expect(try await ports.execution.control(cancel, owner: owner)?.status == .accepted)
+            try await ports.execution.finish(scope: .input("reply"), source: owner.endpoint)
+            #expect(await playback.commands == [.pause])
+        } else {
+            if scenario == .resumeAfterPause {
+                #expect(try await ports.execution.control(resume, owner: owner) == nil)
+            }
+            try await waitForPlaybackControl {
+                feedback.withLock {
+                    $0.contains { event in
+                        if case .receipt(let receipt) = event { return receipt.controlID == resume.controlID }
+                        return false
+                    }
+                }
+            }
+            #expect(await playback.commands == [.pause, .resume])
+            #expect(results.withLock { $0.isEmpty })
+            await release.open()
+            try await ports.execution.finish(scope: .input("reply"), source: "assistant")
+        }
+        let phases = feedback.withLock { events in
+            events.compactMap { event in
+                if case .stateChanged(let change) = event { return change.state }
+                return nil
+            }
+        }
+        let expectedPhases: [ActionExecutionStateChange.State] =
+            switch scenario {
+            case .cancelWhilePaused: [.pausing, .paused]
+            case .resumeAfterPause: [.pausing, .paused, .resuming, .running]
+            case .resumeDuringPause: [.pausing, .resuming, .running]
+            }
+        #expect(phases == expectedPhases)
+        try await waitForPlaybackControl { results.withLock { $0.first?.executionID == executionID } }
+        let expectedStatus: ExecutionResult.Status = scenario == .cancelWhilePaused ? .cancelled : .succeeded
+        #expect(results.withLock { $0.count == 1 && $0.first?.status == expectedStatus })
+        #expect(try await ports.execution.control(resume, owner: owner)?.status == .alreadyFinished)
+    } catch {
+        await release.open()
+        try await gateway.stop()
+        try await actions.stop()
+        throw error
+    }
+    try await gateway.stop()
+    try await actions.stop()
+}
+
+private func waitForPlaybackControl(_ condition: @Sendable () async -> Bool) async throws {
+    for _ in 0..<200 {
+        if await condition() { return }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    try #require(await condition())
 }
 
 @Test(.actionCatalog) func assistantSpeechKeepsInputOwnershipAndRejectsOverflow() async throws {

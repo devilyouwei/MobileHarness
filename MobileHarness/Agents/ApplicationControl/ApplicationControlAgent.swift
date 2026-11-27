@@ -118,7 +118,7 @@ public actor ApplicationControlAgent: Agent {
             category: configuration.category,
             id: .applicationControl, name: "ApplicationControl",
             inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
+            outputs: [.communication, .actionCall, .toolCall, .control],
             capabilities: try configuration.capabilities.adding(
                 internalTools: [
                     InternalTool(path: "Speech.Detection.run"),

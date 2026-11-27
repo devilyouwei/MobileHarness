@@ -148,10 +148,10 @@ extension AssistantChatWorker {
         if State.agentID == .assistant { try await inputAdmission.acquire() }
         defer { if State.agentID == .assistant { inputAdmission.release() } }
         let history = try await conversations.readCurrent()
-        if fullDuplex, let prepared = history.current.turns.first(where: { $0.id == input.id }),
-            !prepared.awaitingModel, (prepared.modelRequests ?? []).allSatisfy({ $0.awaitingDispatch == true })
-        {
-            return prepared
+        if fullDuplex, history.current.turns.contains(where: { $0.id == input.id }) {
+            return try await conversations.prepareAdmittedInput(
+                id: input.id, dialogID: history.current.id, user: Self.inputText(input) ?? text,
+                request: AgentChatContextBuilder.project(messages), model: name)
         }
         return try await conversations.begin(
             id: input.id, user: Self.inputText(input) ?? text, request: AgentChatContextBuilder.project(messages),

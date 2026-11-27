@@ -15,7 +15,7 @@ public struct AgentGenerator: Sendable {
     private let capabilities: CapabilityRegistry
     public typealias TextMapping = @Sendable (String) throws -> [GenerationEvent]
     private let mapTextCalls: TextMapping?
-    private var parser = FunctionTokenParser()
+    private var parser: FunctionTokenParser
     private var sentences: SentenceFunctionBuffer
     private var sentenceSources: [Range<Int>] = []
     private var calls = 0
@@ -25,9 +25,11 @@ public struct AgentGenerator: Sendable {
 
     public init(
         capabilities: CapabilityRegistry, textMapping: TextMapping? = nil,
-        segmentation: TextSegmentationPolicy = .sentences
+        segmentation: TextSegmentationPolicy = .sentences,
+        scopedActions: Set<String> = ["wait"]
     ) {
         sentences = SentenceFunctionBuffer(policy: segmentation)
+        parser = FunctionTokenParser(scopedActions: scopedActions)
         self.capabilities = capabilities
         self.mapTextCalls = textMapping
     }
@@ -81,15 +83,26 @@ public struct AgentGenerator: Sendable {
                 }
                 sentenceSources += located.textSources
                 result += try mapText(sentences.append(text))
-            case .scheduling(let directive):
+            case .scope(let alias, let boundary):
                 result += try flush()
-                guard capabilities.supportsWait else {
-                    result.append(
-                        .init(.rejected(CallRejection(kind: .action, alias: "wait", reason: .unknownCapability))))
-                    continue
+                waitDepth += boundary == .start ? 1 : -1
+                do {
+                    if alias == "wait" {
+                        guard capabilities.supportsWait else { throw GenerationError.unknownCapability }
+                        result.append(
+                            .init(.action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: boundary))))
+                    } else {
+                        let call = try capabilities.resolveAction(alias, parameters: [:])
+                        result.append(
+                            .init(
+                                .action(
+                                    .init(
+                                        actionPath: call.actionPath, channel: call.channel, parameters: call.parameters,
+                                        scope: boundary))))
+                    }
+                } catch let error as GenerationError {
+                    result.append(.init(.rejected(.init(kind: .action, alias: alias, reason: error))))
                 }
-                waitDepth += directive == .beginWait ? 1 : -1
-                result.append(.init(.scheduling(directive)))
             case .action(let alias, let parameters):
                 result += try flush()
                 try reserve(1)
@@ -101,7 +114,12 @@ public struct AgentGenerator: Sendable {
                         guard pausedMilliseconds + milliseconds <= CapabilityRegistry.maximumTotalPauseMilliseconds
                         else { throw GenerationError.limitExceeded }
                         pausedMilliseconds += milliseconds
-                        result.append(.init(.scheduling(.pause(milliseconds: milliseconds))))
+                        result.append(
+                            .init(
+                                .action(
+                                    .init(
+                                        actionPath: ActionCall.waitPath, channel: "Wait",
+                                        parameters: ["time": String(Double(milliseconds) / 1000)]))))
                         continue
                     }
                     if capabilities.isControl(alias) {

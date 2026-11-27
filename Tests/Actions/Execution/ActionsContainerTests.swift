@@ -405,7 +405,7 @@ private func engineJob(id: String = UUID().uuidString) throws -> ScheduledAction
     return try ScheduledAction(
         envelope: .init(
             source: context.source, sessionID: context.sessionID,
-            inputID: id, schedulingID: id, context: context), call: .init(actionPath: containerPath),
+            inputID: id, schedulingScope: .input(id), context: context), call: .init(actionPath: containerPath),
         channel: "main", owner: .init(endpoint: "producer", incarnation: "generation", sessionID: "session"))
 }
 

@@ -439,7 +439,7 @@ public actor InputGateway {
         return try await bus.publish(
             input, from: publisher,
             envelope: .init(
-                id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
+                id: input.id, sessionID: input.sessionID, contract: input.metadata.contract, channel: channel,
                 version: input.metadata.version, hops: input.metadata.hops, payloadBytes: bytes,
                 expiresAt: input.metadata.deadline, cleanup: cleanup,
                 control: AgentContracts.isControlContract(input.metadata.contract)),
@@ -577,13 +577,26 @@ public actor InputGateway {
     }
 
     func deliverActionStart(_ started: ExecutionStart) async -> ActionResultDelivery {
-        guard let round = started.envelope.roundID, let call = started.envelope.callID,
-            await usesUnifiedActionFeedback(started.owner)
-        else { return .accepted }
+        guard await usesUnifiedActionFeedback(started.owner) else { return .accepted }
         let causality = (started.envelope.correlation as? SignalCausality) ?? .root(id: started.envelope.inputID)
         return await deliverFeedback(
-            .executionFeedback(.actionStarted(roundID: round, callID: call)), owner: started.owner, causality: causality
+            .executionFeedback(
+                .actionStarted(
+                    roundID: started.envelope.roundID, callID: started.envelope.callID,
+                    executionID: started.executionID, controlCapabilities: started.controlCapabilities,
+                    path: started.path.map { .init(domain: $0.domain, module: $0.module, function: $0.function) })),
+            owner: started.owner, causality: causality
         )
+    }
+
+    func deliverActionControl(_ control: ActionControlFeedback) async -> ActionResultDelivery {
+        let feedback: ExecutionFeedback
+        switch control.event {
+        case .stateChanged(let change): feedback = .actionStateChanged(change)
+        case .receipt(let receipt): feedback = .actionControlReceipt(receipt)
+        }
+        let causality = (control.envelope.correlation as? SignalCausality) ?? .root(id: control.envelope.inputID)
+        return await deliverFeedback(.executionFeedback(feedback), owner: control.owner, causality: causality)
     }
 
     public func deliverActivityEvent(_ event: ActivityEvent) async -> ActionResultDelivery {
@@ -746,8 +759,10 @@ public actor InputGateway {
                                     }()),
                                 envelope: SignalEnvelope(
                                     id: input.id, sessionID: input.sessionID,
-                                    contract: input.metadata.contract, version: input.metadata.version,
-                                    hops: input.metadata.hops, payloadBytes: encodedBytes,
+                                    contract: input.metadata.contract,
+                                    channel: policy?.contracts[input.metadata.contract]?.channel,
+                                    version: input.metadata.version, hops: input.metadata.hops,
+                                    payloadBytes: encodedBytes,
                                     expiresAt: input.metadata.deadline,
                                     control: {
                                         if case .observation(let message) = input.payload {
@@ -762,6 +777,7 @@ public actor InputGateway {
                                 source: sourcePort, target: targetPort,
                                 envelope: SignalEnvelope(
                                     id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
+                                    channel: policy?.contracts[input.metadata.contract]?.channel,
                                     version: input.metadata.version, hops: input.metadata.hops,
                                     payloadBytes: encodedBytes,
                                     expiresAt: input.metadata.deadline,

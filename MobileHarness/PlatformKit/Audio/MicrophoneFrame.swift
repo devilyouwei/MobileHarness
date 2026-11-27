@@ -1,6 +1,80 @@
 import Foundation
 import Synchronization
 
+/// Single-consumer control for one playback stream. Intermediate adjustments can be coalesced.
+public final class AudioPlaybackControl: Sendable {
+    public enum Adjustment: Equatable, Sendable {
+        case playing(volume: Float)
+        case paused
+    }
+
+    private struct PlaybackState {
+        var adjustment: Adjustment = .playing(volume: 1)
+        var isPlaying: Bool?
+        var closed = false
+        var failure: AudioIOError?
+    }
+
+    private let state = Mutex(PlaybackState())
+    private let notifications = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    var changes: AsyncStream<Void> { notifications.stream }
+    public var adjustment: Adjustment { state.withLock { $0.adjustment } }
+
+    public init() {}
+
+    public func set(_ value: Adjustment) {
+        let changed = state.withLock { current in
+            guard !current.closed, current.adjustment != value else { return false }
+            current.adjustment = value
+            return true
+        }
+        if changed { notifications.continuation.yield(()) }
+    }
+
+    func confirmPlaying(_ isPlaying: Bool) {
+        state.withLock { playback in
+            guard !playback.closed else { return }
+            playback.isPlaying = isPlaying
+        }
+    }
+
+    public func waitUntilPlaying(_ isPlaying: Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(2)
+        while true {
+            try Task.checkCancellation()
+            let (closed, confirmed) = state.withLock { ($0.closed, $0.isPlaying == isPlaying) }
+            guard !closed else { throw CancellationError() }
+            if confirmed { return }
+            guard ContinuousClock.now < deadline else {
+                let failure = AudioIOError.playbackControlTimeout
+                state.withLock { $0.failure = failure }
+                notifications.continuation.yield(())
+                throw failure
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
+    var failure: AudioIOError? { state.withLock { $0.failure } }
+
+    public func close() {
+        state.withLock { $0.closed = true }
+        notifications.continuation.finish()
+    }
+
+    deinit { notifications.continuation.finish() }
+}
+
+enum AudioPlaybackRamp {
+    static let steps = 24
+    static let stepMilliseconds = 5
+
+    static func volume(from start: Float, to target: Float, step: Int) -> Float {
+        if step >= steps { return target }
+        return start + (target - start) * Float(step) / Float(steps)
+    }
+}
+
 public enum MicrophoneChannelLayout: Sendable, Equatable {
     case mono
     case firstOrderAmbisonicsACNSN3D
@@ -84,7 +158,8 @@ public protocol AudioCaptureObserving: Sendable {
 }
 
 public enum AudioIOError: Error, Equatable {
-    case microphoneDenied, invalidFormat, overflow, busy, interrupted, startFailed, runtimeFailed
+    case microphoneDenied, invalidFormat, overflow, busy, interrupted, startFailed, runtimeFailed,
+        playbackControlTimeout
 }
 
 /// The native generation and its single ordered source; no forwarding queue.

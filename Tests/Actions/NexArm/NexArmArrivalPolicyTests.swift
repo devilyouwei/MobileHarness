@@ -206,7 +206,7 @@ extension LiveRuntimeTests {
             try await scheduler.enqueue(
                 invocation: ScheduledAction(envelope: envelope, owner: owner, feedback: .terminal))
         }
-        try await scheduler.finish(inputID: input.id, source: AgentID(rawValue: "assistant"))
+        try await scheduler.finish(scope: .input(input.id), source: AgentID(rawValue: "assistant"))
         await scheduler.finishResultDelivery()
         let results = await scheduler.resultSnapshot().compactMap(\.result)
         #expect(results.count == 2)

@@ -445,7 +445,7 @@ private actor RoundConcurrencyGate {
         active += 1
         started += 1
         maximum = max(maximum, active)
-        if started == 4 {
+        if started == 6 {
             startedWaiter?.resume()
             startedWaiter = nil
         }
@@ -453,8 +453,8 @@ private actor RoundConcurrencyGate {
         active -= 1
         return .value("actual-\(started)")
     }
-    func waitForFour() async {
-        if started >= 4 { return }
+    func waitForSix() async {
+        if started >= 6 { return }
         await withCheckedContinuation { startedWaiter = $0 }
     }
     func release() {
@@ -464,7 +464,7 @@ private actor RoundConcurrencyGate {
     }
 }
 
-@Test(.actionCatalog, .timeLimit(.minutes(1))) func generationRoundToolsHaveFourWayBoundAndFullRoundBarrier()
+@Test(.actionCatalog, .timeLimit(.minutes(1))) func generationRoundToolsRunConcurrentlyAndShareRoundBarrier()
     async throws
 {
     let gate = RoundConcurrencyGate()
@@ -472,13 +472,13 @@ private actor RoundConcurrencyGate {
         action: false, toolCount: 6, handler: { _ in await gate.run() })
     let pump = try await harness.start(
         .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("parallel")))
-    await gate.waitForFour()
-    #expect(await gate.active == 4)
-    #expect(await gate.started == 4)
+    await gate.waitForSix()
+    #expect(await gate.active == 6)
+    #expect(await gate.started == 6)
     #expect(await harness.model.requests.count == 1)
     await gate.release()
     try await pump.value
-    #expect(await gate.maximum == 4)
+    #expect(await gate.maximum == 6)
     #expect(await gate.started == 6)
     let requests = await harness.model.requests
     try #require(requests.count == 2)
@@ -2030,7 +2030,7 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput(cleanupConfirmed: 
         activity(
             SpeechActivity(
                 .vadProgress, generation: capture, sequence: 64,
-                oldestWindow: SpeechSignalClock.offset(at: .now), onsetRevision: 0)))
+                oldestWindow: SpeechSignalClock.offset(at: .now))))
     for _ in 0..<1000 {
         let turns = try await harness.store.snapshot().current.turns
         if cleanupConfirmed, turns.first(where: { $0.id == next.id })?.state == .completed { break }
@@ -2106,6 +2106,72 @@ func fullDuplexPauseCancelsParkedRoundWithoutReplayingOnResume() async throws {
 }
 
 @Test(.timeLimit(.minutes(1)))
+func assistantGatewayActionControlAdvancesWhileActionCallsRemainFIFO() async throws {
+    let gate = DuplexActionGate()
+    let observed = AsyncStream<UInt64>.makeStream(bufferingPolicy: .bufferingOldest(4))
+    let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
+    let input = AgentInput(id: "channel-input", sessionID: "channel-session", payload: .text("fixture"))
+    let call = ActionCall(actionPath: .init(domain: "Fixture", module: "Control", function: "step"), channel: "fixture")
+    for (sequence, output) in [
+        (UInt64(1), AgentOutput.actionCall(call)),
+        (2, .actionCall(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end))),
+        (3, .actionControl(.init(executionID: "execution", controlSequence: 1, command: .pause))),
+    ] {
+        outputs.continuation.yield(
+            .init(source: .assistant, context: input.context, output: output, sequence: sequence))
+    }
+    outputs.continuation.finish()
+    let task = Task {
+        defer { observed.continuation.finish() }
+        try await AssistantGenerationTransport.consume(outputs.stream, contracts: AgentContracts.communication) {
+            output in
+            observed.continuation.yield(output.sequence)
+            if output.sequence == 1 { try await gate.execute() }
+        }
+    }
+    defer { task.cancel() }
+    var iterator = observed.stream.makeAsyncIterator()
+    let concurrent = [await iterator.next(), await iterator.next()]
+    #expect(Set(concurrent.compactMap { $0 }) == [1, 3])
+    await gate.release()
+    #expect(await iterator.next() == 2)
+    try await task.value
+}
+
+@Test(.timeLimit(.minutes(1)))
+func assistantToolLaneSealsWhileActionAdmissionIsSuspended() async throws {
+    let gate = DuplexActionGate()
+    let output = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(8))
+    let toolSealed = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let round = UUID().uuidString
+    let input = AgentInput(id: "lane-fixture", sessionID: "session", payload: .text("fixture"))
+    let call = ActionCall(actionPath: .init(domain: "Fixture", module: "Work", function: "run"), channel: "main")
+    let events: [AgentOutput] = [
+        .roundStarted(round), .actionCall(call), .roundFinished(round),
+    ]
+    for event in events {
+        output.continuation.yield(.init(source: .assistant, context: input.context, output: event, roundID: round))
+    }
+    output.continuation.finish()
+    let delivery = Task {
+        defer { toolSealed.continuation.finish() }
+        try await AssistantGenerationTransport.consume(output.stream, contracts: AgentContracts.communication) {
+            envelope in
+            switch envelope.output {
+            case .actionCall: try await gate.execute()
+            case .roundBranchSealed(.tool, let id) where id == round: toolSealed.continuation.yield(())
+            default: break
+            }
+        }
+    }
+    defer { delivery.cancel() }
+    var eventsSeen = toolSealed.stream.makeAsyncIterator()
+    try #require(await eventsSeen.next() != nil)
+    await gate.release()
+    try await delivery.value
+}
+
+@Test(.timeLimit(.minutes(1)))
 func duplexRoundTransportReportsSealFailureWithoutWaitingForMoreOutputs() async throws {
     let outputs = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(4))
     let input = AgentInput(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("fixture"))
@@ -2118,7 +2184,7 @@ func duplexRoundTransportReportsSealFailureWithoutWaitingForMoreOutputs() async 
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true])
-func duplexSemanticResultsShareQueueCapacityWhileSettlementKeepsReservedSlot(speech: Bool) async throws {
+func duplexSemanticResultsShareQueueCapacityWhileSettlementUsesSeparateQueue(speech: Bool) async throws {
     let gate = DuplexActionGate()
     let harness = try await roundHarness(action: false, toolCount: 1, fullDuplex: true) { _ in
         try await gate.execute()
@@ -2142,10 +2208,11 @@ func duplexSemanticResultsShareQueueCapacityWhileSettlementKeepsReservedSlot(spe
     await agent.holdDispatchForFixture()
     await gate.release()
     for _ in 0..<1000 {
-        if await agent.status().queuedInputs == 2 { break }
+        if await agent.hasReadyRoundSettlementForFixture() { break }
         try await Task.sleep(for: .milliseconds(10))
     }
-    #expect(await agent.status().queuedInputs == 2)
+    #expect(await agent.hasReadyRoundSettlementForFixture())
+    #expect(await agent.status().queuedInputs == 1)
     for index in 0..<31 {
         let id = UUID().uuidString
         let payload: InputPayload =
@@ -2157,7 +2224,7 @@ func duplexSemanticResultsShareQueueCapacityWhileSettlementKeepsReservedSlot(spe
                     payload: payload, source: speech ? "speechPerception" : "user",
                     origin: speech ? .agent : .local, rootID: id)))
     }
-    #expect(await agent.status().queuedInputs == 33)
+    #expect(await agent.status().queuedInputs == 32)
     await #expect(throws: HarnessError.self) {
         try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("overflow")))
     }

@@ -78,7 +78,7 @@ private actor UnifiedFixtureLog {
         channel: "Display", parameters: ["x": "0.2", "y": "0.3"])
     let agent = AgentID(rawValue: "fixture")
     try await scheduler.enqueue(invocation: ActionInvocation(source: agent, input: input, call: call, sequence: 7))
-    try await scheduler.finish(inputID: input.id, source: agent)
+    try await scheduler.finish(scope: .input(input.id), source: agent)
     let tool = ToolRequest(
         id: UUID().uuidString, toolPath: definition.path.description, arguments: ["x": "0.2", "y": "0.3"])
     let result = try await ToolExecutor(registry: ToolRegistry(modules: [module.tools])).execute(
@@ -208,7 +208,7 @@ private actor UnifiedReceiptAgent: Agent {
     #expect(rejected.isError == true)
     #expect(await log.values == ["first:" + first.id])
     await release.open()
-    try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
+    try await scheduler.finish(scope: .input(first.id), source: agent.descriptor.id)
     let result = try await gateway.dispatch(
         .init(
             source: agent.descriptor.id, context: native.context,
@@ -219,7 +219,7 @@ private actor UnifiedReceiptAgent: Agent {
     #expect(await log.values == ["first:" + first.id, "second:" + native.id])
     let receipts = await agent.receipts
     #expect(receipts.count == 2 && receipts.first?.isError == true && receipts.last?.completion == .value("second"))
-    try await scheduler.finish(inputID: first.id, source: agent.descriptor.id)
+    try await scheduler.finish(scope: .input(first.id), source: agent.descriptor.id)
     let held = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("hold"))
     let cancellation = Task {
         try await gateway.dispatch(

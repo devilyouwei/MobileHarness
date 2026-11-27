@@ -548,20 +548,25 @@ func expressionPreservesSemanticIdentifier(_ emotion: UIActions.Emotion) async t
 }
 
 struct EndpointVAD: VoiceActivityCapability {
+    var voicedWindows = 3
     var availability: CapabilityAvailability { .available }
-    func detectVoiceActivity(format: ModelKit.AudioFormat) -> any VoiceActivitySession { EndpointVADSession() }
+    func detectVoiceActivity(format: ModelKit.AudioFormat) -> any VoiceActivitySession {
+        EndpointVADSession(voicedWindows: voicedWindows)
+    }
 }
 
 private actor EndpointVADSession: VoiceActivitySession {
     private var position: Int64 = 0
     private var pending = 0
+    private let voicedSamples: Int64
+    init(voicedWindows: Int = 3) { voicedSamples = Int64(voicedWindows * 512) }
     func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
         pending += frame.sampleCount
         var scores: [VoiceActivityScore] = []
         while pending >= 512 {
             scores.append(
                 try VoiceActivityScore(
-                    startSample: position, sampleCount: 512, probability: position < 1536 ? 1 : 0))
+                    startSample: position, sampleCount: 512, probability: position < voicedSamples ? 1 : 0))
             position += 512
             pending -= 512
         }
@@ -1818,7 +1823,7 @@ func speechRolesOwnIndependentIslandsAndJoinShutdown(initiallyUnavailable: Bool)
     await state.stop()
 }
 
-@Test func nativeVoiceProcessingKeepsRecognitionActiveDuringReplies() async throws {
+@Test(.actionCatalog) func nativeVoiceProcessingKeepsRecognitionActiveDuringReplies() async throws {
     let echo = try AudioEchoCancellationSelection.select(voiceProcessing: { true })
     let fullDuplex = AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo)
     #expect(fullDuplex)
@@ -1907,6 +1912,25 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(silence.rmsDecibels == -120)
 }
 
+@Test func speechSuppressionHysteresisRequiresConsecutiveWindows() {
+    var policy = SpeechEnergyBands()
+    func window(_ level: Float) -> [Float] { Array(repeating: pow(10, level / 20), count: 512) }
+
+    #expect(policy.observe(window(-32), hasVoice: true) == nil)
+    #expect(policy.observe(window(-37), hasVoice: true) == nil)
+    #expect(policy.observe(window(-32), hasVoice: true) == nil)
+    #expect(policy.observe(window(-32), hasVoice: true) == .medium)
+    for _ in 0..<4 { #expect(policy.observe(window(-37), hasVoice: true) == nil) }
+    #expect(policy.energy == .medium)
+
+    for _ in 0..<5 { #expect(policy.observe(window(-16), hasVoice: true) == nil) }
+    #expect(policy.observe(window(-16), hasVoice: true) == .high)
+    for _ in 0..<4 { #expect(policy.observe(window(-23), hasVoice: true) == nil) }
+    #expect(policy.energy == .high)
+    for _ in 0..<4 { #expect(policy.observe(window(-28), hasVoice: true) == nil) }
+    #expect(policy.observe(window(-28), hasVoice: true) == .medium)
+}
+
 @Test func speechOutputTracksNativePlaybackForTheOwningReply() async throws {
     let session = UUID().uuidString
     let input = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("reply"))
@@ -1924,6 +1948,15 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(await speech.isPlaying(sessionID: session) != true)
     await speech.stop()
     await store.shutdown()
+}
+
+@Test func playbackSuppressionGainUsesLinearInterpolation() {
+    let steps = AudioPlaybackRamp.steps
+    #expect(AudioPlaybackRamp.volume(from: 0.35, to: 0, step: 0) == 0.35)
+    #expect(AudioPlaybackRamp.volume(from: 0.35, to: 0, step: steps / 2) == 0.175)
+    #expect(AudioPlaybackRamp.volume(from: 0.35, to: 0, step: steps) == 0)
+    #expect(AudioPlaybackRamp.volume(from: 0, to: 1, step: steps / 2) == 0.5)
+    #expect(AudioPlaybackRamp.volume(from: 0, to: 1, step: steps) == 1)
 }
 
 @Test func cancellingPreparedSpeechRevokesPlaybackBeforeFirstPCM() async throws {
@@ -1993,9 +2026,10 @@ func speechPerceptionPublishesActivityAndFinalText() async throws {
     let contracts = try AgentContracts.communication
     for kind in SpeechActivity.Kind.allCases {
         let activity = SpeechActivity(
-            kind, generation: "g", utterance: kind == .onsetConfirmed ? "u" : nil,
+            kind, generation: "g", utterance: [.onsetConfirmed, .energyChanged].contains(kind) ? "u" : nil,
             sequence: kind == .vadProgress ? 4 : nil,
-            onsetRevision: [.captureStopped, .captureStarted].contains(kind) ? nil : 1)
+
+            energy: kind == .energyChanged ? .high : nil)
         #expect(try contracts.validatedSize(activity.message()) > 0)
     }
     for failure in [nil, "recognition failed"] {
@@ -2011,11 +2045,72 @@ func speechPerceptionPublishesActivityAndFinalText() async throws {
             modelID: "fixture", modelName: nil, inferenceDuration: .milliseconds(-1), completedAt: .milliseconds(70)))
     #expect(throws: CommunicationError.invalidPayload) { try contracts.validatedSize(invalidKeyword.message()) }
     #expect(throws: CommunicationError.invalidPayload) {
-        try contracts.validatedSize(SpeechActivity(.onsetConfirmed, generation: "g", onsetRevision: 1).message())
+        try contracts.validatedSize(SpeechActivity(.onsetConfirmed, generation: "g").message())
     }
     #expect(throws: CommunicationError.invalidPayload) {
         try contracts.validatedSize(SpeechActivity(.captureStarted, generation: "").message())
     }
+}
+
+@Test(
+    .actionCatalog, .timeLimit(.minutes(1)),
+    arguments: [
+        (false, false, true), (true, false, true), (true, true, true), (true, false, false), (true, true, false),
+    ])
+func speechEnergyFollowsConfirmedVADWindows(fullDuplex: Bool, playing: Bool, loudWindowsAreVoice: Bool) async throws {
+    let session = UUID().uuidString
+    let microphone = NativeMicrophoneFixture()
+    let speech = try SpeechPerceptionAgent(
+        recognition: RecognitionFixture(text: "继续", includeFinal: true),
+        vad: EndpointVAD(voicedWindows: loudWindowsAreVoice ? 17 : 5),
+        sessionID: session, interactionSessionID: session, residentListening: true, microphoneInput: microphone,
+        speechDetection: { (1, 0.5) },
+        context: AgentContextRepository(
+            agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+    let events = Mutex([AgentMessage]())
+    let pump = Task {
+        for await envelope in speech.outputs {
+            if case .communication(let action) = envelope.output {
+                events.withLock { $0.append(action.message) }
+            }
+        }
+    }
+    try await speech.start()
+    _ = try await speech.setListening(enabled: true, sessionID: session)
+    try await speech.openCapture(sessionID: session)
+    await speech.setCaptureDuplex(fullDuplex)
+    await speech.bindMicrophoneGeneration("capture")
+    let origin = ContinuousClock.now - .seconds(2)
+    if playing { await microphone.setPlayback(.init(periods: [.init(start: origin - .milliseconds(100))])) }
+    for index in 0..<42 {
+        if index == 11, playing, loudWindowsAreVoice {
+            // A pause ends audible output, but the same confirmed utterance still drives recovery.
+            await microphone.setPlayback(
+                .init(periods: [.init(start: origin - .milliseconds(100), end: origin + .milliseconds(352))]))
+        }
+        let amplitude: Float = index < 5 ? 0.05 : index < 11 ? 0.25 : index < 17 ? 0.05 : 0
+        try await speech.processMicrophone(
+            MicrophoneFrame(
+                samples: Array(repeating: amplitude, count: 512), sampleRate: 16000,
+                sequence: UInt64(index), timestamp: Double(index) * 0.032,
+                capturedAt: origin + .milliseconds(index * 32)),
+            sessionID: session, captureGeneration: "capture")
+    }
+    await speech.stop()
+    await pump.value
+    let messages = events.withLock { $0 }
+    let activities = messages.compactMap { $0.content(as: SpeechActivity.self) }
+    let expected: [SpeechActivity.Energy] = loudWindowsAreVoice ? [.medium, .high, .medium, .low] : [.medium, .low]
+    #expect(activities.compactMap(\.energy) == expected)
+    let final = try #require(messages.firstIndex { $0.content(as: SpeechRecognition.self)?.kind == .final })
+    let started = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .captureStarted })
+    let candidate = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .onsetStarted })
+    let onset = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .onsetConfirmed })
+    let first = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.energy == .medium })
+    let recovered = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.energy == .low })
+    let stopped = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .captureStopped })
+    #expect(started < candidate && candidate < onset && onset < first && first < recovered)
+    #expect(recovered < final && final < stopped)
 }
 
 @Test(.actionCatalog, arguments: [true, false])
@@ -2106,7 +2201,7 @@ func speechFactsTravelOneWayThroughGatewayEvents() async throws {
     #expect(configuration.communication.subscriptions.isEmpty)
     let generation = "capture"
     let turn = AgentTurn(id: "u1", ordinal: 1)
-    let activity = SpeechActivity(.onsetConfirmed, generation: generation, utterance: turn.id, onsetRevision: 1)
+    let activity = SpeechActivity(.onsetConfirmed, generation: generation, utterance: turn.id)
     let parent = AgentInput(id: UUID().uuidString, sessionID: session, payload: .event("speech"), turn: turn)
     let match = SpeechKeywordMatch(
         generation: generation, utterance: turn.id, label: "en-stop", keyword: "stop",

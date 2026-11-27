@@ -8,6 +8,7 @@ public struct VoiceSegmentation: Sendable {
         public let sampleCount: Int
         public let onsetCandidate: Bool
         let speaking: Bool
+        let hasVoice: Bool
         let pcm: [Float]
     }
     public let streamEvents: [VoiceStreamEvent]
@@ -69,6 +70,7 @@ public actor VoiceActivitySegmenter {
                     floatSamples: slice, format: frame.format,
                     sequence: UInt64(position), timestamp: Double(position) / 16000)
                 let wasSpeaking = policy.isSpeaking
+                let windowThreshold = wasSpeaking ? threshold : (onsetThreshold ?? threshold)
                 _ = policy.consume(
                     window, probability: score.probability, threshold: threshold, onsetWindows: onsetWindows,
                     useShortEndpoint: useShortEndpoint, onsetThreshold: onsetThreshold,
@@ -90,7 +92,8 @@ public actor VoiceActivitySegmenter {
                 windows.append(
                     .init(
                         offset: Int(score.startSample - frameStart), sampleCount: score.sampleCount,
-                        onsetCandidate: policy.hasOnsetCandidate, speaking: policy.isSpeaking, pcm: slice))
+                        onsetCandidate: policy.hasOnsetCandidate, speaking: policy.isSpeaking,
+                        hasVoice: score.probability >= windowThreshold, pcm: slice))
                 streamEvents += policy.streamEvents
                 consumed += score.sampleCount
                 position += Int64(score.sampleCount)

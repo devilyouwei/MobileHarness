@@ -401,7 +401,7 @@ func idleMessageDispatchesWithoutDecisionAndCannotInterruptItself(speech: Bool) 
         try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "idle-turn", onsetRevision: 1)))
+                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "idle-turn")))
         try await agent.receive(keywordSignal("idle-turn"))
         #expect(await agent.interruptionWait == nil)
         let payload = InputPayload.observation(
@@ -514,7 +514,17 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
         }, keywordLog: { log.record(.decision($0)) }, speechSessionID: "s", chat: main,
         listening: FullKeywordListening(), context: context)
     _ = try await bindSpeechRequests(agent)
-    let pump = Task { for try await _ in FixtureGenerationOutputs(agent: agent) {} }
+    let adjustments = Mutex([OutputEnvelope]())
+    let volumeCalls = Mutex([OutputEnvelope]())
+    let pump = Task {
+        for try await envelope in FixtureGenerationOutputs(agent: agent) {
+            if case .actionControl = envelope.output {
+                adjustments.withLock { $0.append(envelope) }
+            } else if case .actionCall(let call) = envelope.output, call.actionPath.function == "setVolume" {
+                volumeCalls.withLock { $0.append(envelope) }
+            }
+        }
+    }
     defer { pump.cancel() }
     let cleanup = DecisionSettlementGate()
     let interrupts = InterruptProbe()
@@ -524,12 +534,28 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
         await cleanup.wait()
     }
     try await agent.start()
+    // An energy update can be the first event while both reply and playback are idle.
+    try await agent.receive(
+        speechSignal(
+            SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .high)))
+    #expect(adjustments.withLock { $0.isEmpty })
     try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
     try await agent.receive(.init(id: "reply", sessionID: "s", payload: .text("Tell a story")))
     for _ in 0..<500 where await main.requests.isEmpty { try await Task.sleep(for: .milliseconds(2)) }
     try #require(await agent.currentReplyID(sessionID: "s") != nil)
+    let playbackExecutionID = UUID().uuidString
+    let playbackStarted = InputPayload.executionFeedback(
+        .actionStarted(
+            roundID: nil, callID: nil, executionID: playbackExecutionID,
+            controlCapabilities: [ActionControl.Command.pause.rawValue, ActionControl.Command.resume.rawValue],
+            path: .init(domain: "Speech", module: "Playback", function: "speak")))
     try await agent.receive(
-        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "command", onsetRevision: 1)))
+        .init(
+            id: "playback-start", sessionID: "s", payload: playbackStarted,
+            metadata: .init(
+                payload: playbackStarted, source: "runtime", origin: .runtime, rootID: "reply", parentID: "reply")))
+    try await agent.receive(
+        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "command")))
     let final = InputPayload.observation(
         SpeechRecognition(.final, text: "Stop the story", generation: "capture").message())
     try await agent.receive(
@@ -540,16 +566,70 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
     for _ in 0..<500 where await classifier.requests.isEmpty { try await Task.sleep(for: .milliseconds(2)) }
     try #require(await classifier.requests.count == 1)
 
+    try await agent.receive(
+        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "ongoing")))
+    for _ in 0..<500 where adjustments.withLock({ $0.isEmpty }) { try await Task.sleep(for: .milliseconds(2)) }
+    let pause = try #require(adjustments.withLock { $0.first })
+    #expect(pause.inputID == "reply" && pause.roundID == nil)
+    if case .actionControl(let control) = pause.output {
+        #expect(control.executionID == playbackExecutionID)
+        #expect(control.command == .pause)
+    }
+
+    try await agent.receive(
+        speechSignal(
+            SpeechActivity(
+                .energyChanged, generation: "capture", utterance: "ongoing", energy: .medium)))
+    for _ in 0..<500 where volumeCalls.withLock({ $0.isEmpty }) { try await Task.sleep(for: .milliseconds(2)) }
+    let volume = try #require(volumeCalls.withLock { $0.first })
+    guard case .actionCall(let volumeCall) = volume.output else { throw HarnessError.invalidTransition }
+    let volumeCallID = try #require(volume.callID)
+    #expect(volumeCall.parameters == ["volume": "0.35", "executionID": playbackExecutionID])
+    #expect(volume.roundID == nil && volume.schedulingScope == .standaloneCall(volumeCallID))
+    #expect(adjustments.withLock { $0.count == 1 })
+    let volumeResult = InputPayload.executionFeedback(
+        .actionFinished(
+            .init(
+                executionID: UUID().uuidString,
+                owner: .init(agent: .assistant, incarnation: "fixture", sessionID: "s"), path: volumeCall.actionPath,
+                causality: SignalCausality(envelope: volume), status: .succeeded, effect: .contractCompleted,
+                completion: .completed, callID: volumeCallID)))
+    try await agent.receive(
+        .init(
+            id: "volume-finished", sessionID: "s", payload: volumeResult,
+            metadata: .init(
+                payload: volumeResult, source: "runtime", origin: .runtime, rootID: "reply", parentID: "reply")))
+    for _ in 0..<500 where adjustments.withLock({ $0.count < 2 }) { try await Task.sleep(for: .milliseconds(2)) }
+    let resume = try #require(adjustments.withLock { $0.last })
+    if case .actionControl(let control) = resume.output {
+        #expect(control.executionID == playbackExecutionID && control.command == .resume)
+    }
+    try await agent.receive(
+        speechSignal(
+            SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .high)
+        ))
+    for _ in 0..<500 where adjustments.withLock({ $0.count < 3 }) { try await Task.sleep(for: .milliseconds(2)) }
+
     if keywordWins {
-        try await agent.receive(keywordSignal("command", inferenceDuration: .milliseconds(23)))
+        try await agent.receive(keywordSignal("ongoing", inferenceDuration: .milliseconds(23)))
     } else {
         await classifier.release()
     }
     for _ in 0..<500 where await interrupts.count == 0 { try await Task.sleep(for: .milliseconds(2)) }
     #expect(await interrupts.count == 1)
-    try await agent.receive(keywordSignal("command"))
+    try await agent.receive(
+        speechSignal(
+            SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .low))
+    )
+    try await agent.receive(keywordSignal("ongoing"))
+    let empty = InputPayload.observation(SpeechRecognition(.final, text: "", generation: "capture").message())
+    try await agent.receive(
+        .init(
+            id: "ongoing-final", sessionID: "s", payload: empty,
+            metadata: .init(payload: empty, source: "speechPerception", origin: .agent, rootID: "ongoing-final"),
+            turn: .init(id: "ongoing", ordinal: 2)))
     try await agent.receive(.init(id: "follow-up", sessionID: "s", payload: .text("Tell me something else")))
-    try await finishVADWindow(agent, onsetRevision: 1)
+    try await finishVADWindow(agent)
     await cleanup.release()
 
     for _ in 0..<500 {
@@ -558,6 +638,8 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(keywordWins: Bool
     }
     #expect(await classifier.requests.count == 1)
     #expect(await interrupts.count == 1)
+    #expect(adjustments.withLock({ $0.count }) == 3)
+    #expect(volumeCalls.withLock({ $0.count }) == 1)
     let keyword = log.decisions.first { $0.route == .keyword }
     let model = log.decisions.first { $0.id == "command-final" }
     if keywordWins {
@@ -831,14 +913,14 @@ private func speechSignal(_ activity: SpeechActivity, session: String = "s") -> 
 }
 
 private func finishVADWindow(
-    _ agent: FixtureNativeAgent, generation: String = "capture", onsetRevision: UInt64 = 0
+    _ agent: FixtureNativeAgent, generation: String = "capture"
 ) async throws {
     _ = try #require(await agent.interruptionWait)
     try await agent.receive(
         speechSignal(
             SpeechActivity(
-                .vadProgress, generation: generation, sequence: 64,
-                oldestWindow: SpeechSignalClock.offset(at: .now), onsetRevision: onsetRevision)))
+                .vadProgress, generation: generation,
+                oldestWindow: SpeechSignalClock.offset(at: .now))))
 }
 
 private func keywordSignal(
@@ -880,7 +962,7 @@ func speechActivityIsAcceptedOnlyFromTheSubscribedPerceptionAgent() async throws
         fullDuplex: true, speechSessionID: "s", chat: DeferredBooleanChat(blocksFirst: false), context: context)
     try await agent.start()
     try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
-    let forged = speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u", onsetRevision: 1))
+    let forged = speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u"))
     let impostor = AgentInput(
         id: forged.id, sessionID: "s", payload: forged.payload,
         metadata: InputMetadata(
@@ -888,7 +970,7 @@ func speechActivityIsAcceptedOnlyFromTheSubscribedPerceptionAgent() async throws
             topic: SpeechActivity.channel))
     await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(impostor) }
     try await agent.receive(
-        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u", onsetRevision: 1)))
+        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u")))
     #expect(await agent.speechUtterances == ["u"])
     await agent.stop()
 }
@@ -904,7 +986,7 @@ func quietFinalSpeechIsJudgedInsteadOfEnteringTheConversation() async throws {
     try await agent.start()
     try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
     try await agent.receive(
-        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u", onsetRevision: 1)))
+        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u")))
     let payload = InputPayload.observation(.transcript("let me think", final: true))
     try await agent.receive(
         AgentInput(
@@ -936,7 +1018,7 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
         if scenario == "duringCleanup" {
             try await agent.receive(
                 speechSignal(
-                    SpeechActivity(.onsetConfirmed, generation: generation, utterance: "new-turn", onsetRevision: 1)))
+                    SpeechActivity(.onsetConfirmed, generation: generation, utterance: "new-turn")))
         }
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
@@ -951,7 +1033,7 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     if ["final", "twoTurns", "empty", "deliveryFailure"].contains(scenario) {
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.onsetConfirmed, generation: generation, utterance: "new-turn", onsetRevision: 1)))
+                SpeechActivity(.onsetConfirmed, generation: generation, utterance: "new-turn")))
     }
     func finalInput(id: String, turn: String, text: String) -> AgentInput {
         let payload = InputPayload.observation(.transcript(text, final: true))
@@ -963,7 +1045,7 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     if scenario == "twoTurns" {
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.onsetConfirmed, generation: generation, utterance: "next-turn", onsetRevision: 2)))
+                SpeechActivity(.onsetConfirmed, generation: generation, utterance: "next-turn")))
     }
     #expect(try await agent.requestInterrupt(AssistantInterrupt(), sessionID: "s") == .interrupted)
     #expect(await main.requests.count == 1)
@@ -982,30 +1064,27 @@ func interruptedSpeechWaitsForWindowAndFinalAdmission(scenario: String) async th
     if ["candidate", "candidateClears", "noSpeech"].contains(scenario) {
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.vadProgress, generation: generation, sequence: 63, onsetRevision: 0)))
+                SpeechActivity(.vadProgress, generation: generation, sequence: 63)))
         #expect(await agent.interruptionWait != nil)
     }
     if ["candidate", "candidateClears"].contains(scenario) {
-        try await agent.receive(speechSignal(SpeechActivity(.onsetStarted, generation: generation, onsetRevision: 1)))
+        try await agent.receive(speechSignal(SpeechActivity(.onsetStarted, generation: generation)))
     }
     #expect(await main.requests.count == 1)
-    let revision: UInt64 =
-        scenario == "twoTurns" ? 2 : ["captureClosed", "noSpeech"].contains(scenario) ? 0 : 1
     try await finishVADWindow(
-        agent, generation: scenario == "captureClosed" ? "recovered" : generation,
-        onsetRevision: revision)
+        agent, generation: scenario == "captureClosed" ? "recovered" : generation)
     if ["candidate", "candidateClears"].contains(scenario) {
         #expect(await agent.interruptionWait != nil)
         #expect(await main.requests.count == 1)
         if scenario == "candidate" {
             try await agent.receive(
                 speechSignal(
-                    SpeechActivity(.onsetConfirmed, generation: generation, utterance: "new-turn", onsetRevision: 2)))
+                    SpeechActivity(.onsetConfirmed, generation: generation, utterance: "new-turn")))
             try await agent.receive(finalInput(id: "final", turn: "new-turn", text: "continue speaking"))
         }
         if scenario == "candidateClears" {
             try await agent.receive(
-                speechSignal(SpeechActivity(.onsetCleared, generation: generation, onsetRevision: 2)))
+                speechSignal(SpeechActivity(.onsetCleared, generation: generation)))
         }
     }
     if ["final", "duringCleanup", "deliveryFailure", "twoTurns"].contains(scenario) {
@@ -1080,11 +1159,11 @@ func onsetAfterThe64thWindowStaysOutOfTheRetainedBatch(order: String) async thro
     try await agent.receive(
         speechSignal(
             SpeechActivity(
-                .onsetStarted, generation: "capture", onsetRevision: 1, oldestWindowBeforeOnset: proof)))
+                .onsetStarted, generation: "capture", oldestWindowBeforeOnset: proof)))
     try await agent.receive(
         speechSignal(
             SpeechActivity(
-                .onsetConfirmed, generation: "capture", utterance: "late", onsetRevision: 2,
+                .onsetConfirmed, generation: "capture", utterance: "late",
                 oldestWindowBeforeOnset: proof)))
     if order == "finalBeforeCleanup" { try await agent.receive(final) }
 
@@ -1116,10 +1195,10 @@ func decisionInterruptKeepsFullWindowForFollowUpSpeech(scenario: String) async t
     let cleanup = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     await agent.bindFixtureInputInterruption { session in
         try await agent.receive(
-            speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "next", onsetRevision: 2)))
+            speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "next")))
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
         if scenario == "slowCleanup" {
-            try await finishVADWindow(agent, onsetRevision: 2)
+            try await finishVADWindow(agent)
             #expect(await main.requests.count == 1)
         }
         cleanup.continuation.yield(())
@@ -1138,20 +1217,20 @@ func decisionInterruptKeepsFullWindowForFollowUpSpeech(scenario: String) async t
             turn: .init(id: turn, ordinal: 1))
     }
     try await agent.receive(
-        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "command", onsetRevision: 1)))
+        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "command")))
     try await agent.receive(final(id: "command-final", turn: "command", text: "please stop"))
     var observed = cleanup.stream.makeAsyncIterator()
     _ = try #require(await observed.next())
 
     if scenario == "longSpeech" {
-        try await finishVADWindow(agent, onsetRevision: 2)
+        try await finishVADWindow(agent)
         #expect(await main.requests.count == 1)
         #expect(await agent.interruptionWait != nil)
     }
     try await agent.receive(final(id: "next-final", turn: "next", text: "tell me something else"))
     if scenario == "shortSpeech" {
         #expect(await agent.interruptionWait != nil)
-        try await finishVADWindow(agent, onsetRevision: 2)
+        try await finishVADWindow(agent)
     }
     for _ in 0..<600 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
     #expect(await main.requests.count == 2)
@@ -1181,7 +1260,7 @@ func modelInterruptObservesVADWhilePlaybackActionCleansUp(keyword: Bool) async t
         try await agent.receive(
             speechSignal(
                 SpeechActivity(
-                    .onsetConfirmed, generation: "capture", utterance: "follow-up", onsetRevision: keyword ? 2 : 1)))
+                    .onsetConfirmed, generation: "capture", utterance: "follow-up")))
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
         nativeStopRequested.continuation.yield(())
         var iterator = nativeStopped.stream.makeAsyncIterator()
@@ -1200,7 +1279,7 @@ func modelInterruptObservesVADWhilePlaybackActionCleansUp(keyword: Bool) async t
     let target = try #require(await agent.currentReplyID(sessionID: "s"))
     if keyword {
         try await agent.receive(
-            speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "keyword", onsetRevision: 1))
+            speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "keyword"))
         )
     }
     let interruption = Task {
@@ -1227,7 +1306,7 @@ func modelInterruptObservesVADWhilePlaybackActionCleansUp(keyword: Bool) async t
             id: "follow-up-final", sessionID: "s", payload: payload,
             metadata: .init(payload: payload, source: "speechPerception", origin: .agent, rootID: "follow-up-final"),
             turn: .init(id: "follow-up", ordinal: 1)))
-    try await finishVADWindow(agent, onsetRevision: keyword ? 2 : 1)
+    try await finishVADWindow(agent)
     #expect(await main.requests.count == 1)
 
     await speech.setPlaying(false)
@@ -1360,11 +1439,11 @@ func modelInterruptKeepsOnsetCandidateReceivedBeforeSignal(source: String, confi
             turn: .init(id: turn, ordinal: 1))
     }
     try await agent.receive(
-        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "command", onsetRevision: 1)))
+        speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "command")))
     if source == "decision" {
         try await agent.receive(final(id: "command-final", turn: "command", text: "stop"))
     }
-    try await agent.receive(speechSignal(SpeechActivity(.onsetStarted, generation: "capture", onsetRevision: 2)))
+    try await agent.receive(speechSignal(SpeechActivity(.onsetStarted, generation: "capture")))
     if source == "speechPerception" {
         try await agent.receive(keywordSignal("command"))
     } else {
@@ -1377,18 +1456,18 @@ func modelInterruptKeepsOnsetCandidateReceivedBeforeSignal(source: String, confi
     }
 
     // Only the candidate is outstanding when the window elapses. No second onsetStarted will arrive.
-    try await finishVADWindow(agent, onsetRevision: 2)
+    try await finishVADWindow(agent)
     #expect(await main.requests.count == 1)
     #expect(await agent.interruptionWait != nil)
     if confirms {
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "follow-up", onsetRevision: 3)))
+                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "follow-up")))
         #expect(await agent.interruptionWait != nil)
         #expect(await main.requests.count == 1)
         try await agent.receive(final(id: "follow-up-final", turn: "follow-up", text: "continue speaking"))
     } else {
-        try await agent.receive(speechSignal(SpeechActivity(.onsetCleared, generation: "capture", onsetRevision: 3)))
+        try await agent.receive(speechSignal(SpeechActivity(.onsetCleared, generation: "capture")))
     }
     for _ in 0..<400 where await main.requests.count < 2 { try await Task.sleep(for: .milliseconds(5)) }
     #expect(await main.requests.count == 2)
@@ -1844,11 +1923,10 @@ func keywordAndFinalOrderingPreservesSpeechWithoutDuplicateDecision(scenario: St
     }
     _ = try #require(await agent.currentReplyID(sessionID: "s"))
     if scenario == "finalFirst" { try await agent.receive(command) }
-    let initialRevision: UInt64 = scenario == "beforeVAD" ? 0 : 1
-    if initialRevision == 1 {
+    if scenario != "beforeVAD" {
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "utterance", onsetRevision: 1)))
+                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "utterance")))
     }
     let keyword = keywordSignal(
         "utterance", label: scenario == "unlisted" ? "hello" : "en-stop",
@@ -1859,17 +1937,17 @@ func keywordAndFinalOrderingPreservesSpeechWithoutDuplicateDecision(scenario: St
 
     if confirm { #expect(await agent.interruptionWait != nil) }
     if scenario == "sameTurnContinuation" {
-        try await finishVADWindow(agent, onsetRevision: initialRevision)
+        try await finishVADWindow(agent)
         #expect(await agent.interruptionWait != nil)
         #expect(await main.requests.count == 1)
     }
     if !["duringCleanup", "finalFirst"].contains(scenario) { try await agent.receive(command) }
     if scenario == "continuation" {
-        try await agent.receive(speechSignal(SpeechActivity(.onsetStarted, generation: "capture", onsetRevision: 2)))
-        try await finishVADWindow(agent, onsetRevision: 2)
+        try await agent.receive(speechSignal(SpeechActivity(.onsetStarted, generation: "capture")))
+        try await finishVADWindow(agent)
         #expect(await main.requests.count == 1)
         try await agent.receive(
-            speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "next", onsetRevision: 3)))
+            speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "next")))
         #expect(await agent.interruptionWait != nil)
         let continuation = InputPayload.observation(.transcript("tell me something else", final: true))
         try await agent.receive(
@@ -1882,11 +1960,11 @@ func keywordAndFinalOrderingPreservesSpeechWithoutDuplicateDecision(scenario: St
     if scenario == "beforeVAD" {
         try await agent.receive(
             speechSignal(
-                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "utterance", onsetRevision: 1)))
+                SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "utterance")))
         #expect(await agent.speechUtterances.isEmpty)
     }
     if confirm && !["continuation", "sameTurnContinuation"].contains(scenario) {
-        try await finishVADWindow(agent, onsetRevision: 1)
+        try await finishVADWindow(agent)
     }
     for _ in 0..<500 {
         let received = confirm ? await main.requests.count > 1 : await !cloud.requests.isEmpty

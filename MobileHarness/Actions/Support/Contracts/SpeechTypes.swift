@@ -1,6 +1,7 @@
 import Foundation
 
 extension SpeechActions {
+
     public struct ListeningPolicy: Sendable {
         public let enabled: Bool
         public let paused: Bool

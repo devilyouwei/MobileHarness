@@ -71,6 +71,72 @@ private actor MediaTransportRecording {
     #expect(await recorded.frames == [0, 32])
 }
 
+@Test(.timeLimit(.minutes(1))) func speechDispatchPreservesOrderWithinEachChannel() async throws {
+    let source = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
+    let vadStarted = MediaTransportGate()
+    let releaseVAD = MediaTransportGate()
+    let asrStarted = MediaTransportGate()
+    let releaseASR = MediaTransportGate()
+    let asrFinished = MediaTransportGate()
+    let keywordDispatched = MediaTransportGate()
+    let recorded = MediaTransportRecording()
+    let generation = "capture"
+    let input = AgentInput(id: "input", sessionID: "session", payload: .event("speech"))
+    func envelope(_ message: AgentMessage, sequence: UInt64) throws -> OutputEnvelope {
+        OutputEnvelope(
+            source: .speechPerception, context: input.context,
+            output: .communication(try CommunicationAction(message: message)), sequence: sequence)
+    }
+    let events: [AgentMessage] = [
+        SpeechActivity(.captureStarted, generation: generation).message(),
+        SpeechRecognition(.partial, text: "hel", generation: generation).message(),
+        SpeechActivity(.onsetConfirmed, generation: generation, utterance: "utterance").message(),
+        SpeechActivity(.energyChanged, generation: generation, utterance: "utterance", energy: .high).message(),
+        SpeechRecognition(.final, text: "hello", generation: generation).message(),
+        SpeechActivity(.energyChanged, generation: generation, utterance: "utterance", energy: .low).message(),
+        SpeechActivity(.captureStopped, generation: generation).message(),
+        SpeechKeywordMatch(
+            generation: generation, utterance: "utterance", label: "en-stop", keyword: "stop",
+            onset: .zero, matchedAt: .milliseconds(64)
+        ).message(),
+    ]
+    let envelopes = try events.enumerated().map { index, message in
+        try envelope(message, sequence: UInt64(index))
+    }
+    let pump = Task {
+        try await IndependentOutputWorkflow.consumeSignals(source.stream, contracts: AgentContracts.communication) {
+            value in
+            await recorded.frame(value.sequence)
+            switch value.sequence {
+            case 0:
+                await vadStarted.release()
+                await releaseVAD.wait()
+            case 1:
+                await asrStarted.release()
+                await releaseASR.wait()
+            case 4: await asrFinished.release()
+            case 7: await keywordDispatched.release()
+            default: break
+            }
+        }
+    }
+    source.continuation.yield(envelopes[0])
+    await vadStarted.wait()
+    for value in envelopes.dropFirst() { source.continuation.yield(value) }
+    source.continuation.finish()
+    await asrStarted.wait()
+    await keywordDispatched.wait()
+    #expect(Set(await recorded.frames) == [0, 1, 7])
+    await releaseASR.release()
+    await asrFinished.wait()
+    #expect(Set(await recorded.frames) == [0, 1, 4, 7])
+    await releaseVAD.release()
+    try await pump.value
+    let frames = await recorded.frames
+    #expect(frames.filter { [0, 2, 3, 5, 6].contains($0) } == [0, 2, 3, 5, 6])
+    #expect(frames.filter { [1, 4].contains($0) } == [1, 4])
+}
+
 @Test(.timeLimit(.minutes(1))) func mediaTransportRejectsExpiredFrameWithoutStoppingDiscreteOutputs() async throws {
     let old = try syntheticCameraImage(
         width: 1, height: 1, value: 0, sequence: 1, timestamp: 1, rotation: 0,

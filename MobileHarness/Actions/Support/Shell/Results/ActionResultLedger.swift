@@ -67,8 +67,8 @@ struct ActionResultLedger {
     }
 
     mutating func started(_ invocation: ScheduledAction) {
-        guard invocation.envelope.roundID != nil, invocation.envelope.callID != nil,
-            invocation.feedback == .terminal
+        guard invocation.feedback == .terminal,
+            invocation.envelope.callID != nil || invocation.prepared?.descriptor.controlCapabilities.isEmpty == false
         else { return }
         entries[invocation.executionID]?.startedAt = .now
     }
@@ -99,7 +99,9 @@ struct ActionResultLedger {
         if entry.startedAt != nil, let owner = entry.invocation.owner {
             return .started(
                 .init(
-                    executionID: entry.invocation.executionID, owner: owner, envelope: entry.invocation.envelope))
+                    executionID: entry.invocation.executionID, owner: owner, envelope: entry.invocation.envelope,
+                    path: entry.invocation.call.actionPath,
+                    controlCapabilities: entry.invocation.prepared?.descriptor.controlCapabilities ?? []))
         }
         return entry.result.map(Delivery.finished)
     }

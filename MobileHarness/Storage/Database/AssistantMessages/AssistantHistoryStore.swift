@@ -408,6 +408,23 @@ public actor AssistantHistoryStore {
             maximumOutputTokens: maximumOutputTokens, temperature: temperature, awaitingModel: awaitingModel)
     }
 
+    /// Prepares an already admitted input without fencing unrelated writes in the same dialog.
+    public func prepareAdmittedInput(
+        id: String, dialogID: String, user: String, request: [ModelMessage], model: String
+    ) async throws -> AssistantRecord {
+        try await acquireWrite()
+        defer { releaseWrite() }
+        try await load()
+        try await synchronizeCurrentLocked()
+        guard value.current.id == dialogID, let record = value.current.turns.first(where: { $0.id == id }),
+            record.state == .generating, (record.modelRequests ?? []).allSatisfy({ $0.awaitingDispatch == true })
+        else { throw AssistantHistoryError.conflict }
+        if !record.awaitingModel { return record }
+        return try await beginLocked(
+            id: id, user: user, request: request, model: model, maximumOutputTokens: nil, temperature: 0.7,
+            awaitingModel: false)
+    }
+
     private func beginLocked(
         id: String, user: String, request: [ModelMessage], model: String,
         maximumOutputTokens: Int?, temperature: Double, awaitingModel: Bool

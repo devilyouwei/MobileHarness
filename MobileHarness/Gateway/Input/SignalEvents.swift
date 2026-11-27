@@ -132,7 +132,6 @@ public actor SignalEventTransport {
         let branches: [UUID: (SignalEndpoint, Task<SignalEventBranchResult, Never>)]
     }
     private struct BranchKey: Hashable {
-        let source: SignalEndpoint
         let channel: EventChannel
         let target: SignalEndpoint
     }
@@ -270,7 +269,7 @@ public actor SignalEventTransport {
         }
         // A full subscriber queue rejects only its own branch and must not consume shared budget.
         let targets = matched.values.map(\.endpoint).filter {
-            (depths[BranchKey(source: publisher.endpoint, channel: producer.channel, target: $0)] ?? 0)
+            (depths[BranchKey(channel: producer.channel, target: $0)] ?? 0)
                 < configuration.branchCapacity
         }
         guard envelope.payloadBytes >= 0, envelope.payloadBytes <= definition.maximumBytes else {
@@ -295,10 +294,14 @@ public actor SignalEventTransport {
         var pending: [(BranchKey, UUID, Task<SignalEventBranchResult, Never>)] = []
         var branchTasks: [UUID: (SignalEndpoint, Task<SignalEventBranchResult, Never>)] = [:]
         var initialResults: [SignalEventBranchResult] = []
+        let deliveryEnvelope = SignalEnvelope(
+            id: envelope.id, sessionID: envelope.sessionID, contract: envelope.contract, channel: producer.channel.id,
+            version: envelope.version, hops: envelope.hops, payloadBytes: envelope.payloadBytes,
+            expiresAt: envelope.expiresAt, cleanup: envelope.cleanup, control: envelope.control)
         // Reserve each branch tail in admission order, before any publication task can suspend.
         for (subscriptionID, subscriber) in matched {
             let target = subscriber.endpoint
-            let key = BranchKey(source: publisher.endpoint, channel: producer.channel, target: target)
+            let key = BranchKey(channel: producer.channel, target: target)
             if (depths[key] ?? 0) >= configuration.branchCapacity {
                 initialResults.append(.init(target: target.address, status: .rejected, reason: "capacityExceeded"))
                 continue
@@ -310,8 +313,8 @@ public actor SignalEventTransport {
                     _ = await previous?.value
                     do {
                         try Task.checkCancellation()
-                        try await transport.send(
-                            source: publisher.endpoint, target: target, envelope: envelope, payload: event)
+                        try await transport.deliverEvent(
+                            source: publisher.endpoint, target: target, envelope: deliveryEnvelope, payload: event)
                         return SignalEventBranchResult(target: target.address, status: .accepted, reason: nil)
                     } catch {
                         return SignalEventBranchResult(

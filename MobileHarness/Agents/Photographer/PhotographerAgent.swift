@@ -77,7 +77,7 @@ public actor PhotographerAgent: Agent {
             category: configuration.category,
             id: configuration.agentID, name: "Photographer",
             inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
+            outputs: [.communication, .actionCall, .toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID

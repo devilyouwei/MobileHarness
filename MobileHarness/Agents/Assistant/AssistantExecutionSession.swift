@@ -107,7 +107,9 @@ public actor AssistantExecutionSession {
                 }
                 pump = Task {
                     do {
-                        try await AssistantGenerationTransport.consume(agent.outputs) { envelope in
+                        try await AssistantGenerationTransport.consume(
+                            agent.outputs, contracts: AgentContracts.communication
+                        ) { envelope in
                             do {
                                 let outcome = try await consumer.execute(envelope)
                                 if outcome.isError {

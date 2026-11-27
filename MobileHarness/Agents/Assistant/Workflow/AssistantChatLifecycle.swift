@@ -94,6 +94,7 @@ extension AssistantChatWorker {
             }
         decisionTurn = nil
         pendingRounds.removeAll()
+        readyRoundSettlements.removeAll()
         settlementAdmissions.removeAll()
         batchMembers.removeAll()
         batchTexts.removeAll()
@@ -167,6 +168,7 @@ extension AssistantChatWorker {
                 seen.insert($0.id).inserted && $0.id != activeInput?.id
             }
         pendingRounds.removeAll()
+        readyRoundSettlements.removeAll()
         settlementAdmissions.removeAll()
         batchMembers.removeAll()
         batchTexts.removeAll()

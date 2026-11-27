@@ -55,7 +55,7 @@ public actor MemoryAgent: Agent {
         descriptor = AgentDescriptor(
             category: configuration.category,
             id: .memory, name: "Memory", inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control, .scheduling],
+            outputs: [.communication, .actionCall, .toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID

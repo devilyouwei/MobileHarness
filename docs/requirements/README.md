@@ -28,6 +28,7 @@
 
 | 需求 | 未实现范围 |
 | --- | --- |
+| [用户自定义 WebView Action](Custom-WebView-Actions.md) | Native 与 WebView Action 统一管理和调试，动态 Function Token 调用与 WebKit 执行、原生能力桥、Writer 编写 Skill 与 Assistant 使用 Skill。 |
 | [用户导航与 AI 交互边界](Manual-Navigation-and-Agent-Interaction.md) | 用户手动导航，AI 通过口述或独立 Window 交互，撤除已有模型导航路径。 |
 | [English and Simplified Chinese](App-Localization.md) | App language, user-facing copy, model prompts and speech language. |
 | [统一记录与记忆管理](Unified-Memory-Plan.md) | 后续以 MemorySkill 统一 Writer 记录、聊天记录和综合记忆，评估独立 Memory Agent；当前 History/Writing 暂不调整。 |

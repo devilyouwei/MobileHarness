@@ -2100,7 +2100,7 @@ extension LiveRuntimeTests {
         try await until { await link.observedCommands.count == 1 }
         await #expect(throws: NexArmExecutionError.busy) { try await workflow.aim(base: 0.8, pitch: -0.4) }
         await link.resumeTelemetry()
-        try await scheduler.finish(inputID: input.id, source: .assistant)
+        try await scheduler.finish(scope: .input(input.id), source: .assistant)
         let records = await scheduler.executionSnapshot().records
         #expect(records.count == 2 && records.allSatisfy { $0.phase == .succeeded })
         let stopped = await link.liveCommands.count
@@ -2824,7 +2824,7 @@ extension LiveRuntimeTests {
         let writesBeforeSecond = await link.observedCommands.count
         releaseFailure.continuation.yield(())
         releaseFailure.continuation.finish()
-        try await scheduler.finish(inputID: input.id, source: .assistant)
+        try await scheduler.finish(scope: .input(input.id), source: .assistant)
         await scheduler.finishResultDelivery()
         #expect(attempts == 2)
         #expect(await link.observedCommands.count > writesBeforeSecond)

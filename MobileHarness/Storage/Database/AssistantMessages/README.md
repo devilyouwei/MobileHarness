@@ -4,6 +4,8 @@ assistant_messages 每行对应一次实际发起的模型请求，保存完整�
 
 AssistantMessageRepository/SQLiteAssistantMessageRepository 只读写 Assistant 消息。AssistantRecordStore 显式接收 AssistantConversationRepository、AssistantMessageRepository、AssistantTaskRepository/AssistantTaskSummaryRepository 与 ModelRequestLogRepository；AssistantHistoryStore 提供串行窗口修改、读 fence、checkpoint、分页和恢复。窗口保留等待 ReACT 的输入生命周期，不把 HTTP/图片重新载入运行上下文。
 
+已接纳的输入通过 `prepareAdmittedInput` 在历史写门内准备。调用方提供当前对话和输入 ID，Store 核对输入仍可准备，再更新该输入的请求。其他消息或执行反馈在同一对话中的写入可以与准备交错。新建历史记录仍使用读版本令牌。
+
 本目录拥有 AssistantRecords、消息 DTO、skills/Action 决策投影、通信来源关联、摘要感知分页和中断恢复。消息写入借用 AssistantTasks 内部操作使摘要失效，并在同一事务初始化日志或消费来源通信。SQL 不选择或读取 Writer 私有消息/任务。更新失败不伪造成功，checkpoint 错误保留供重试；写入等待上限 16，满时显式 busy。
 
 关系和共享基础机制见[Database](../README.md)。

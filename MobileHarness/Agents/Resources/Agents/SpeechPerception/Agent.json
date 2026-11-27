@@ -8,7 +8,8 @@
   "signals": {
     "requests": [],
     "feedback": [
-      "action.result.v1"
+      "action.result.v1",
+      "tool.result.v1"
     ],
     "publications": [
       {

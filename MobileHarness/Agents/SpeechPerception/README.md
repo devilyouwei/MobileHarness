@@ -186,7 +186,7 @@ startInput 只订阅当前已开启采集代。回复半双工暂停保留该订
 
 SoundSourceEstimator retains scalar statistics for one 100 ms native-rate window (fractional rate rounding permits at most 101 ms). Correlate W with Y/Z/X: captured-field X front, Y left, Z up; azimuth/elevation are radians. RMS threshold is −50 dBFS and correlation quality threshold 0.6, a heuristic rather than probability. Quiet windows clear direction immediately and become inactive after 200 ms. No distance, identity, robot-frame or camera-mirror mapping is inferred.
 
-Mono publishes unavailable once per format/listening epoch and still supports ASR. Format/resume resets DSP; reply pause clears FOA direction. One publisher and one latest pending sound observation retain 500 ms window-end freshness. No subscribers is allowed loss. Stop joins publisher and processing without self-joining a failure path.
+Mono publishes unavailable once per format/listening epoch and still supports ASR. Format/resume resets DSP; reply pause clears FOA direction. One publisher and one latest pending sound observation retain 500 ms window-end freshness. The publisher saves observation evidence before submitting it and reports persistence failure. No subscribers is allowed loss. Stop joins publisher and processing without self-joining a failure path.
 
 ## 失败与限制
 
@@ -249,6 +249,8 @@ Each native input is processed inline; there is no second native FIFO. The windo
 ## 播放状态与连续接纳
 
 PlatformKit 通过 `AudioCaptureObserving.playbackSnapshot()` 提供最近 32 段原生播放区间。SpeechPerception 按原始采集时间选取门槛。播放和结束后 200 ms 使用较严格的起声门槛，只有实际播放区间使用短静音端点。
+
+有效采集中的已确认语句逐窗检查当前 VAD 判定，能量上报与播报状态及采集路由的双工能力独立。通过的语音窗计算 RMS，未通过的窗口按静音推进恢复并清零高能量累计。中、高档进入阈值分别为 −34、−20 dBFS，离开阈值分别为 −39、−25 dBFS。两个连续语音窗可进入中档，连续六个高能量语音窗才进入高档。离开高档需要五个窗口，回到低档通常需要三个。仅发布档位变化。声学端点和识别失败发布当前语句的低档恢复。采集结束以对应采集代的 `captureStopped` 生效。采集开始、起声、能量变化、恢复与采集结束按生成顺序进入 VAD 信道。VAD、ASR、关键词命中与声音定位各用自己的有界 FIFO，每个信道串行提交，不同信道并行。语音信号先入队再记录诊断证据；关闭或替换后的旧采集结果停止发布。
 
 ASR完整语句结束后重置识别和预处理历史，允许下一片音频立即进入VAD。ASR收尾中的现有识别状态机、半双工播放暂停、会话与采集代隔离仍由原有生命周期控制。
 

@@ -176,7 +176,8 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let writer = try agents.render("entry", variables: ["id": "writer", "description": description])
     #expect(prompt.contains(try agents.render("heading") + "\n" + writer))
     #expect(!(try AgentPrompts.load(named: "Assistant")).names.contains("inputProtocol"))
-    let role = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
+    let role = try AgentConfigurations.identityInstructions(
+        named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     let basic = try controlGuide()
     #expect(role.contains("is converted to speech and displayed as captions"))
     #expect(!basic.contains("is converted to speech and displayed as captions"))
@@ -263,10 +264,17 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
         #expect(trace.parserError == nil && !trace.events.contains { if case .rejected = $0 { true } else { false } })
         return trace.events
     }
-    #expect(orderingEvents[0].filter { $0 == .scheduling(.beginWait) }.count == 2)
-    #expect(orderingEvents[1].contains(.scheduling(.pause(milliseconds: 1000))))
-    #expect(orderingEvents[2].contains(.scheduling(.pause(milliseconds: 2000))))
-    #expect(orderingEvents[2].first == .scheduling(.beginWait))
+    #expect(
+        orderingEvents[0].filter {
+            $0 == .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start))
+        }.count == 2)
+    #expect(
+        orderingEvents[1].contains(
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "1.0"]))))
+    #expect(
+        orderingEvents[2].contains(
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", parameters: ["time": "2.0"]))))
+    #expect(orderingEvents[2].first == .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)))
     let examples = Array(allExamples.suffix(2))
     let emotions = UIActions.Emotion.allCases.filter { $0 != .clear }.map(\.rawValue)
     let labels = [
@@ -285,11 +293,11 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
         var inGroup = false
         for event in trace.events {
             switch event {
-            case .scheduling(.beginWait):
+            case .action(let call) where call.isWait && call.scope == .start:
                 #expect(!inGroup)
                 inGroup = true
                 current = []
-            case .scheduling(.endWait):
+            case .action(let call) where call.isWait && call.scope == .end:
                 #expect(inGroup)
                 groups.append(current)
                 inGroup = false
@@ -349,8 +357,12 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
             let speech = trace.calls.filter { $0.channel == "Speech" }.compactMap { $0.parameters["text"] }
             #expect(Set(speech).count == speech.count)
             if example.contains("<wait>") {
-                let begin = try #require(trace.events.lastIndex(of: .scheduling(.beginWait)))
-                let end = try #require(trace.events.lastIndex(of: .scheduling(.endWait)))
+                let begin = try #require(
+                    trace.events.lastIndex(
+                        of: .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start))))
+                let end = try #require(
+                    trace.events.lastIndex(
+                        of: .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end))))
                 #expect(begin < end && speech.count == 1)
                 #expect(trace.calls.filter { $0.channel == "Display" }.count == 1)
                 for (index, event) in trace.events.enumerated() {
@@ -446,7 +458,8 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     var state = AgentTaskSkillState()
     try state.initialize(fixed: config.assistantFixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     let basic = try controlGuide()
-    let identity = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
+    let identity = try AgentConfigurations.identityInstructions(
+        named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     let capabilityContext = try AgentPrompts.capabilityContext()
     let output = try capabilityContext.protocolRules()
     #expect(output.contains("additional Actions may appear in the next request's catalog"))
@@ -752,11 +765,11 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
             .control(
                 ControlCall(
                     path: start.path, destination: .own, parameters: ["name": "task", "value": "plan"])),
-            .scheduling(.beginWait),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .start)),
             .rejected(CallRejection(kind: .control, alias: "send", reason: .controlInsideWait)),
-            .scheduling(.endWait),
+            .action(.init(actionPath: ActionCall.waitPath, channel: "Wait", scope: .end)),
         ])
-    #expect(events.compactMap(\.actionCall).isEmpty)
+    #expect(events.compactMap(\.actionCall).allSatisfy { $0.isWait })
     let send = try #require(basic.controls.first { $0.alias == "send" })
     #expect(send.requiredParameters == ["agent_id", "text"] && send.optionalParameters.isEmpty)
     for arguments in [["text": "蓝色"], ["agent_id": "writer"]] {
@@ -816,7 +829,8 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     let privateInstructions = try AgentConfigurations.identityInstructions(named: "Writer")
     #expect(!privateInstructions.isEmpty && !allowedPrompt.contains(privateInstructions))
     #expect(!allowedPrompt.contains("Your private workflow uses tools, never XML scheduling"))
-    let identity = try AgentConfigurations.identityInstructions(named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
+    let identity = try AgentConfigurations.identityInstructions(
+        named: "Assistant", variables: ["default": AgentPrompts.defaultOutputLanguage])
     let basic = try AgentConfigurations.skillInstructions("basic-interaction")
     #expect(!identity.contains("Writer") && !identity.contains("task.delegate") && !identity.contains("state.set"))
     #expect(!basic.contains("Writer") && !basic.contains("writer"))

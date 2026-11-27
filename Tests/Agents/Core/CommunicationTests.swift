@@ -11,6 +11,24 @@ import Testing
 @testable import Agents
 @testable import Gateway
 
+@Test func actionToolControlAndLifecycleFeedbackUseDistinctProtocols() {
+    let action = ActionResult(
+        executionID: nil, owner: .init(agent: .assistant, incarnation: "fixture", sessionID: "session"),
+        path: .init(domain: "Fixture", module: "Work", function: "run"), causality: .root(),
+        status: .failed, effect: .notStarted, callID: "call", roundID: "round")
+    let control = ActionControl(executionID: UUID().uuidString, controlSequence: 1, command: .pause)
+    let payloads: [InputPayload] = [
+        .executionFeedback(.actionFinished(action)),
+        .toolResult(.init(callID: "tool", value: "value", isError: false, roundID: "round")),
+        .executionFeedback(.actionControlReceipt(.init(control, status: .applied))),
+        .executionFeedback(.roundFinished(.init(id: "round"))),
+    ]
+    #expect(
+        payloads.map { InputMetadata(payload: $0, rootID: "fixture").contract } == [
+            "action.result.v1", "tool.result.v1", "action.control.result.v1", "action.execution.event.v1",
+        ])
+}
+
 private func communicationFixtureContracts() throws -> CommunicationContracts {
     try CommunicationContracts(
         additional: AgentContracts.communication.registered.filter { $0.kind == .observation } + [
@@ -386,7 +404,11 @@ extension LiveRuntimeTests {
         ])
 
     #expect(assistant.requests.isEmpty)
-    #expect(Set(assistant.feedback) == [ExecutionFeedback.contract])
+    #expect(
+        Set(assistant.feedback) == [
+            ExecutionFeedback.contract, ExecutionFeedback.actionResultContract, ExecutionFeedback.toolResultContract,
+            ExecutionFeedback.controlResultContract,
+        ])
     #expect(assistant.subscriptions.contains { $0.channel == "agent.interruption" })
 }
 

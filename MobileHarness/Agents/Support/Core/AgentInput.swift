@@ -181,9 +181,9 @@ public struct InputMetadata: Sendable {
             contract = "user.text"
             defaultSource = "user"
         case .event: contract = "runtime.event"
-        case .toolResult: contract = "action.result.v1"
-        case .actionResult: contract = "action.result.v1"
-        case .executionFeedback: contract = ExecutionFeedback.contract
+        case .toolResult: contract = ExecutionFeedback.toolResultContract
+        case .actionResult: contract = ExecutionFeedback.actionResultContract
+        case .executionFeedback(let feedback): contract = feedback.protocolID
         case .activityEvent: contract = "activity.event"
         case .audio:
             contract = "media.audio"
