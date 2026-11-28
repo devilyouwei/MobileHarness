@@ -66,3 +66,5 @@ A host write entering quiet joins interruption cleanup. A model write settles in
 ## 流式关键词快停
 
 Assistant 从 [InterruptionKeywords.json](../../Resources/Agents/Assistant/Input/InterruptionKeywords.json) 加载允许打断的标签集合。有效命中必须属于当前语音会话，起声时间也须落在当前回复开始之后。关键词和模型共用同一个打断接纳屏障。清理完成或失败后，Assistant 将关键词、模型身份、起声到检测完成的总耗时、ModelKit 累计推理耗时和打断结果投影到 Decision 日志。来自 ApplicationControl 的 `agent.interruption.v1` 也走统一打断接纳入口。
+
+[AssistantSignalSelection.swift](AssistantSignalSelection.swift) classifies signals and selects the decision batch. [AssistantFeedbackAdmission.swift](AssistantFeedbackAdmission.swift) verifies feedback origin, session and turn.

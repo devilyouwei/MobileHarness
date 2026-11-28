@@ -41,26 +41,26 @@ The root keeps the Agent entry, container, execution session and processing asse
 | [AssistantChatLifecycle.swift](Workflow/AssistantChatLifecycle.swift) | Start, recovery, pause/resume, stop and cleanup. |
 | [AssistantChatInput.swift](Input/AssistantChatInput.swift) | Input admission, text handling, prepared batches, queue drain and reply-turn start. |
 | [AssistantChatGeneration.swift](Workflow/AssistantChatGeneration.swift) | Generation per input: language selection, rounds, execution, completion and batch finish. |
-| [AssistantChatFeedback.swift](Output/AssistantChatFeedback.swift) | Round Action results, pending feedback acceptance and publication, observation text. |
+| [AssistantChatRoundFeedback.swift](Workflow/AssistantChatRoundFeedback.swift) | Round Action results, pending feedback acceptance and publication, observation text. |
 | [AssistantChatEmission.swift](Output/AssistantChatEmission.swift) | Output collection, Action and native Tool emission, playback, failures and runtime events. |
 | [AssistantChatTaskCommunication.swift](Workflow/AssistantChatTaskCommunication.swift) | Directed task communication: receiving tasks and reports, delegation, `send` delivery and rejection. |
-| [AssistantChatWriterEvents.swift](AssistantChatWriterEvents.swift) | Writer events, completion facts and the Writer notice queue and playback. |
-| [AssistantChatStatus.swift](State/AssistantChatStatus.swift) | Signal preparation, status, resident context, effective capabilities, local history decisions and decision metadata. |
+| [AssistantChatPeerEvents.swift](Workflow/AssistantChatPeerEvents.swift) | Writer events, completion facts and the Writer notice queue and playback. |
+| [AssistantChatStatus.swift](State/AssistantChatStatus.swift) | Status, resident context, visible variables and effective capabilities. |
 | [AssistantControls.swift](Controls/AssistantControls.swift) | Control library: aliases, declarations, `destination` (`send` is `peer`; the rest are `self`), `AgentControlOperation` and fixed registrations. |
 | [AssistantControlExecution.swift](Controls/AssistantControlExecution.swift) | Control execution (`executeControl`, `control` gating, state/Skill/send entries, the `task` trigger) and the late-bound `AssistantControlLink`. |
 | [AssistantChatContext.swift](Workflow/AssistantChatContext.swift) | AssistantChatState, workflow control intent, transactional AssistantHistoryContext and recovery/compression. |
 | [AssistantHistoryProjection.swift](Workflow/AssistantHistoryProjection.swift) | Durable history reconstruction and private request selection. |
 | [AssistantContainer.swift](AssistantContainer.swift) | Stable role capability, UI-facing state/control and resident-state projection. |
 | [AssistantExecutionSession.swift](AssistantExecutionSession.swift) | Registration, output ownership, task/waiting/Decision presentation and joined session cleanup. |
-| [AssistantGenerationTransport.swift](Workflow/AssistantGenerationTransport.swift) | Ordered output reader, bounded native execution slots and per-round seals. |
-| [AssistantProcessing.swift](AssistantProcessing.swift) | Concrete state, prompt/capability assembly, preprocessing and history binding. |
+| [AssistantGenerationTransport.swift](Output/AssistantGenerationTransport.swift) | Ordered output reader, bounded native execution slots and per-round seals. |
+| [AssistantContextState.swift](AssistantContextState.swift) | Private context, identity and fixed capabilities. Model context assembly lives in [Workflow](Workflow/README.md) and signal selection lives in [Input](Input/README.md). |
 | [AssistantSessionControl.swift](Workflow/AssistantSessionControl.swift) | Runtime cleanup/close message and typed decoding. |
 | [AssistantInterrupt.swift](Input/AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
 | [ListeningControl.swift](Input/ListeningControl.swift) | Assistant 私有布尔聆听门控。 |
 | [ListeningCoordinator.swift](Input/ListeningCoordinator.swift) / [QuietExitJudge.swift](Input/QuietExitJudge.swift) | `listening` Trigger handler, `quiet` exit judgment and its record. |
 | [AssistantInputDecision.swift](Input/AssistantInputDecision.swift) | Settings-selected Decision model, bounded inference for interrupt and quiet wake, and targeted interrupt settlement. |
 | [AssistantInputBatch.swift](Input/AssistantInputBatch.swift) | Trusted source timeline, batch text, source-line markers and input prompt access. |
-| [AssistantStateBindings.swift](State/AssistantStateBindings.swift) | Business-only exact-path State adaptation. |
+| [AgentStateBindings.swift](../Support/Context/AgentStateBindings.swift) | Business-only exact-path State adaptation. |
 | [AssistantSpeechOutput.swift](Output/AssistantSpeechOutput.swift) | AssistantSpeechProducing contract, audio-handle production and synthesis/playback presentation. |
 | [SpeechPlaybackFailure.swift](Output/SpeechPlaybackFailure.swift) | Playback-boundary failure copy with preserved underlying synthesis/cache cause. |
 
@@ -145,7 +145,7 @@ In synchronous mode, the worker joins all admitted calls, reliable results and t
 
 Successful send or publish confirms admission. Model stop/toolCalls/lengthLimit ends generation. Action and Tool outcomes return via the [shared Agents result adapter](../Support/README.md#interfaces-and-flow). The execution session matches each outcome to the original call, and only calls carrying a round ID enter that round's settlement.
 
-Runtime-generated caption, speech and waiting calls can join completion and retain diagnostics, but their values/failures never become model observations or independently trigger reasoning. A real model business observation remains deliverable even if internal presentation fails in the same round. Without business observations, the worker handles internal failure through its runtime-failure path.
+Beginning a model-generated reply, presenting its captions and playing its synthesized speech use scheduled Action calls. The waiting animation uses a request-correlated independent Tool. Its receipt does not trigger model reasoning. A real model business observation remains deliverable even if internal presentation fails in the same round. Without business observations, the worker handles internal failure through its runtime-failure path.
 
 ## Bounds and overflow
 
@@ -190,7 +190,7 @@ Full-duplex Action and native Tool result inputs retain their originating conver
 
 ## State and image ownership
 
-AssistantStateBindings installs one App-backed exact-path resolver. Skill.useStates alone selects sources; parent paths do not imply child reads. It preserves the producer's complete Business dictionaries/arrays while excluding Runtime, health/issues, metadata and child indices. Missing/unreadable/malformed sources become unknown/null with bounded path/code diagnostics; cancellation, closed context and capacity failures propagate. There is no polling, tree discovery, loadState or duplicate path allowlist.
+AgentStateBindings installs one App-backed exact-path resolver. Skill.useStates alone selects sources; parent paths do not imply child reads. It preserves the producer's complete Business dictionaries/arrays while excluding Runtime, health/issues, metadata and child indices. Missing/unreadable/malformed sources become unknown/null with bounded path/code diagnostics; cancellation, closed context and capacity failures propagate. There is no polling, tree discovery, loadState or duplicate path allowlist.
 
 BasicInteraction includes passive native time, power, thermal, network, permissions, audio, locale and accessibility facts plus navigation/windows. Facts never override authorization or execution checks. Resident state inspection reads initialized committed memory only, without persistence restoration or a second mutable registry; unknown is reported before initialization. start owns restoration and its failures.
 
@@ -253,3 +253,5 @@ Decision模型切换支持D3 Edge、Vela 3 Fast/3.1 Fast及Laya Multilingual；�
 Assistant 写入 ModelKit 在 dispatch 边界报告的模型身份，并在生成清理后为同一次请求补写执行元数据。Decision 解析本地注册的原生与 Chat 能力，运行日志读取模型会话身份，分类总耗时仍由 Agent 测量。
 
 关键词快停日志使用 SpeechPerception 命中观察的检测总耗时及 ModelKit 提供的模型身份和推理耗时。接纳及停播清理仍通过统一入口，日志在清理结果可用后写入。
+
+容器快照的 `business.lifecyclePhase` 公开本角色生命周期，取值见[角色 State 契约](../README.md#reflexive-state-reads-and-disclosure)。

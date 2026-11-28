@@ -1,99 +1,37 @@
-# VisionPerception — 相机帧消费、姿态与视线策略
+# VisionPerception
 
-本角色的静态类别由资源 Agent.json 声明并传入 Descriptor，归类与语义见 [Agents 分类](../README.md#agent-categories)。
+VisionPerception 是相机、相册、姿态推理、视觉展示与机械跟踪的常驻感知角色。根容器注册一个身份，绑定一个角色执行端。相机和相册请求可在姿态模型关闭时使用。Actions 拥有相机、图库和机械设备的实际操作，ModelKit 提供姿态模型与推理租约。
 
-## 角色容器
-
-[VisionPerceptionContainer.swift](VisionPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。持有至多一个捕获代任务，VisionAgentSession 在其内完成注册、原生观察和受保护输出消费。重叠 run 显式 busy；取消和 suspend 加入实际任务；根 stop 永久关闭容器。会话失败与清理失败分别保留。
-
-捕获代任务独立于触发它的相机执行请求，有自己的 Gateway 请求链。容器持有任务句柄并在取消时加入。会话装配在主 Actor 上执行。
-
-生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
-
-## 职责与注入能力
-
-构造注入 PlatformKit `CameraFrameObserving`、ModelKit `PoseCapability`、采样／镜像配置、会话身份及私有 Context。角色主动订阅原始 CameraFrame，负责节奏、运动证据、姿态关联、骨架和眼睛目标；不持有 UI 子容器、相机控制器或 Storage 根。
-
-生产装配提供 ModelKit 的 `ModelVisionContainer`，供会话调用 `estimatePose`。ModelKit 管理默认 `yolo26n-pose` 的预热、模型制品解析和推理租约。[ModelKit Vision](../../ModelKit/Vision/README.md)
-
-## 文件与职责
-
-| 文件 | 职责 |
-| --- | --- |
-| [FaceGazeTracker.swift](Workflow/FaceGazeTracker.swift) | 人脸目标选择与视线平滑 |
-| [FrameCadence.swift](Workflow/FrameCadence.swift) | 采样节奏、姿态需求与有界运动判据 |
-| [FrameMotionAnalyzer.swift](Workflow/FrameMotionAnalyzer.swift) | 图像运动证据的纯计算 |
-| [PoseOverlayPayload.swift](Output/PoseOverlayPayload.swift) | 推理观测到有界骨架调用载荷的转换 |
-| [VisionAgentSession.swift](VisionAgentSession.swift) | 视觉角色注册、推理／输出分支和停止加入 |
-| [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) | 视觉角色准入、单推理／最新候选和实际输出 |
-| [VisionPerceptionCamera.swift](Input/VisionPerceptionCamera.swift) | 原始相机帧的角色只读订阅 |
-| [VisionPerceptionProcessing.swift](Workflow/VisionPerceptionProcessing.swift) | 视觉私有 Context、预处理与采样配置 |
-
-## 外部关系（一层）
+## 接口与生命周期
 
 ```mermaid
 flowchart LR
- A["VisionPerception"]:::agent
- G["Gateway：调用／Signal／反馈"]:::gateway
- C["AgentCore：身份／契约"]:::host
- H["Agents 根级装配：构造与生命周期"]:::host
- H -.-> A
- A --> C
- A <-->|"受身份绑定的输出与反馈"| G
- P["PlatformKit.vision：CameraFrameObserving"]:::platform
- P -->|"直接 CameraFrame"| A
- M["ModelKit.vision：PoseCapability"]:::model
- A <--> M
- subgraph Peers["其他 Agent：仅经 Gateway 通信"]
- PH["Photographer"]:::agent
- end
- G -->|"perception.vision.pose.v1"| PH
-
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+    UI[相机与相册请求] --> V[VisionPerception]
+    Frames[PlatformKit 原生帧] --> V
+    V <--> Model[ModelKit 姿态推理]
+    V <-->|Tool 请求与执行回执| Gateway
+    V -->|姿态发布与固定任务事件| Gateway
 ```
 
-角色间消息经 Gateway 递送；基础能力通过构造注入，输入订阅由角色持有。角色、Skill 与 Task 授权归 Agents；Actions 来源的协作接口由 App 以中立窄端口绑定，Agents 不导入 Actions、CallRuntime 或 ExecutionRuntime。
+[VisionPerceptionContainer](VisionPerceptionContainer.swift) 投影摄影任务与运行状态，working 表示视觉采集代正在运行。常驻执行会话绑定相机与相册 UI。[VisionAgentSession](VisionAgentSession.swift) 按采集代绑定跟踪并启动帧订阅、推理、呈现和健康监控。打开视觉的调用与持续运行的采集任务拥有独立的请求链。关闭时取消并加入推理、发布、跟踪和该代输出，常驻角色继续受理相机事务。
 
-<a id="输入订阅与输出契约"></a>
-
-## 内部结构与执行链
+## 职责与工作流
 
 ```mermaid
-flowchart TB
- P["注入 Platform.vision：只读帧"]:::platform
- M["注入 ModelKit.vision：Pose"]:::model
- subgraph Role["VisionPerception"]
- N["Camera 消费／采集代／新鲜度"]:::agent
- L["一个 latest 待处理槽"]:::agent
- C["FrameMotionAnalyzer＋FrameCadence"]:::agent
- I["一个在途 Pose 推理"]:::agent
- O["PoseObservation／PoseOverlayPayload／FaceGazeTracker"]:::agent
- Q["有界 mailbox／最新状态替换"]:::agent
- end
- P --> N --> L --> C --> I --> O --> Q
- M <--> I
- Q --> G["Gateway：调度／Signal 递送"]:::gateway
- G --> X["UI.Pose.showPose／UI.Gaze.moveEyes"]:::action
- X --> U["UI.camera：同帧骨架；UI.home：眼睛"]:::ui
- G --> PH["Photographer：perception.vision.pose.v1"]:::agent
- classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
- classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
- classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
- classDef storage fill:#fef3c7,stroke:#d97706,color:#78350f
- classDef agent fill:#eef2ff,stroke:#6366f1,color:#312e81
- classDef gateway fill:#ffedd5,stroke:#ea580c,color:#7c2d12
- classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
- classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
+flowchart LR
+    Camera[相机请求] --> Transaction[相机事务] --> Tool[绑定的 Tool 调用]
+    Tool -->|实际回执| Transaction
+    Frame[最新帧] --> Pose[姿态推理]
+    Pose --> Tracking[本地跟踪策略] --> Aim[最新目标派发]
+    Pose --> Overlay[同帧骨架与视线]
+    Pose --> Publication[对外姿态观察]
 ```
 
-`VisionPerceptionCamera.swift` 拥有唯一原生订阅及私有 ProcessingContext。start/resume 建立，pause/stop 关闭接纳并取消加入。订阅不请求权限、不启动／切换设备。相机预览由 Actions 相机执行服务直接呈现，不等待姿态推理；模型结果经受保护 Tool 呈现，同帧附件由 Actions 校验原生类型和 UI 代际。
+- [Input](Input/) 接纳相机、相册、固定任务与原生帧，订阅低频相机事实。
+- [Workflow](Workflow/) 管理独立采集代、姿态推理、采样、视线和跟踪策略，以及具有请求身份的摄影事务。跟踪仅保留一个执行中的设备调用和一个待发送的最新目标。
+- [Output](Output/) 绑定执行端、派发摄影与跟踪工具、编码骨架载荷。摄影岛依据真实相机事实更新。相机请求按请求 ID 对应结果，保留预览、录像及已保存媒体的身份。
+
+业务调用以 tool.call.v1 到达 Actions，execution.call.result.v1 沿原请求返回。固定任务沿 agent.task.v1 接纳，沿 agent.task.events.v1 报告。对外保留 perception.vision.pose.v1；跟踪直接读取本代已接纳的姿态，设备故障独立报告。
 
 ## Input, workers and freshness
 
@@ -152,14 +90,29 @@ OutputMailbox has 18 total slots shared by discrete output and the overlay/gaze/
 
 通信见 [Agent.json](../Resources/Agents/VisionPerception/Agent.json)。
 
+
+## 基础相册实施契约
+
+订阅UI.album并经身份绑定Gateway执行内部Album操作，根持有导入导出任务，停止取消并加入；相册不依赖相机开启。
+
+## Execution ownership and lifecycle
+
+Camera/device execution and CameraInteractionWorkflow belong to ActionsContainer. VisionPerception receives narrow App-bound access interfaces and UI-owned controls, owns authorization/tracking intent and cancels its execution scopes explicitly. Private album attachments validate request/session independently of role permission.
+
 ## Passive container state
 
-stateSnapshot projects local installation/closure and existing work or Agent lifecycle/queue counters directly from memory. Reading starts no role, persistence restoration or inference. Initialization remains in the existing owner lifecycle. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+当前角色在 `agents.visionperception` 同时暴露常驻角色状态和采集代的 `working`。AgentRuntime 为每次运行创建新的 Context scope，摄影事务与帧推理使用各自的私有 Context。持久化日志中的旧 `photographer` 来源保留事件发生时的身份。
 
-## 目录职责
+stateSnapshot projects local installation/closure, Agent lifecycle/queue counters and initialized committed task/Skill fields without message content. residentContext() reads the repository’s last committed memory only; context fields are unknown before initialization. Agent start owns initialization/restoration and its failures. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
 
-- [Input](Input/) 订阅相机帧并校验捕获代。
-- [Workflow](Workflow/) 计算帧采样节奏、运动证据、姿态上下文和视线目标。
-- [Output](Output/) 将同帧姿态编码成有界骨架 Tool 载荷。
+The fixed camera input workflow includes takePhoto for the window shutter. Its authorized Tool is Camera.Capture.takePhoto, sharing the existing capture/receipt/ownership pipeline. Camera window management is handled by ApplicationControl; VisionPerception retains camera and album business requests.
 
-业务 Tool 经绑定的角色端口发送，调用方按原请求消费执行结果。这些调用独立于模型轮次。
+Typed camera intent also includes perceptionOpen/perceptionClose/perceptionFlip/perceptionRetry, mapped to fixed Camera.Perception.openVision/closeVision/flipVision/retryVision calls. The same bounded request workflow and Gateway authorization apply. Pose/tracking scope exists independently of the photo window; stopping it joins tracking output before a replacement scope. Root model requirements include vision only while background visual demand is enabled.
+
+## Capture enhancement requests
+
+CameraInput maps to a bounded CameraCaptureIntent containing optional complete CameraCaptureSettings or a UUID recordingID. Intent validation enforces operation-specific fields before the role invokes fixed Capture.configure/cancelCapture or Video.startRecording/stopRecording/saveVideo/ignoreVideo. For startRecording the fixed Tool supplies waitForCompletion=false, acknowledging native startup without retaining the request until the movie ends. UI stop remains a separate ToolCall; it does not enter ChannelScheduler or model inference and can stop an Assistant's scheduled recording whose default completion waits for the ready file. The single pending request and source/session checks are shared with photo/lens controls; file/native work remains in Actions. UI countdown cancellation cancels and joins its existing request, or submits the fixed cancelCapture operation when the countdown was started elsewhere.
+
+容器快照的 `business.lifecyclePhase` 公开本角色生命周期，取值见[角色 State 契约](../README.md#reflexive-state-reads-and-disclosure)。
+
+[Input](Input/) 订阅相机、相册与帧输入，选择相机信号和推理帧。[Workflow](Workflow/) 推进相机操作、姿态推理与机械跟踪。[Output](Output/) 派发相册和视觉 Tool，接收调用回执并生成叠加层及灵动岛呈现。VisionPerceptionExecutionSession 在角色根目录管理注册和输出消费者的生命周期。

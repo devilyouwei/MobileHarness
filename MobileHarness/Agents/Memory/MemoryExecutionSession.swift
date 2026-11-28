@@ -39,16 +39,25 @@ public actor MemoryExecutionSession {
                 guard !closed else { throw CommunicationError.scopeClosed }
                 started = true
                 pump = Task {
-                    do {
-                        try await IndependentOutputWorkflow.consumeGeneration(
-                            agent.outputs, contracts: AgentContracts.communication
-                        ) { envelope in
-                            do { _ = try await consumer.execute(envelope) } catch {
-                                await self.recordFailure(error)
+                    for await envelope in agent.outputs {
+                        do {
+                            let result = try await agent.executeHistoryOutput(envelope, using: consumer)
+                            if result.isError {
+                                throw HistoryIntentFailure.execution(
+                                    result.failure ?? result.tool?.value ?? "History operation failed")
                             }
+                            if case .toolCall(let call) = envelope.output,
+                                call.toolPath == MemoryHistoryWorkflow.presentation.path
+                            {
+                                try await agent.completeFixedTask(inputID: envelope.inputID, value: result.tool?.value)
+                            }
+                        } catch {
+                            await self.recordFailure(error)
+                            do {
+                                try await agent.completeFixedTask(
+                                    inputID: envelope.inputID, value: nil, failure: String(describing: error))
+                            } catch { await self.recordFailure(error) }
                         }
-                    } catch is CancellationError {} catch {
-                        lastExecutionFailure = String(describing: error)
                     }
                     await closeResources()
                 }

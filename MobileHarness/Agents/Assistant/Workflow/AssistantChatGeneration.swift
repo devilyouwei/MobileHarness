@@ -364,28 +364,16 @@ extension AssistantChatWorker {
             imageScopes.removeAll()
             if usesSkills {
                 guard let stateContext else { throw CommunicationError.invalidPayload }
-                let names = try AgentSkillLoader.useStates(requestSkillIDs)
-                await stateContext.synchronize(
-                    session: input.sessionID, dialog: decisionContext.state.history.current.id)
-                let snapshot = try await stateContext.multimodalSnapshot(session: input.sessionID, names: names)
-                requestedStates = names
-                resourceBindings = snapshot.resourceBindings
-                imageScopes = Dictionary(
-                    uniqueKeysWithValues: snapshot.images.compactMap { image in
-                        image.resourceScope.map { (image.id, $0) }
-                    })
-                let imageProjection = try AgentChatContextBuilder.applyingStateImages(
-                    snapshot.images, to: stateMessages, user: userIntent, supportsImages: await chat.supportsImages)
-                stateMessages = imageProjection.messages
-                ephemeralImageIDs = imageProjection.ephemeralIDs
-                let contextTemplates = try AgentPrompts.stateContext()
-                var block =
-                    try contextTemplates.render("frame")
-                    + contextTemplates.render(
-                        "skillState", variables: ["state": String(decoding: snapshot.facts, as: UTF8.self)])
-                if let manifest = imageProjection.manifest {
-                    block += try contextTemplates.render("images", variables: ["manifest": manifest])
-                }
+                let skillState = try await AgentChatContextBuilder.skillStateContext(
+                    skills: requestSkillIDs, from: stateContext, session: input.sessionID,
+                    dialog: decisionContext.state.history.current.id, messages: stateMessages,
+                    user: userIntent, supportsImages: await chat.supportsImages)
+                requestedStates = skillState.paths
+                resourceBindings = skillState.resourceBindings
+                imageScopes = skillState.imageScopes
+                stateMessages = skillState.messages
+                ephemeralImageIDs = skillState.ephemeralImageIDs
+                var block = skillState.prompt
                 if let waiting = inputInteractions[input.id]?.first(where: {
                     AgentTaskMessaging.isPeer($0.scope.executor)
                 }),

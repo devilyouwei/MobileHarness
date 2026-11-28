@@ -1,0 +1,10 @@
+{
+  "entries": {
+    "setVolume": {
+      "description": "设置当前及后续语音播报的目标音量。空闲时也可设置。",
+      "parameters": {
+        "volume": { "description": "目标音量，范围为 0 到 1。" }
+      }
+    }
+  }
+}

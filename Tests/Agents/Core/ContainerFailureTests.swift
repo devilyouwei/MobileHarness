@@ -95,7 +95,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
         sessionID = UUID().uuidString
         manager = AgentManager()
         let configurations = try [
-            "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "Memory",
+            "Assistant", "SpeechPerception", "VisionPerception", "Memory",
             "ApplicationControl", "Writer",
         ].map { try AgentConfigurations.load(named: $0) }
         let policy = try CommunicationPolicy(
@@ -216,7 +216,7 @@ private actor FailedDiagnosticDatabase: DatabaseStorage {
 {
     let manager = AgentManager()
     let configurations = try [
-        "Assistant", "SpeechPerception", "VisionPerception", "Photographer", "Memory",
+        "Assistant", "SpeechPerception", "VisionPerception", "Memory",
         "ApplicationControl", "Writer",
     ].map {
         try AgentConfigurations.load(named: $0)

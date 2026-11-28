@@ -215,6 +215,25 @@ func historyDeleteUsesCorrelatedRuntimeResultBeforePresentation() async throws {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func memorySessionAdvancesHistoryFromTheDirectToolReply() async throws {
+    let session = UUID().uuidString
+    let store = AssistantHistoryStore()
+    let archived = try await archivedHistory(store)
+    let presentation = HeldHistoryPresentation()
+    let runtime = try await intentRuntime(
+        sessionID: session, presentation: presentation,
+        mutations: HistoryMutationService(store: store, summarizeTitle: { _ in "Unused fixture title" }))
+    try await runtime.prepareForInteraction()
+    var started = presentation.started.stream.makeAsyncIterator()
+    try await runtime.agent.receive(MemoryHistoryIntent.delete(archived).input(sessionID: session))
+    await started.next()
+    #expect(try await store.snapshot().past.isEmpty)
+    #expect(try await runtime.agent.contextSnapshot().state.pendingRequestIDs.isEmpty)
+    await presentation.finish()
+    await runtime.shutdown()
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
 func historyDeleteRejectsCurrentAndMissingIDsAndAllowsRefreshAfterFailure()
     async throws
 {
@@ -328,17 +347,11 @@ func memoryDeleteRejectsUncorrelatedOrForeignFeedbackAndOverlappingIntent() asyn
                 id: UUID().uuidString, sessionID: session, payload: payload,
                 metadata: InputMetadata(payload: payload, source: "user", rootID: UUID().uuidString)))
     }
-    try await agent.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: payload))
-    let followup = try #require(await reader.next())
-    #expect(followup.inputID == envelope.inputID)
-    guard case .toolCall(let presentation) = followup.output else {
-        Issue.record("Expected presentation")
-        return
-    }
-    #expect(presentation.toolPath == "UI.HistoryPresentation.showHistory")
+    // Even a matching call ID cannot advance the workflow through the public inbox.
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(AgentInput(id: UUID().uuidString, sessionID: session, payload: payload))
     }
+    #expect(try await agent.contextSnapshot().state.pendingRequestIDs == [call.id])
     await agent.stop()
 }
 
@@ -528,11 +541,16 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     await runtime.shutdown()
 }
 
-@Test(.actionCatalog) func memoryAndPhotographerHaveCanonicalIndependentRoleIdentities() throws {
+@Test(.actionCatalog) func memoryAndVisionHaveCanonicalIndependentRoleIdentities() throws {
     let memory = try AgentConfigurations.load(named: "Memory")
-    let photographer = try AgentConfigurations.load(named: "Photographer")
+    let visionPerception = try AgentConfigurations.load(named: "VisionPerception")
     #expect(memory.agentID == .memory)
-    #expect(photographer.agentID == .photographer)
+    let runtime = try MemoryAgent.runtimeCapabilities()
+    #expect(memory.category == .cognition && memory.communication.feedback.isEmpty)
+    #expect(runtime.actions.isEmpty && runtime.internalActions.isEmpty)
+    #expect(runtime.tools.isEmpty)
+    #expect(runtime.internalTools.contains { $0.path == "History.Conversation.readFull" })
+    #expect(visionPerception.agentID == .visionPerception)
     #expect(
         try MemoryAgent(
             sessionID: UUID().uuidString,
@@ -540,23 +558,25 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
                 agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
         ).descriptor.name == "Memory")
     #expect(
-        try PhotographerAgent(
+        try VisionPerceptionAgent(
             sessionID: UUID().uuidString,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
-        ).descriptor.name == "Photographer")
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
+        ).descriptor.name == "VisionPerception")
     #expect(throws: AgentConfigurationError.identityMismatch) {
         try MemoryAgent(
-            sessionID: UUID().uuidString, configuration: photographer,
+            sessionID: UUID().uuidString, configuration: visionPerception,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
         )
     }
     #expect(throws: AgentConfigurationError.identityMismatch) {
-        try PhotographerAgent(
+        try VisionPerceptionAgent(
             sessionID: UUID().uuidString, configuration: memory,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
     }
 }
@@ -568,13 +588,14 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "memory"), scope: UUID().uuidString, state: MemoryContextState())
     )
-    let photographer = try PhotographerAgent(
+    let visionPerception = try VisionPerceptionAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: CameraTransactionContextState())
     )
     try await memory.start()
-    try await photographer.start()
+    try await visionPerception.start()
     var accepted: [String] = []
     for _ in 0..<256 {
         let input = try MemoryHistoryIntent.refresh.input(sessionID: session)
@@ -586,14 +607,14 @@ private struct FailedArchivePresentation: HistoryPresentationCapability {
     }
     #expect(await memory.status().lifecycle == .failed)
     #expect(await memory.status().processedInputs == 256)
-    #expect(await photographer.status().lifecycle == .running)
+    #expect(await visionPerception.status().lifecycle == .running)
     var retained: [String] = []
     for await envelope in memory.outputs {
         #expect(envelope.source == .memory)
         retained.append(envelope.inputID)
     }
     #expect(retained == accepted)
-    await photographer.stop()
+    await visionPerception.stop()
 }
 
 @Test(.actionCatalog) @MainActor func taskDialogueRemainsVisibleAndNewConversationPreservesItsEvidence() async throws {

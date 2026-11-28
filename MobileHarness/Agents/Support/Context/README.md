@@ -76,7 +76,7 @@ recordSignal 只保存有界中立 Data 证据到内存，非 Signal 传输或�
 
 ## Agent state variables
 
-Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Agents/Resources/Agents](../../Resources/Agents/README.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（`task` 与 `listening`）。
+Agent 自身变量表（[AgentStateVariables](AgentStateVariables.swift)）是角色私有 Context 的一部分，字符串值，内存存储，随 Context 事务提交，重启丢弃。声明来自 Agent.json 的 `states`（见 [Agents/Resources/Agents](../../Resources/AgentAuthoring.md)），由 `AgentStateSchema` 在配置加载时校验；Swift 侧只提供按类型的解析与按名绑定的 Trigger（`task` 与 `listening`）。
 
 [ListeningModeControlling](ListeningMode.swift) 连接模式 Trigger、感知事实和 Assistant 生命周期。Assistant 停止时通过 `cancelJudgment` 淘汰待完成的唤醒判定。判定与推理清理由 [Assistant Input](../../Assistant/Input/README.md#listening-and-quiet) 拥有。
 
@@ -126,7 +126,7 @@ AgentStateContext 管理只读来源和会话接纳，不持有目标副本；�
 
 ## Container context read path
 
-AgentStateContext owns a single exact-path resolver and session generations, never facts or a Task mirror. App supplies the classified node reader; AssistantStateBindings adapts the complete Business dictionary. Skill.useStates alone selects sources on each request. No path or field list is duplicated in Assistant. Nested Business arrays/objects remain intact; Runtime, health/issues, metadata and child indices are excluded. Reads never traverse children or start devices.
+AgentStateContext owns a single exact-path resolver and session generations, never facts or a Task mirror. App supplies the classified node reader; AgentStateBindings adapts the complete Business dictionary. Skill.useStates alone selects sources on each request. No path or field list is duplicated in Assistant. Nested Business arrays/objects remain intact; Runtime, health/issues, metadata and child indices are excluded. Reads never traverse children or start devices.
 
 A missing, unreadable or malformed node has no meaningful value (null, or only nulls): it is omitted from the model context entirely (no null, placeholder or diagnostic is injected), and the State log shows the variable as empty. Sources encode only their value, with no availability wrapper. Exception messages and producer diagnostics are not copied. Other selected sources continue. Cancellation, context closure, generation changes and byte/count limits remain fatal. The adapter bounds raw nodes at256KiB; Context bounds32 names,64 sessions,8KiB/source and16KiB total. Sources are read sequentially outside the lock and generation is checked after collection. Empty selection performs no reads. There is no polling, caching or retry.
 
@@ -151,7 +151,7 @@ The producer classifies its own complete node data; Assistant chooses Business f
 
 residentSnapshot() returns the last initialized committed Context without acquiring the transaction slot, restoring persistence or mutating state. Before initialization it returns nil; an in-flight commit leaves the previous committed value readable. Role State reads use their owning Agent’s residentContext() accessor; Agent start() performs the existing initialization through snapshot(). Operational snapshot()/transaction semantics remain unchanged, including validation, recovery and explicit persistence failure.
 
-ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. Photography and ApplicationControl select it explicitly; BasicInteraction remains unchanged. It contains no capture, media or Task authority.
+ui.windows reports windowID/title/content/mode/phase and focusedID from the UI owner. The Camera and Vision, ApplicationControl and BasicInteraction Skills select it explicitly. It contains no capture, media or Task authority.
 
 WebBrowsing/WebDrawing选择ui.web与ui.windows；ui.web 由生产者提供按窗口组织的页面类型与 URL，本地路径保持 unknown。Skill加载改变下一轮读取集合，新增来源无需修改角色路径清单。
 

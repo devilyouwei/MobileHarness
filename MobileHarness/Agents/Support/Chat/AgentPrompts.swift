@@ -59,7 +59,7 @@ public final class AgentPrompts: @unchecked Sendable {
         lock.withLock { cache[path] = nil }
     }
 
-    /// Simplified Chinese text kept beside an owner's English-only metadata file (`Agent.json`, `Skill.json`);
+    /// Simplified Chinese text kept beside an owner's structured metadata file;
     /// nil when the language is English or the owner has not translated the key.
     func translation(of path: String, _ key: String) throws -> String? {
         guard Self.language == "zh-Hans" else { return nil }

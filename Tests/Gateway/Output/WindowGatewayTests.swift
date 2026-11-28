@@ -62,27 +62,30 @@ private struct WindowToolsFixture: ToolModule { let definitions: [ActionBinding]
 @Test(.actionCatalog) func windowSkillsShareAliasesWithoutExpandingBasicInteraction() throws {
     let configuration = try AgentConfigurations.load(named: "Assistant")
     let shared = try AgentSkillLoader.registry(
-        ["photography", "application-control"], fixed: configuration.capabilities)
+        ["camera-and-vision", "application-control"], fixed: configuration.capabilities)
     #expect(shared.actions.filter { $0.path.description.hasPrefix("UI.Window.") }.count == 6)
     let base = try AgentSkillLoader.registry(["basic-interaction"], fixed: configuration.capabilities)
     #expect(!base.actions.contains { $0.path.description.hasPrefix("UI.Window.") })
 }
 
-@Test(.actionCatalog) func cameraIntentSkillsExposeSeparateVisionAndPhotoEntrypoints() throws {
+@Test(.actionCatalog) func cameraAndVisionSkillKeepsCaptureAndPerceptionIndependent() throws {
     let fixed = try AgentConfigurations.load(named: "Assistant").capabilities
-    let vision = try AgentSkillLoader.registry(["application-control"], fixed: fixed)
-    let photo = try AgentSkillLoader.registry(["photography"], fixed: fixed)
+    let application = try AgentSkillLoader.registry(["application-control"], fixed: fixed)
+    let camera = try AgentSkillLoader.registry(["camera-and-vision"], fixed: fixed)
     let base = try AgentSkillLoader.registry(["basic-interaction"], fixed: fixed)
     for (alias, function) in [
         ("Vision.open", "openVision"), ("Vision.close", "closeVision"),
         ("Vision.flip", "flipVision"), ("Vision.retry", "retryVision"),
     ] {
-        let action = try #require(vision.actions.first { $0.alias == alias })
+        let action = try #require(camera.actions.first { $0.alias == alias })
         #expect(action.path.description == "Camera.Perception.\(function)")
+        #expect(action.defaultChannel == "Vision")
     }
-    #expect(!vision.actions.contains { $0.path.description.hasPrefix("Camera.Capture.") })
-    #expect(!photo.actions.contains { $0.path.description.hasPrefix("Camera.Perception.") })
-    #expect(photo.actions.first { $0.alias == "openCamera" }?.path.description == "Camera.Capture.open")
-    #expect(photo.actions.first { $0.alias == "takePhoto" }?.path.description == "Camera.Capture.takePhoto")
+    let openCamera = try #require(camera.actions.first { $0.alias == "openCamera" })
+    #expect(openCamera.path.description == "Camera.Capture.open")
+    #expect(openCamera.defaultChannel == "Camera")
+    #expect(camera.actions.first { $0.alias == "takePhoto" }?.path.description == "Camera.Capture.takePhoto")
+    #expect(!application.actions.contains { $0.path.description.hasPrefix("Camera.") })
+    #expect(try AgentSkillLoader.useStates(["application-control"]) == ["ui.windows"])
     #expect(!base.actions.contains { $0.path.description.hasPrefix("Camera.") })
 }

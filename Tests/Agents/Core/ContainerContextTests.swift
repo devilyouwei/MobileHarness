@@ -17,6 +17,19 @@ private struct FailingContext: Encodable, Sendable {
     func encode(to encoder: any Encoder) throws { throw ContextFixtureFailure.encoding }
 }
 
+@Test @MainActor func writerLifecycleStateIsVisibleToCodeAndModelBeforeInstallAndAfterClose() async throws {
+    let writer = WriterContainer()
+    let context = AgentStateContext()
+    try AgentStateBindings.register(in: context) { _ in try await writer.stateSnapshot() }
+    try context.open(session: "state")
+    for phase in ["notInstalled", "stopped"] {
+        if phase == "stopped" { try await writer.stop() }
+        #expect(try await writer.stateSnapshot().business["lifecyclePhase"] == .text(phase))
+        let model = try await context.snapshot(session: "state", names: ["agents.writer"])
+        #expect(model.contains("\"lifecyclePhase\":\"" + phase + "\""))
+    }
+}
+
 @Test func reflexivitySevenSchemasPreserveTheSameWireContractAndExactCounters() throws {
     let snapshots: [any Encodable & Sendable] = [
         ActionsStateSnapshot(path: "actions", runtime: ["revision": .unsigned(.max)]),
@@ -137,7 +150,7 @@ private struct FailingContext: Encodable, Sendable {
     let reads = FixtureFactCell([String]())
     let expression = FixtureFactCell("smile")
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { path in
+    try AgentStateBindings.register(in: context) { path in
         reads.update { $0.append(path) }
         return AgentStateSnapshot(
             path: path,
@@ -167,7 +180,7 @@ private struct FailingContext: Encodable, Sendable {
 
 @Test func assistantStateBindingsPreserveUnknownAndDoNotTurnDiagnosticsIntoBusinessDamage() async throws {
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { path in
+    try AgentStateBindings.register(in: context) { path in
         AgentStateSnapshot(
             path: path, runtime: ["closed": .flag(true), "queue": .count(1)], health: .fault,
             issues: [.init(code: "cleanupFailure", impact: "diagnosticOnly")])
@@ -182,7 +195,7 @@ private struct FailingContext: Encodable, Sendable {
 @Test func assistantStateBindingsSelectParentAndChildIndependently() async throws {
     let reads = FixtureFactCell([String]())
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { path in
+    try AgentStateBindings.register(in: context) { path in
         reads.update { $0.append(path) }
         return AgentStateSnapshot(
             path: path, business: ["connected": .flag(true), "targetCounts": .object(["1": .count(1000)])],
@@ -198,7 +211,7 @@ private struct FailingContext: Encodable, Sendable {
 
 @Test func assistantStateBindingsIsolateReadFailuresAndRespectSourceSelection() async throws {
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { _ in throw ContextFixtureFailure.encoding }
+    try AgentStateBindings.register(in: context) { _ in throw ContextFixtureFailure.encoding }
     try context.open(session: "assistant")
     #expect(try await context.snapshot(session: "assistant", names: []) == "{}")
     #expect(try await context.snapshot(session: "assistant", names: ["actions.robot"]) == "{}")
@@ -348,7 +361,8 @@ private actor ContextReadBarrier {
             == (FixedPlatformState.sourceNames + [
                 "agents.applicationcontrol", "agents.writer", "ui.home.expression", "ui.navigation", "ui.windows",
             ]).sorted())
-    _ = try skills.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
+    _ = try skills.control(
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: "input", fixed: fixed)
     let names = try AgentSkillLoader.useStates(skills.loaded)
     #expect(
         names
@@ -356,9 +370,10 @@ private actor ContextReadBarrier {
                 "actions.camera", "actions.camera.preview", "agents.applicationcontrol", "agents.writer",
                 "platform.vision.camera", "ui.album",
                 "ui.camera", "ui.home.expression",
-                "ui.navigation", "ui.windows", "ui.island",
+                "ui.navigation", "ui.windows",
             ]).sorted())
-    _ = try skills.control("skill.unload", arguments: ["skills": "[\"photography\"]"], inputID: "input", fixed: fixed)
+    _ = try skills.control(
+        "skill.unload", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: "input", fixed: fixed)
     owner.camera.update { $0.running = true }
     #expect(
         try AgentSkillLoader.useStates(skills.loaded)
@@ -612,7 +627,7 @@ private actor ContextReadBarrier {
     let full = try await inspection.snapshot(path: "ui.home.expression")
     #expect(full.runtime["rendererAvailable"] == .flag(true))
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { path in try await inspection.snapshot(path: path) }
+    try AgentStateBindings.register(in: context) { path in try await inspection.snapshot(path: path) }
     try context.open(session: "decoupling")
     let assistant = try await context.snapshot(session: "decoupling", names: ["ui.home.expression"])
     #expect(assistant.contains("smile") && !assistant.contains("rendererAvailable"))
@@ -670,7 +685,7 @@ private func bundledStateSkillIDs() throws -> [String] {
             ]
         })
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { try await inspection.snapshot(path: $0) }
+    try AgentStateBindings.register(in: context) { try await inspection.snapshot(path: $0) }
     try context.open(session: "web-regression")
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     let base = try AgentConfigurations.baseSkills(named: "Assistant")
@@ -701,7 +716,7 @@ private func bundledStateSkillIDs() throws -> [String] {
 @Test func skillSelectedNewNodesNeedNoAssistantRegistrationAndFailuresAreIsolated() async throws {
     let context = AgentStateContext()
     let reads = FixtureFactCell([String]())
-    try AssistantStateBindings.register(in: context) { path in
+    try AgentStateBindings.register(in: context) { path in
         reads.update { $0.append(path) }
         if path == "fixture.missing" { throw ContextFixtureFailure.encoding }
         return AgentStateSnapshot(
@@ -735,7 +750,7 @@ private func bundledStateSkillIDs() throws -> [String] {
     let inspection = ApplicationStateInspection()
     try inspection.registerRoot("ui", readers: { try await ui.stateReaders() })
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { try await inspection.snapshot(path: $0) }
+    try AgentStateBindings.register(in: context) { try await inspection.snapshot(path: $0) }
     try context.open(session: "shared-window")
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     var skills = AgentTaskSkillState()

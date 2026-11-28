@@ -1,5 +1,7 @@
 # Storage — Cache / Database / Files
 
+[开发规范](AGENTS.md)
+
 ## Responsibilities and boundaries
 
 Storage provides temporary bytes, structured persistence and confined filesystem capabilities. App owns

@@ -1,5 +1,7 @@
 # Resources — Application Assets
 
+[开发规范](AGENTS.md)
+
 ## 职责与边界
 
 Resources 只保存 App 层随包资源：应用图标资产目录和隐私清单。模块资源跟随所属 SwiftPM target：[Agents/Resources](../Agents/Resources/README.md) 保存 Agent、Skill 与 Catalog 声明，[Actions/Resources](../Actions/Resources/README.md) 保存 Action 翻译。ModelKit 自带制品声明并负责获取、校验和安装；业务层负责模型选择。

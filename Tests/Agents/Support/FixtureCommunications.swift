@@ -85,7 +85,15 @@ extension AssistantChatWorker {
 extension SpeechPerceptionAgent {
     func bind(_ port: AgentMessaging) async throws { try await FixtureCommunicationStreams.bind(self, port: port) }
 }
-extension VisionPerceptionAgent {
+// Only isolated transport fixtures register the pose worker as a synthetic producer.
+extension PoseInferenceWorkflow: Agent {
+    public nonisolated var descriptor: AgentDescriptor {
+        AgentDescriptor(
+            category: .perception, id: .visionPerception, name: "Pose fixture", inputs: [],
+            outputs: [.communication, .control, .toolCall],
+            capabilities: try! Self.runtimeCapabilities())
+    }
+
     func bind(_ port: AgentMessaging) async throws { try await FixtureCommunicationStreams.bind(self, port: port) }
 }
 

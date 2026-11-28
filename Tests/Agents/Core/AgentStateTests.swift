@@ -27,7 +27,7 @@ private func schema() throws -> AgentStateSchema {
     #expect(listening.kind == .typed && listening.type == .bool && listening.access == .readWrite)
     #expect(listening.values.isEmpty && listening.trigger == "listening")
     #expect(schema.declarations["quiet"] == nil)
-    for name in ["Memory", "Writer", "Photographer", "ApplicationControl", "SpeechPerception", "VisionPerception"] {
+    for name in ["Memory", "Writer", "VisionPerception", "ApplicationControl", "SpeechPerception"] {
         #expect(try AgentConfigurations.stateSchema(named: name).declarations.isEmpty)
     }
 }

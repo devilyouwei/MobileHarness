@@ -1,5 +1,7 @@
 # UI — 呈现与人机交互
 
+[开发规范](AGENTS.md)
+
 ## 职责与边界
 
 UI是零项目模块依赖的基础模块。只接收UI自有值和注入的操作接口，拥有展示状态、原生渲染及交互回执，不拥有设备、模型、仓库或业务策略；不导入Actions、Agents、Gateway、PlatformKit、Storage或FactoryKit。

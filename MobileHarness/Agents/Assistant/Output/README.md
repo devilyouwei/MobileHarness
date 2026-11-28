@@ -15,8 +15,14 @@ Action terminal feedback is routed through one entry. It matches the owning roun
 | File | Responsibility |
 | --- | --- |
 | [AssistantChatEmission.swift](AssistantChatEmission.swift) | Output collection, Action and native Tool emission, playback, failures and runtime events. |
-| [AssistantChatFeedback.swift](AssistantChatFeedback.swift) | Round Action results, pending feedback acceptance and publication, observation text. |
+| [AssistantGenerationTransport.swift](AssistantGenerationTransport.swift) | Ordered output reader, bounded native execution slots and per-round seals. |
 | [AssistantSpeechOutput.swift](AssistantSpeechOutput.swift) | `AssistantSpeechProducing`, audio-handle production and synthesis/playback presentation. |
 
-Assistant sends pause and resume through `ActionControl` using the active `speak` execution ID from start feedback. It sets volume via the independent `Speech.Playback.setVolume` Tool Call. When voice suppression needs to resume playback, Assistant waits for the matching successful Tool completion before sending resume. Superseded completions cannot release the pause. Each newly registered playback instance applies the current speech energy from its session, including energy received before a reply starts. State changes and control receipts are separate from Action completion. Paused playback remains active for Decision and cancellation until the native terminal callback.
+The output reader admits all Tools into one pool of up to 128 concurrent calls and rejects overflow. Each Tool returns as soon as it completes. Round seals join only calls carrying that round ID. Independent calls participate in output-session shutdown and cancellation.
+
+Assistant sends pause and resume through `ActionControl` using the active `speak` execution ID from start feedback. It sends volume-only `Speech.Playback.setVolume` Tool Calls in emission order, including while idle. When voice suppression needs to resume playback, Assistant waits for the matching successful Tool completion before sending resume. Superseded completions cannot release the pause. Each newly registered playback instance applies the current speech energy from its session, including energy received before a reply starts. State changes and control receipts are separate from Action completion. Paused playback remains active for Decision and cancellation until the native terminal callback.
 | [SpeechPlaybackFailure.swift](SpeechPlaybackFailure.swift) | Playback failure value and its presentation. |
+
+[AssistantGenerationTransport.swift](AssistantGenerationTransport.swift) admits ordered generation output and seals round delivery. [AssistantToolReceipts.swift](AssistantToolReceipts.swift) correlates direct Tool replies with the source call.
+
+Matching terminal feedback immediately retires the instance used for pause and any pending resume, including when the generation is parked or the playback was independently scheduled.

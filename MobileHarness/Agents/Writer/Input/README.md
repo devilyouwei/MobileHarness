@@ -1,7 +1,3 @@
 # Writer input
 
-Naming of incoming requests.
-
-| File | Responsibility |
-| --- | --- |
-| [WriterRequestNaming.swift](WriterRequestNaming.swift) | Request title derivation. |
+[WriterTaskInbox.swift](WriterTaskInbox.swift) authenticates scoped task messages, records admission, deduplicates requests, and drains the bounded inbox into the task workflow.

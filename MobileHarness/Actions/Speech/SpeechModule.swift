@@ -22,7 +22,7 @@ public struct SpeechModule: CapabilityModule {
             }).supportingControls([.pause, .resume, .cancel]),
             SpeechActions.setVolumeDefinition(handler: { [playback] invocation in
                 try await SpeechActions.setVolume(invocation: invocation) {
-                    try await playback.setVolume($0, executionID: $1, invocation: $2)
+                    await playback.setVolume($0)
                 }
             }),
             SpeechActions.startListeningDefinition(handler: { [listening] invocation in

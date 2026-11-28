@@ -799,7 +799,7 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
                     try Task.checkCancellation()
                 }
                 await log.append("\(invocation.context.source):end")
-                if invocation.context.source == "photographer" { await childFinished.open() }
+                if invocation.context.source == "visionPerception" { await childFinished.open() }
             }
         ]))
     let session = UUID().uuidString
@@ -807,15 +807,15 @@ private func boundary(_ directive: SchedulingDirective, _ input: AgentInput) -> 
     let child = AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("child"))
     try await scheduler.enqueue(invocation: actionInvocation("parent", input: parent, source: .assistant))
     await started.wait()
-    try await scheduler.enqueue(invocation: actionInvocation("child", input: child, source: .photographer))
+    try await scheduler.enqueue(invocation: actionInvocation("child", input: child, source: .visionPerception))
     await childFinished.wait()
-    #expect(await log.values == ["assistant:start", "photographer:start", "photographer:end"])
+    #expect(await log.values == ["assistant:start", "visionPerception:start", "visionPerception:end"])
     let parentFinish = Task { try await scheduler.finish(scope: .input(parent.id), source: .assistant) }
-    let childFinish = Task { try await scheduler.finish(scope: .input(child.id), source: .photographer) }
+    let childFinish = Task { try await scheduler.finish(scope: .input(child.id), source: .visionPerception) }
     await release.open()
     try await parentFinish.value
     try await childFinish.value
-    #expect(await log.values == ["assistant:start", "photographer:start", "photographer:end", "assistant:end"])
+    #expect(await log.values == ["assistant:start", "visionPerception:start", "visionPerception:end", "assistant:end"])
     await scheduler.shutdown()
 }
 

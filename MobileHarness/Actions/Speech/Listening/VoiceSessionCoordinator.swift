@@ -857,28 +857,12 @@ public enum VoiceReplyCancellation {
             traceListening("resume.committed")
             runtime.endpoints.presentation.homeEffects.replyDidFinish()
         }
-        private struct ActiveSpeechPlayback {
-            let invocation: any FunctionInput
-            let control: SpeechPlaybackControl
-            var volumeSequence: UInt64?
-        }
+        private var targetPlaybackVolume: Double = 1
+        private var activeSpeechPlayback: SpeechPlaybackControl?
 
-        private var activeSpeechPlayback: ActiveSpeechPlayback?
-
-        public func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) throws {
-            try Task.checkCancellation()
-            guard let active = activeSpeechPlayback, acceptsPlayback(active.invocation.context),
-                executionID == nil || executionID?.uuidString == active.invocation.executionID
-            else { throw ActionHostError.scopeClosed }
-            guard let owner = invocation.executionOwner, owner == active.invocation.executionOwner else {
-                throw ActionHostError.unauthorized
-            }
-            if let lastSequence = active.volumeSequence, invocation.context.sequence <= lastSequence {
-                // A newer gain has already reached the same playback.
-                throw CancellationError()
-            }
-            try active.control.setVolume(volume)
-            activeSpeechPlayback?.volumeSequence = invocation.context.sequence
+        public func setVolume(_ volume: Double) {
+            targetPlaybackVolume = volume
+            activeSpeechPlayback?.setVolume(volume)
         }
 
         public func play(audioID: String, invocation: any FunctionInput) async throws {
@@ -905,7 +889,8 @@ public enum VoiceReplyCancellation {
                 guard acceptsPlayback(invocation.context), !videoAudioHeld else { throw CancellationError() }
                 guard activeSpeechPlayback == nil else { throw AudioIOError.busy }
                 let playbackControl = SpeechPlaybackControl()
-                activeSpeechPlayback = .init(invocation: invocation, control: playbackControl)
+                playbackControl.setVolume(targetPlaybackVolume)
+                activeSpeechPlayback = playbackControl
                 defer {
                     activeSpeechPlayback = nil
                     playbackControl.audioControl.close()

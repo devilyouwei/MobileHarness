@@ -38,7 +38,7 @@ import StorageFiles
         @ObservationIgnored private let modelArtifacts: any ModelArtifactsManaging
         private func makeStateContext() throws -> AgentStateContext {
             let context = AgentStateContext()
-            try AssistantStateBindings.register(in: context) { [weak self] path in
+            try AgentStateBindings.register(in: context) { [weak self] path in
                 guard let self else { throw ContainerContextError.closed }
                 return try await self.readState(path)
             }
@@ -61,7 +61,7 @@ import StorageFiles
                 } ?? [],
                 children: [
                     .init(path: "agents.assistant"), .init(path: "agents.applicationcontrol"),
-                    .init(path: "agents.writer"), .init(path: "agents.memory"), .init(path: "agents.photographer"),
+                    .init(path: "agents.writer"), .init(path: "agents.memory"),
                     .init(path: "agents.speechperception"),
                     .init(path: "agents.visionperception"),
                 ])
@@ -75,7 +75,6 @@ import StorageFiles
                 },
                 "agents.writer": AgentStateSnapshot.reader(of: writer) { try await $0.stateSnapshot() },
                 "agents.memory": AgentStateSnapshot.reader(of: memory) { try await $0.stateSnapshot() },
-                "agents.photographer": AgentStateSnapshot.reader(of: photographer) { try await $0.stateSnapshot() },
                 "agents.speechperception": AgentStateSnapshot.reader(of: speechPerception) {
                     try await $0.stateSnapshot()
                 },
@@ -124,7 +123,7 @@ import StorageFiles
                 settings: settings, resources: modelResources, diagnostics: diagnostics,
                 devices: devices, navigation: navigation, facades: facades, failures: containerFailures)
             memory = MemoryContainer(history: history, facades: facades)
-            photographer = PhotographerContainer(camera: cameraUI, facades: facades)
+            visionPerception = VisionPerceptionContainer(camera: cameraUI, facades: facades)
             homeUI = home
             self.runtimeLog = runtimeLog
             settingsUI = settings
@@ -154,9 +153,8 @@ import StorageFiles
         public let applicationControl: ApplicationControlContainer
         public let writer = WriterContainer()
         public let memory: MemoryContainer
-        public let photographer: PhotographerContainer
+        public let visionPerception: VisionPerceptionContainer
         public let speechPerception: SpeechPerceptionContainer
-        public let visionPerception = VisionPerceptionContainer()
         @ObservationIgnored private lazy var lifecycle = AgentContainerLifecycle(
             start: { [unowned self] in try await self.startServices() },
             invalidate: { [unowned self] in self.invalidateServices() },
@@ -178,8 +176,8 @@ import StorageFiles
             guard !isolatedPresentation else { return }
             reportEnvironment(.scene, value: value ? "active" : "background")
             if !value {
-                visionPerception.invalidate()
-                try await visionPerception.suspend()
+                visionPerception.capture.invalidate()
+                try await visionPerception.capture.suspend()
             }
         }
 
@@ -210,7 +208,7 @@ import StorageFiles
         ) async throws {
             do {
                 try lifecycle.requireAvailable()
-                try await visionPerception.run(
+                try await visionPerception.capture.run(
                     runtime: runtime(), pose: visionModels, camera: cameraDevice,
                     sessionID: sessionID, mirrored: mirrored, status: status)
             } catch is CancellationError { throw CancellationError() } catch {
@@ -309,7 +307,7 @@ import StorageFiles
                 maintenance: maintenance,
                 containerFailures: containerFailures, home: homeUI, log: runtimeLog,
                 assistantContainer: assistant, applicationControlContainer: applicationControl,
-                memoryContainer: memory, photographerContainer: photographer, writerContainer: writer,
+                memoryContainer: memory, visionContainer: visionPerception, writerContainer: writer,
                 stateContext: try makeStateContext(), cache: cacheStorage,
                 repositories: try repositories(),
                 cameraUI: cameraUI, albumUI: albumUI, windowsUI: windows, settingsUI: settingsUI,
@@ -430,7 +428,7 @@ import StorageFiles
             let runtime = try runtime()
             try await runtime.output.bindCommunications(try repositories().agentMessages)
             try await applicationControl.start()
-            try await photographer.start()
+            try await visionPerception.start()
             try await memory.start()
             try await writer.start()
             try await assistant.start()
@@ -458,13 +456,13 @@ import StorageFiles
             _ = await preparation?.result
             var cleanupErrors: [any Error] = []
             do { try await speechPerception.stop() } catch { cleanupErrors.append(error) }
-            do { try await visionPerception.stop() } catch { cleanupErrors.append(error) }
+            do { try await visionPerception.capture.stop() } catch { cleanupErrors.append(error) }
             if !cleanupErrors.isEmpty { throw NativeCleanupFailure(errors: cleanupErrors) }
         }
         private func stopAgents() async throws {
             var errors: [any Error] = []
             do { try await assistant.stop() } catch { errors.append(error) }
-            do { try await photographer.stop() } catch { errors.append(error) }
+            do { try await visionPerception.stop() } catch { errors.append(error) }
             do { try await writer.stop() } catch { errors.append(error) }
             do { try await memory.stop() } catch { errors.append(error) }
             do { try await applicationControl.stop() } catch { errors.append(error) }
@@ -483,22 +481,22 @@ import StorageFiles
             assistant.setInputAvailable(value && !assistantModelChangeHeld)
             applicationControl.setInputAvailable(value)
             memory.setInputAvailable(value)
-            photographer.setInputAvailable(value)
+            visionPerception.setInputAvailable(value)
             speechPerception.setInputAvailable(value)
         }
         private func invalidateServices() {
             preparation?.cancel()
             setInputAvailable(false)
             invalidateNative()
-            visionPerception.invalidate()
+            visionPerception.capture.invalidate()
         }
         private func applyForeground(_ value: Bool) async throws {
             if !value {
                 var errors: [any Error] = []
                 await speechPerception.suspend()
-                do { try await visionPerception.suspend() } catch { errors.append(error) }
+                do { try await visionPerception.capture.suspend() } catch { errors.append(error) }
                 do { try await applicationControl.setForeground(false) } catch { errors.append(error) }
-                do { try await photographer.setForeground(false) } catch { errors.append(error) }
+                do { try await visionPerception.setForeground(false) } catch { errors.append(error) }
                 do { try await writer.setForeground(false) } catch { errors.append(error) }
                 do { try await memory.setForeground(false) } catch { errors.append(error) }
                 do { try await assistant.setForeground(false) } catch { errors.append(error) }
@@ -510,7 +508,7 @@ import StorageFiles
                 return
             }
             try await applicationControl.setForeground(true)
-            try await photographer.setForeground(true)
+            try await visionPerception.setForeground(true)
             try await memory.setForeground(true)
             try await writer.setForeground(true)
             try await assistant.setForeground(true)

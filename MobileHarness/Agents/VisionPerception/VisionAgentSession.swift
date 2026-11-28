@@ -66,30 +66,28 @@ public enum VisionPipelineWorkflow {
         let runtime: AgentRuntime
         let pose: any PoseCapability
         let camera: any CameraFrameObserving
-        /// Assemble the role and its protected output; VisionPerception owns its native subscription.
+        /// Start one capture generation using the resident role’s bound output port.
         func run(
             sessionID: String, mirrored: Bool,
             status: @escaping @MainActor @Sendable (String?, String) -> Void
         ) async throws {
-            let vision = try VisionPerceptionAgent(
+            let session = runtime.visionSession
+            let vision = try PoseInferenceWorkflow(
                 pose: pose, sessionID: sessionID, cameraInput: camera, mirroredGaze: mirrored,
-                context: runtime.visionContext())
-            try await runtime.manager.register(vision, sessionID: sessionID)
-            var tracking = false
-            var registered = true
+                track: { pose, input in
+                    await session.track(pose, input: input)
+                }, context: runtime.visionContext())
+            try await session.attachTracking(sessionID: sessionID)
             do {
-                try await runtime.photographerSession.attachTracking(sessionID: sessionID)
-                tracking = true
-                try await runtime.manager.start(.visionPerception)
-                let consumer = try await runtime.output.consumer(for: vision)
-
+                let consumer = try await session.boundConsumer()
+                try await vision.start()
                 try await VisionPipelineWorkflow.run(
                     input: { try await vision.waitForInput() },
                     inputFailed: { error in await vision.failInput(error) },
                     output: {
                         try await IndependentOutputWorkflow.consumeSignals(
-                            vision.outputs, contracts: AgentContracts.communication,
-                            replacementKey: { VisionPerceptionAgent.outputReplacementKey($0.output) },
+                            vision.outputs, publicationChannels: session.agent.descriptor.publicationChannels,
+                            replacementKey: { PoseInferenceWorkflow.outputReplacementKey($0.output) },
                             onMediaExpired: { envelope in
                                 await vision.presentationFinished(
                                     failure: "Pose media expired before presentation; sequence=\(envelope.sequence)")
@@ -125,30 +123,18 @@ public enum VisionPipelineWorkflow {
                     monitor: {
                         try await self.monitorVision(vision, status: status, runtime: runtime, sessionID: sessionID)
                     })
-                if tracking { await runtime.photographerSession.detachTracking(sessionID: sessionID) }
-                try await runtime.manager.remove(.visionPerception)
-                registered = false
-                await runtime.output.cancel(sessionID: sessionID)
                 try Task.checkCancellation()
             } catch {
-                if tracking { await runtime.photographerSession.detachTracking(sessionID: sessionID) }
-                let primary = error
-                var cleanup: [any Error] = []
-                if registered {
-                    do { try await runtime.manager.remove(.visionPerception) } catch { cleanup.append(error) }
-                }
-                await runtime.output.cancel(sessionID: sessionID)
-                if !cleanup.isEmpty {
-                    throw AgentFailure(
-                        component: "visionPerception", operation: "session", underlying: primary,
-                        cleanupErrors: cleanup)
-                }
-                throw primary
+                await vision.stop()
+                await session.detachTracking(sessionID: sessionID)
+                throw error
             }
+            await vision.stop()
+            await session.detachTracking(sessionID: sessionID)
         }
 
         private func monitorVision(
-            _ vision: VisionPerceptionAgent, status: @escaping @MainActor @Sendable (String?, String) -> Void,
+            _ vision: PoseInferenceWorkflow, status: @escaping @MainActor @Sendable (String?, String) -> Void,
             runtime: AgentRuntime, sessionID: String
         ) async throws {
             var reported: String?

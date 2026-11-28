@@ -24,7 +24,9 @@ public struct AgentConfiguration: Sendable {
             requests: communication.requests.filter(allowed.contains),
             feedback: communication.feedback.filter(allowed.contains),
             publications: communication.publications.filter { allowed.contains($0.protocol) },
-            subscriptions: communication.subscriptions.filter { allowed.contains($0.protocol) })
+            subscriptions: communication.subscriptions.filter { allowed.contains($0.protocol) },
+            sendChannels: communication.sendChannels.filter { allowed.contains($0.key) },
+            eventChannels: communication.eventChannels.filter { allowed.contains($0.key) })
         try declaration.validate(contracts: contracts)
         return AgentConfiguration(
             version: version, communication: declaration, agentID: agentID, category: category,
@@ -50,19 +52,30 @@ public struct AgentConfiguration: Sendable {
         }
         // Scheduling registration is optional: absent means no scheduling Action is registered.
         let hasScheduling = (raw as? [String: Any])?.keys.contains("scheduling") == true
+        var keys = Self.rootKeys
+        if (raw as? [String: Any])?["version"] as? Int == 10 {
+            keys.remove("signals")
+            keys.formUnion(["channels", "feedback"])
+        }
         let root = try Self.dictionary(
-            raw, keys: hasScheduling ? Self.rootKeys : Self.rootKeys.subtracting(["scheduling"]), field: "root")
+            raw, keys: hasScheduling ? keys : keys.subtracting(["scheduling"]), field: "root")
         let decoded: Document
         do { decoded = try JSONDecoder().decode(Document.self, from: data) } catch {
             throw AgentConfigurationError.invalidFormat
         }
-        guard decoded.version == 9 else {
+        guard decoded.version == 9 || decoded.version == 10 else {
             throw AgentConfigurationError.unsupportedVersion(decoded.version)
         }
         version = decoded.version
         category = decoded.category
-        try decoded.signals.validate(contracts: contracts, agentID: .init(rawValue: decoded.id))
-        communication = decoded.signals
+        if let channels = decoded.channels, let feedback = decoded.feedback {
+            communication = try .init(channels: channels, feedback: feedback, contracts: contracts)
+        } else if let legacy = decoded.signals {
+            communication = legacy
+        } else {
+            throw AgentConfigurationError.invalidFormat
+        }
+        try communication.validate(contracts: contracts, agentID: .init(rawValue: decoded.id))
         guard let scheduling = (root["scheduling"] ?? [String]()) as? [String], Set(scheduling).isSubset(of: ["wait"]),
             scheduling.count <= 1
         else { throw AgentConfigurationError.invalidField("scheduling") }
@@ -194,7 +207,9 @@ public struct AgentConfiguration: Sendable {
     }
 
     private struct Document: Decodable {
-        let signals: CommunicationDeclaration
+        let feedback: [String]?
+        let channels: [String: AgentChannelBinding]?
+        let signals: CommunicationDeclaration?
         let version: Int
         let id: String
         let category: AgentCategory

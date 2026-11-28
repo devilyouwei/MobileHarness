@@ -92,7 +92,7 @@ extension AssistantChatWorker {
                     || (input.metadata.origin == .local && input.metadata.source == "runtime"),
                 input.metadata.origin == .local
                     || communicationPolicy.subscriptions.contains(where: {
-                        $0.channel == "agent.interruption" && $0.protocol == AssistantInterrupt.contract
+                        $0.protocol == AssistantInterrupt.contract
                             && $0.sources.contains(input.metadata.source)
                             && input.metadata.incarnation != nil && input.metadata.topic == $0.channel
                     }),
@@ -112,7 +112,7 @@ extension AssistantChatWorker {
             guard State.agentID == .assistant, input.metadata.origin == .agent,
                 input.metadata.incarnation != nil,
                 communicationPolicy.subscriptions.contains(where: {
-                    $0.channel == SpeechActivity.channel && $0.protocol == SpeechActivity.contract
+                    $0.protocol == SpeechActivity.contract
                         && $0.sources.contains(input.metadata.source) && input.metadata.topic == $0.channel
                 }),
                 let activity = message.content(as: SpeechActivity.self)
@@ -128,7 +128,7 @@ extension AssistantChatWorker {
         if case .observation(let message) = input.payload, message.contract == SpeechKeywordMatch.contract {
             guard State.agentID == .assistant, input.metadata.origin == .agent, input.metadata.incarnation != nil,
                 communicationPolicy.subscriptions.contains(where: {
-                    $0.channel == SpeechKeywordMatch.channel && $0.protocol == SpeechKeywordMatch.contract
+                    $0.protocol == SpeechKeywordMatch.contract
                         && $0.sources.contains(input.metadata.source) && input.metadata.topic == $0.channel
                 }),
                 let match = message.content(as: SpeechKeywordMatch.self)

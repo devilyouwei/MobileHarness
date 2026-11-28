@@ -2,6 +2,14 @@
 
 确认方案见 [统一 Action 回报与打断等待](https://chatgpt.com/space/page_d7804d5c963881919c9567e8e4c2cb3e)。
 
+## 调用方选择 Action 或 Tool（2026-11-28）
+
+应用装配将每个已安装的业务 Action 同时投影为 ActionCall 和 ToolCall，引用同一个实现、参数校验、资源规则和执行预算。移除 `BehaviorProtocolBindings.swift` 按路径决定协议的分支，保留已有 Tool 回执策略供现有消费路径使用。两份协议投影共用 canonical 目录容量，直达执行的在途容量仍由 Shell 独立管理。
+
+调用方通过请求类型选择执行方式。ActionCall 进入 Shell 的 Channel 队列并服从 wait 与既有顺序规则。ToolCall 到达后独立发起执行，共享资源准入与取消清理；需要串行的调用方等待前一个 Tool 完成再提交下一个。业务声明、角色授权与调度各自独立。灵动岛继续由角色内部授权使用，Skill 目录不声明其调用。Assistant 的 XML 和 Writer 的原生 Tool 继续走各自请求路径。
+
+在 Actions 目录与 Shell 技术文档、Agents 的授权说明和总体设计同步该契约。测试核对全部已装配路径同时可经两个协议调用，并通过实际 Shell 验证同一函数的 Action 同 Channel 有序、无资源冲突的 Tool 独立并发。按工程入口执行全量检查、定向 Swift 回归及 iOS 模拟器构建。
+
 ## Vision 会话与执行请求隔离
 
 相机打开、重试或切换经 Actions 启动长期视觉会话。相机启动请求和视觉输出各自发起调用，但 Swift `Task` 会将启动请求的 Gateway 请求链继承给视觉会话，导致同一执行端点上的 `UI.Pose.showPose` 和 `UI.Gaze.moveEyes` 报 `cyclicRequest`，启动请求返回后仍会重现。
@@ -204,3 +212,7 @@ Actions 共享契约定义 `CallResultSignal`，承载调度账本的 `Execution
 ### 灵动岛发布与来源请求隔离
 
 语音采集状态可在 Actions 请求回调内提交灵动岛更新。Agents Support 的 `AgentIslandPublication` 启动独立发送任务时隔离调用方的任务局部值，避免继承 Gateway 当前请求链。保留发布任务的单工作者、最新待发项、失败重试节奏、取消和停止回收。Gateway 保留对真正嵌套循环的拦截。更新 Agents Support 的发布生命周期说明，使用真实 Gateway 验证更新可独立发往同一端点，并回归真正的循环请求仍被拒绝。
+
+## Assistant 等待动画
+
+模型回复开始、字幕和语音保留经调度的 Action Call，并在角色能力声明处以英文说明。仅等待模型输出的 UI.Expression.setReplyWaiting 使用独立 Tool，等待开关按同一模型请求身份配对，回执不驱动推理。呈现端按请求身份及原始序列处理等待 Tool 和回复开始 Action 的交错到达。更新 Assistant 的授权和等待动画回归。

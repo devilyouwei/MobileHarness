@@ -81,7 +81,7 @@ flowchart LR
 
 ## 5. Writer 与 Assistant 的 Skills
 
-首版拟由 App 随包提供两份角色专用 Skill。Action 包保存脚本、参数契约和用户可见说明；已安装 Action 的运行声明由宿主校验并按需投影。沿用当前 Skill 资源的职责，静态教学和依赖由 Skill 维护，动态的用户 Action 由运行时目录提供。导入 Action 包时其中的文字按数据处理，安装也不会注册新的 Skill 资源。[Skill 配置与撰写规范](../../MobileHarness/Agents/Resources/Skills/README.md)
+首版拟由 App 随包提供两份角色专用 Skill。Action 包保存脚本、参数契约和用户可见说明；已安装 Action 的运行声明由宿主校验并按需投影。沿用当前 Skill 资源的职责，静态教学和依赖由 Skill 维护，动态的用户 Action 由运行时目录提供。导入 Action 包时其中的文字按数据处理，安装也不会注册新的 Skill 资源。[Skill 配置与撰写规范](../../MobileHarness/Agents/Resources/SkillAuthoring.md)
 
 ### Writer · 编写 Action
 

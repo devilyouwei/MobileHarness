@@ -1,5 +1,7 @@
 # ModelKit — Independent Inference SDK
 
+[开发规范](AGENTS.md)
+
 ## Purpose and boundaries
 
 ModelKit supplies typed Language/Speech/Vision inference, model execution and model/artifact lifecycle. Core owns neutral values and concurrency mechanisms; capability domains own request/result contracts; concrete providers own algorithms and native integration; Management owns registration, residency, artifacts and default assembly.

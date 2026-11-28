@@ -136,3 +136,11 @@ Also verify metadata/cancellation at exact motor reads and retain all existing s
 Re-audit refinement before UI/Assistant edits: ui.navigation.operation is a stale reflection field from the removed album aggregation. NavigationState has no owned operation value; contextSnapshot() without album always supplies nil. Remove the redundant field from the navigation State projection and its Assistant field selection. Preserve NavigationState.contextSnapshot(album:) for actual UI composition and ui.album.operation as the independently selected authoritative State. Do not change Skill paths, page operation execution, navigation confirmation or album behavior. Extend the existing local-navigation regression and reconcile UI/Assistant READMEs. Final checks/builds must include this cleanup.
 
 本轮生产/消费解耦复查完成：32 个具体 Container 与公开逻辑/后端/动态节点已逐项核对；修正语音后端偏好分类、Storage 生命周期故障摘要、权限读取错误吞没、Audio 作用域调试编码，以及导航遗留的相册 operation 字段/消费映射。已补分类、故障、枚举、生产端不受 Assistant 选择影响和本节点归属回归；最终完整检查 923/225 集成用例及四个模拟器构建通过。源状态语义仍归领域所有者，消费策略留在调用方；类型化操作和效果时安全校验保持原职责。完整清单、证据与未执行设备/模型验收见验证记录 Producer/consumer decoupling re-audit 章节。
+
+## 容器 State 的两种读取方式
+
+State 是容器可选的只读能力。实现该能力的容器按业务公开自己的内部变量。直接使用者通过注入的容器或读取接口取快照。模型请求由 Agents 共用层根据当前 Skill.useStates 选择具体路径，将同一快照的 Business 字段及现有媒体来源转换为 CURRENT STATE。将 Assistant 目录中的业务快照适配移至 Support/Context，将 Skill 状态采集与模型展示组装集中到 Support/Chat。Assistant 继续负责自己的任务上下文和消息顺序。沿用各模块独立的快照类型、读取接口、恢复逻辑和现有模型输入范围。
+
+## 六个 Agent 的生命周期 State
+
+六个角色容器在各自快照的 Business 中公开只读 lifecyclePhase，取实际角色的 AgentLifecycle。无角色实例时，开放容器显示 notInstalled，已关闭容器显示 stopped。保留已有运行诊断与角色自己的业务阶段。Assistant 的变量释义按实际 Business 字段提供，使其快照通过统一读取校验。验证直接容器读取及 Skill 上下文投影。

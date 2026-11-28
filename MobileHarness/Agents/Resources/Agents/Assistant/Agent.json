@@ -1,8 +1,7 @@
 {
-  "version": 12,
+  "version": 14,
   "category": "cognition",
   "id": "assistant",
-  "description": "I handle user conversation, understand goals, coordinate available capabilities and report actual results clearly. I own my foreground goals and respect other Agents' private contexts.",
   "skills": [
     "basic-interaction"
   ],
@@ -24,62 +23,63 @@
       "trigger": "listening"
     }
   ],
-  "signals": {
-    "requests": [],
-    "feedback": [
-      "action.execution.event.v1",
-      "action.result.v1",
-      "tool.result.v1",
-      "action.control.result.v1"
-    ],
-    "publications": [
-      {
-        "channel": "agent.task",
-        "protocol": "agent.task.events.v1"
-      }
-    ],
-    "subscriptions": [
-      {
-        "channel": "user.input.speech",
-        "protocol": "user.input.speech.v1",
-        "sources": [
-          "speechPerception"
-        ],
-        "events": [
-          "final"
-        ]
-      },
-      {
-        "channel": "perception.speech.activity",
-        "protocol": "perception.speech.activity.v1",
-        "sources": [
-          "speechPerception"
-        ]
-      },
-      {
-        "channel": "perception.speech.keyword",
-        "protocol": "perception.speech.keyword.v1",
-        "sources": [
-          "speechPerception"
-        ],
-        "events": [
-          "keywordMatched"
-        ]
-      },
-      {
-        "channel": "agent.interruption",
-        "protocol": "agent.interruption.v1",
-        "sources": [
-          "applicationControl"
-        ]
-      },
-      {
-        "channel": "agent.task",
-        "protocol": "agent.task.events.v1",
-        "sources": [
-          "writer"
-        ]
-      }
-    ]
-  }
+  "channels": {
+    "agent.task.v1": {
+      "type": "send",
+      "name": "agent.request"
+    },
+    "agent.task.events.v1": {
+      "type": "pubSub",
+      "name": "agent.task",
+      "publish": true,
+      "sources": [
+        "writer"
+      ]
+    },
+    "user.input.speech.v1": {
+      "type": "pubSub",
+      "name": "user.input.speech",
+      "sources": [
+        "speechPerception"
+      ],
+      "events": [
+        "final"
+      ]
+    },
+    "perception.speech.activity.v1": {
+      "type": "pubSub",
+      "name": "perception.speech.activity",
+      "sources": [
+        "speechPerception"
+      ]
+    },
+    "perception.speech.keyword.v1": {
+      "type": "pubSub",
+      "name": "perception.speech.keyword",
+      "sources": [
+        "speechPerception"
+      ],
+      "events": [
+        "keywordMatched"
+      ]
+    },
+    "agent.interruption.v1": {
+      "type": "pubSub",
+      "name": "agent.interruption",
+      "sources": [
+        "applicationControl"
+      ]
+    },
+    "runtime.delivery.v1": {
+      "type": "send",
+      "name": "runtime.agent",
+      "receive": true
+    }
+  },
+  "feedback": [
+    "action.execution.event.v1",
+    "action.result.v1",
+    "tool.result.v1",
+    "action.control.result.v1"
+  ]
 }

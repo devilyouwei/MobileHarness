@@ -17,7 +17,7 @@
 | 内容 | 位置 |
 | --- | --- |
 | Trigger 注册层（处理器、不重入、失败不发布、模型与宿主同一写入入口）、`task` 迁为首个处理器 | [Support/Context](../../../MobileHarness/Agents/Support/Context/README.md#agent-state-variables) |
-| `listening` 声明（typed enum、readWrite）与教学说明（Agent.json、Agent.zh-Hans.json） | [Agents/Resources/Agents](../../../MobileHarness/Agents/Resources/Agents/README.md) |
+| `listening` 声明（typed enum、readWrite）与教学说明（Agent.json、Agent.zh-Hans.json） | [Agents/Resources/Agents](../../../MobileHarness/Agents/Resources/AgentAuthoring.md) |
 | 三种模式、`full` 的拒绝与回退、`quiet` 路由、退出判定通道、会话结束复位 | [Assistant input](../../../MobileHarness/Agents/Assistant/Input/README.md#listening-and-quiet)（判断归 Assistant，见 [Signal 化](Assistant-Listening-Signals.md)） |
 | 感知角色对模式的采纳、灵动岛状态 | [SpeechPerception](../../../MobileHarness/Agents/SpeechPerception/README.md#聆听模式-listening) |
 | `quiet` 下同伴报告写入对话但不播报、不作为输入 | [Assistant](../../../MobileHarness/Agents/Assistant/README.md) |

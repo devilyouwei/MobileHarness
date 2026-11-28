@@ -108,15 +108,16 @@ private func contractDefinition(
 
 @Test(.actionCatalog) func assembledAgentCatalogsIncludeInternalActionsForStartupValidation() throws {
     let assistant = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
-    let speech = try SpeechPerceptionAgent.runtimeCapabilities(
-        AgentConfigurations.load(named: "SpeechPerception").capabilities)
-    let vision = try VisionPerceptionAgent.runtimeCapabilities(
-        AgentConfigurations.load(named: "VisionPerception").capabilities)
+    let speech = try SpeechPerceptionAgent.runtimeCapabilities()
+    let vision = try VisionPerceptionAgent.runtimeCapabilities()
     let catalogs = [assistant, speech, vision]
     let paths = Set(catalogs.flatMap { $0.actions.map(\.path) + $0.internalActions.map(\.path) })
     #expect(paths.contains(ActionPath(domain: "Speech", module: "Playback", function: "speak")))
     #expect(!paths.contains(ActionPath(domain: "UI", module: "Gaze", function: "moveEyes")))
-    #expect(vision.internalTools.contains { $0.path == "UI.Gaze.moveEyes" })
+    let visualTools = Set(vision.internalTools.map(\.path))
+    #expect(
+        ["UI.Gaze.moveEyes", "UI.Pose.showPose", "Camera.Album.perform", "NexArm.Tracking.aim"].allSatisfy(
+            visualTools.contains))
     let registry = try ActionRegistry(definitions: paths.map { contractDefinition(path: $0) })
     for catalog in catalogs { try registry.validate(capabilities: catalog) }
 }

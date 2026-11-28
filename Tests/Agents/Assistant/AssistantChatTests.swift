@@ -654,7 +654,7 @@ func closingSessionStopsExecutionAndKeepsRunningOrWaitingForegroundTask(_ runnin
     try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
     try skills.beginDecision(original.id, sessionID: session)
     _ = try skills.control(
-        "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: original.id, fixed: fixed)
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: original.id, fixed: fixed)
     try skills.beginTask(
         goal: "拍照并等待选择", taskID: try fixtureTaskID(), sessionID: session, inputID: original.id)
     if !running { try skills.decisionCompleted(inputID: original.id) }
@@ -677,7 +677,7 @@ func closingSessionStopsExecutionAndKeepsRunningOrWaitingForegroundTask(_ runnin
     #expect(state.tasks.last?.status == "waitingUser")
     #expect(state.tasks.last?.failure == nil)
     // Skills are session-scoped recent state, independent of the goal that stays set.
-    #expect(!state.loaded.contains("photography"))
+    #expect(!state.loaded.contains("camera-and-vision"))
     try await agent.receive(.init(id: UUID().uuidString, sessionID: session, payload: .text("hello again")))
     var outputs = FixtureGenerationOutputs(agent: agent).makeAsyncIterator()
     while let output = try await outputs.next() {
@@ -701,11 +701,11 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     try skills.beginDecision(original.id, sessionID: session)
     if mode == "recent" {
         _ = try skills.control(
-            "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: original.id, fixed: fixed)
+            "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: original.id, fixed: fixed)
         try skills.decisionCompleted(inputID: original.id)
     } else {
         _ = try skills.control(
-            "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: original.id, fixed: fixed)
+            "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: original.id, fixed: fixed)
         try skills.beginTask(
             goal: "拍照并等待选择", taskID: try fixtureTaskID(), sessionID: session, inputID: original.id)
         if mode == "waiting" { try skills.decisionCompleted(inputID: original.id) }
@@ -735,10 +735,10 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     #expect(retained.decisions.isEmpty)
     #expect(retained.events.filter { $0.operation == "release" }.isEmpty)
     if mode == "recent" {
-        #expect(retained.recentSkills["photography"]?.remainingDecisions == 5)
+        #expect(retained.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     } else {
         #expect(retained.tasks.last?.status == "waitingUser")
-        #expect(retained.recentSkills["photography"]?.remainingDecisions == 5)
+        #expect(retained.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
         #expect(retained.tasks.last?.goal == "拍照并等待选择")
         #expect(retained.tasks.last?.failure == nil)
     }
@@ -754,9 +754,9 @@ func executionInterruptionPreservesConversationSkillsGoalAndPublicScope(control:
     let request = try #require(await model.requests.last)
     #expect(request.messages[0].content.contains("Action closeCamera:"))
     let continued = try #require(try await repository.snapshot().state.skillState)
-    #expect(continued.recentSkills["photography"]?.remainingDecisions == 4)
+    #expect(continued.recentSkills["camera-and-vision"]?.remainingDecisions == 4)
     try await agent.receive(AssistantSessionControl.cancelSession.input(sessionID: session))
-    #expect(try await repository.snapshot().state.skillState?.loaded.contains("photography") == false)
+    #expect(try await repository.snapshot().state.skillState?.loaded.contains("camera-and-vision") == false)
     await #expect(throws: ContainerContextError.closed) {
         try await publicContext.snapshot(session: session, names: [])
     }
@@ -899,11 +899,12 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
             turn: .init(id: UUID().uuidString, ordinal: 1)))
     var started: String?
     while let envelope = await outputs.next() {
-        if case .actionCall(let call) = envelope.output,
-            call.actionPath.description == "UI.Expression.setReplyWaiting"
+        if case .toolCall(let call) = envelope.output,
+            call.toolPath == "UI.Expression.setReplyWaiting"
         {
-            #expect(call.parameters["enabled"] == "true")
-            started = call.parameters["requestID"]
+            #expect(call.arguments["enabled"] == "true")
+            #expect(envelope.roundID == nil)
+            started = call.arguments["requestID"]
             break
         }
     }
@@ -914,10 +915,11 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
     }
     var ended = false
     while let envelope = await outputs.next() {
-        if case .actionCall(let call) = envelope.output,
-            call.actionPath.description == "UI.Expression.setReplyWaiting"
+        if case .toolCall(let call) = envelope.output,
+            call.toolPath == "UI.Expression.setReplyWaiting"
         {
-            #expect(call.parameters == ["enabled": "false", "requestID": requestID])
+            #expect(call.arguments == ["enabled": "false", "requestID": requestID])
+            #expect(envelope.roundID == nil)
             ended = true
             break
         }
@@ -950,14 +952,14 @@ func assistantReplyWaitingEndsOnFirstOutputAndAllRequestTerminations(outcome: St
             break
         }
     }
-    let markers = answer.compactMap { envelope -> ActionCall? in
-        guard case .actionCall(let call) = envelope.output,
-            call.actionPath.description == "UI.Expression.setReplyWaiting"
+    let markers = answer.compactMap { envelope -> ToolCall? in
+        guard case .toolCall(let call) = envelope.output,
+            call.toolPath == "UI.Expression.setReplyWaiting"
         else { return nil }
         return call
     }
-    #expect(markers.map { $0.parameters["enabled"] } == ["true", "false"], "Outputs: \(answer.map(\.output))")
-    #expect(Set(markers.compactMap { $0.parameters["requestID"] }).count == 1)
+    #expect(markers.map { $0.arguments["enabled"] } == ["true", "false"], "Outputs: \(answer.map(\.output))")
+    #expect(Set(markers.compactMap { $0.arguments["requestID"] }).count == 1)
     #expect(answer.contains { $0.output == .control("agent.finished") })
     await agent.stop()
 }

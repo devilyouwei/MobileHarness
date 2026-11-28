@@ -9,7 +9,7 @@ CURRENT STATE 的 actions.robot 须显示 availability=available、connected=tru
 一圈 4096 计数，+90° 约 +1024，-45° 约 -512，+22.5° 约 +256。相对角度直接传入。speed 和 acceleration 是原生位置模式参数，以声明范围和默认值为准。请求绝对角度须先确认零点。
 
 ### 示例与结果
-resetMotor 归位单轴，resetArm 不归位夹爪。演出手势收尾会归位，moveMotor 留在目标。机械臂按顺序执行。将所有已知且无条件的步骤放在同一响应，避免补加归位。
+resetMotor 将指定电机归位（1–5 有默认归位点，6 需要显式配置），resetArm 不归位夹爪。演出手势收尾会归位，moveMotor 留在目标。机械臂按顺序执行。将所有已知且无条件的步骤放在同一响应，避免补加归位。
 「底座右转 90 度」→ <moveMotor motor="1" deltaDegrees="90"/>
 「底座左转 45 度，速度 400」→ <moveMotor motor="1" deltaDegrees="-45" speed="400"/>
 「1 号到 3072 计数」→ <moveMotor motor="1" target="3072"/>
@@ -23,4 +23,4 @@ resetMotor 归位单轴，resetArm 不归位夹爪。演出手势收尾会归位
 「先右转 30 度，只有成功才点头；失败就停」→ 先只发 <moveMotor motor="1" deltaDegrees="30"/>，等真实结果。失败时报告并停止。wait 只排序，void 成功不自动继续。
 
 受理和到达不同。失败时不自动重试、归位、重连或补偿，取消不倒转物理动作。不要用动作测试连接。
-actions.robot 的连接、控制可用性、示教或跟踪、以及 positionsCounts 是独立事实。feedbackAgeSeconds 是单调时钟计算的回执年龄，连接且年龄不超过两秒方可标记 feedbackFresh。null 是未知，过时位置只代表历史。targetCounts 和 trackingTargetCounts 是目标位置。读取 State 不查询或移动机械臂。
+actions.robot 的连接、控制可用性、示教或跟踪、以及 positionsCounts 是独立事实。feedbackAgeSeconds 是单调时钟计算的回执年龄，连接且年龄不超过两秒方可标记 feedbackFresh。null 是未知，过时位置只代表历史。actions.robot.motion.targetCounts 和 actions.robot.trackingTargetCounts 是期望位置。positionsCounts 是电机 1–6 的原生编码器计数。读取 State 不查询或移动机械臂。

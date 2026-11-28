@@ -75,9 +75,12 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         trackedTasks[reference] = .init(token: token, producer: producer, sessionID: sessionID)
         do {
             if !hasStaticTaskSubscription(from: producer) {
+                guard let channel = communicationPolicy.eventChannels[AgentTaskResponse.contract] else {
+                    throw CommunicationError.unsupportedContract
+                }
                 let subscription = try await messaging.subscribe(
                     .init(
-                        channel: "agent.task", protocolID: "agent.task.events.v1", sources: [producer],
+                        channel: channel, protocolID: AgentTaskResponse.contract, sources: [producer],
                         scope: reference,
                         sessionID: sessionID))
                 guard trackedTasks[reference]?.token == token else {
@@ -95,7 +98,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
     func hasStaticTaskSubscription(from producer: AgentID) -> Bool {
         communicationPolicy.subscriptions.contains {
-            $0.channel == "agent.task" && $0.protocol == "agent.task.events.v1"
+            $0.protocol == AgentTaskResponse.contract
                 && $0.sources.contains(producer.rawValue)
         }
     }
@@ -236,7 +239,17 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             actions.compactMap { completed.contains($0.id) ? ($0.id, $0.source) : nil }
         }
     }
+    func retirePlayback(_ result: ActionResult) {
+        guard result.path == Self.playback.path, let id = result.executionID, id == activePlaybackExecutionID else {
+            return
+        }
+        activePlaybackExecutionID = nil
+        pendingPlaybackVolume = nil
+        playbackNeedsResume = false
+    }
+
     func recordReplyActionCompletion(_ result: ActionResult) {
+        retirePlayback(result)
         if activeInterruption?.replyInputID == result.inputID,
             activeInterruption?.sessionID == result.owner.sessionID,
             activeInterruption?.cleanupConfirmed == false
@@ -290,7 +303,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var playbackStateVersion: UInt64 = 0
     private var playbackControlSequence: UInt64 = 0
     private var playbackNeedsResume = false
-    private var pendingPlaybackVolume: (callID: String, executionID: String)?
+    private var pendingPlaybackVolume: String?
     private var speechEnergy: (utterance: String, energy: SpeechActivity.Energy)?
     private var continuationWatchdog: Task<Void, Never>?
 
@@ -429,7 +442,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         else { return }
         if activity.kind != .captureStopped, speechCaptureGeneration != activity.generation {
             speechCaptureStarted(activity.generation)
-            try releaseSpeechEnergy(sessionID: input.sessionID)
+            try releaseSpeechEnergy(input)
         }
         switch activity.kind {
         case .captureStarted:
@@ -437,17 +450,17 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         case .captureStopped:
             if speechCaptureGeneration == activity.generation {
                 speechCaptureStopped(activity.generation)
-                try releaseSpeechEnergy(sessionID: input.sessionID)
+                try releaseSpeechEnergy(input)
             } else {
                 retireSpeechGeneration(activity.generation)
             }
         case .energyChanged:
             guard let utterance = activity.utterance, let energy = activity.energy else { return }
             if energy == .low {
-                if speechEnergy?.utterance == utterance { try releaseSpeechEnergy(sessionID: input.sessionID) }
+                if speechEnergy?.utterance == utterance { try releaseSpeechEnergy(input) }
             } else {
                 speechEnergy = (utterance, energy)
-                try applySpeechEnergy(energy, sessionID: input.sessionID)
+                try applySpeechEnergy(energy, input: input)
             }
         case .vadProgress:
             guard let observation = continuationObservation, let oldest = activity.oldestWindow,
@@ -473,33 +486,26 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         }
     }
 
-    private func applySpeechEnergy(_ energy: SpeechActivity.Energy, sessionID: String) throws {
-        guard lifecycle == .running, !executionCancellationBarrier, !hostCancellationInProgress,
-            let turn = decisionTurn, turn.sessionID == sessionID
-        else { return }
-        try adjustSpeechPlayback(energy, sessionID: turn.sessionID, inputID: turn.inputID)
-    }
-
-    private func releaseSpeechEnergy(sessionID: String) throws {
+    private func releaseSpeechEnergy(_ input: AgentInput) throws {
         guard speechEnergy != nil else { return }
         speechEnergy = nil
-        try applySpeechEnergy(.low, sessionID: sessionID)
+        try applySpeechEnergy(.low, input: input)
     }
 
-    private func adjustSpeechPlayback(_ energy: SpeechActivity.Energy, sessionID: String, inputID: String) throws {
-        guard let executionID = activePlaybackExecutionID else { return }
-        let input = AgentInput(id: inputID, sessionID: sessionID, payload: .event("assistant.playback"))
+    private func applySpeechEnergy(_ energy: SpeechActivity.Energy, input: AgentInput) throws {
         switch energy {
         case .high:
+            guard !executionCancellationBarrier, !hostCancellationInProgress,
+                let executionID = activePlaybackExecutionID, let turn = decisionTurn, turn.sessionID == input.sessionID
+            else { return }
             pendingPlaybackVolume = nil
             playbackNeedsResume = true
-            try emitPlaybackControl(.pause, executionID: executionID, input: input)
+            let reply = AgentInput(id: turn.inputID, sessionID: turn.sessionID, payload: .event("assistant.playback"))
+            try emitPlaybackControl(.pause, executionID: executionID, input: reply)
         case .low, .medium:
-            let volume = energy == .low ? "1" : "0.35"
-            let call = try Self.playbackVolume.call(["volume": volume, "executionID": executionID])
-            guard emit(.toolCall(call), for: input, independentOfRound: true)
-            else { throw HarnessError.queueFull }
-            pendingPlaybackVolume = (call.id, executionID)
+            let call = try Self.playbackVolume.call(["volume": energy == .low ? "1" : "0.35"])
+            guard emit(.toolCall(call), for: input, independentOfRound: true) else { throw HarnessError.queueFull }
+            pendingPlaybackVolume = playbackNeedsResume ? call.id : nil
         }
     }
 
@@ -513,15 +519,15 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     }
 
     func settlePlaybackVolume(callID: String, outcome: OutputExecutionResult, envelope: OutputEnvelope) throws {
-        guard let pending = pendingPlaybackVolume, pending.callID == callID else { return }
+        guard pendingPlaybackVolume == callID else { return }
         pendingPlaybackVolume = nil
         guard playbackNeedsResume, !outcome.isError, outcome.tool?.completion == .completed,
-            activePlaybackExecutionID == pending.executionID,
+            let executionID = activePlaybackExecutionID,
             !executionCancellationBarrier, !hostCancellationInProgress,
-            let turn = decisionTurn, turn.inputID == envelope.inputID, turn.sessionID == envelope.sessionID
+            let turn = decisionTurn, turn.sessionID == envelope.sessionID
         else { return }
         let input = AgentInput(id: turn.inputID, sessionID: turn.sessionID, payload: .event("assistant.playback"))
-        try emitPlaybackControl(.resume, executionID: pending.executionID, input: input)
+        try emitPlaybackControl(.resume, executionID: executionID, input: input)
         playbackNeedsResume = false
     }
 
@@ -534,8 +540,8 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         pendingPlaybackVolume = nil
         playbackNeedsResume = false
         playbackStateVersion = 0
-        if input.sessionID == speechSessionID, let speechEnergy {
-            try applySpeechEnergy(speechEnergy.energy, sessionID: input.sessionID)
+        if input.sessionID == speechSessionID, speechEnergy?.energy == .high {
+            try applySpeechEnergy(.high, input: input)
         }
     }
 
@@ -954,6 +960,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var peerNotices: [PeerTaskNotice] = []
     var activePeerTaskNoticeID: String?
 
+    // Beginning the model-generated reply must be scheduled before its captions on the Display channel.
     static var beginReply: InternalAction {
         InternalAction(
             domain: "UI", module: "Caption", function: "beginReplyTurn", channel: "Display")
@@ -962,18 +969,18 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     var replyPresentation: (@Sendable (Bool) async -> Void)?
     /// Generic request-latency facts. The role owns content and calls its own presentation tools.
     func bindReplyWaiting(_ callback: @escaping @Sendable (Bool) async -> Void) { replyPresentation = callback }
-    static var replyWaiting: InternalAction {
-        InternalAction(
-            domain: "UI", module: "Expression", function: "setReplyWaiting", channel: "Display",
-            required: ["enabled", "requestID"])
+    static var replyWaiting: InternalTool {
+        InternalTool(path: "UI.Expression.setReplyWaiting", required: ["enabled", "requestID"])
     }
+    // The Speech channel schedules model-generated reply audio after text-to-speech preparation.
     static var playback: InternalAction {
         InternalAction(
             domain: "Speech", module: "Playback", function: "speak", channel: "Speech", required: ["audioID"])
     }
     static var playbackVolume: InternalTool {
-        InternalTool(path: "Speech.Playback.setVolume", required: ["volume"], optional: ["executionID"])
+        InternalTool(path: "Speech.Playback.setVolume", required: ["volume"])
     }
+    // Captions render model-generated text through the ordered Display channel.
     static var caption: InternalAction {
         InternalAction(
             domain: "UI", module: "Caption", function: "print", channel: "Display", required: ["text"])
@@ -1044,7 +1051,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         guard configuration.agentID == State.agentID else { throw AgentConfigurationError.identityMismatch }
         let runtimeCapabilities = try State.runtimeCapabilities(capabilities ?? configuration.capabilities)
         descriptor = AgentDescriptor(
-            category: configuration.category,
+            category: configuration.category, publicationChannels: configuration.communication.publicationChannels,
             id: configuration.agentID, name: State.configurationName,
             inputs: configuration.communication.inputKinds.subtracting([.actionResult]),
             outputs: [.communication, .actionCall, .toolCall, .control],
@@ -1127,11 +1134,11 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
     /// Speech and caption grants shared by every chat State; States add their own on top.
     nonisolated static func chatRuntimeCapabilities(_ model: CapabilityRegistry) throws -> CapabilityRegistry {
         try model.adding(
-            internalActions: [playback, beginReply, caption, replyWaiting]
+            internalActions: [playback, beginReply, caption]
                 .filter { grant in
                     !model.internalActions.contains { $0.path == grant.path }
                 },
-            internalTools: [playbackVolume].filter { grant in
+            internalTools: [playbackVolume, replyWaiting].filter { grant in
                 !model.internalTools.contains { $0.path == grant.path }
             })
     }

@@ -51,7 +51,11 @@ extension AssistantChatWorker {
             throw error
         }
     }
-    /// Presentation calls participate in the round, but never count as a model-generated answer.
+    private func emitReplyWaiting(_ enabled: Bool, requestID: String, for input: AgentInput) throws {
+        let call = try Self.replyWaiting.call(["enabled": enabled ? "true" : "false", "requestID": requestID])
+        guard emit(.toolCall(call), for: input, independentOfRound: true) else { throw HarnessError.queueFull }
+    }
+
     func finishReplyWaiting(_ waitingID: String, input: AgentInput) async throws {
         guard activeReplyWaitingID == waitingID else { return }
         activeReplyWaitingID = nil
@@ -59,10 +63,7 @@ extension AssistantChatWorker {
         guard presentsReply, input.turn != nil else { return }
         // A cancelled round is cleared by the local presentation lifecycle.
         guard !Task.isCancelled else { return }
-        guard
-            try emitAction(
-                Self.replyWaiting.call(["enabled": "false", "requestID": waitingID]), for: input)
-        else { throw HarnessError.queueFull }
+        try emitReplyWaiting(false, requestID: waitingID, for: input)
     }
     func dispatchRequest(_ input: AgentInput, requestID: String, model: InferenceModelIdentity? = nil) async throws {
         try await conversations.markModelRequestDispatched(
@@ -78,12 +79,9 @@ extension AssistantChatWorker {
         -> String
     {
         try Task.checkCancellation()
-        let replyWaitingID = UUID().uuidString
+        let replyWaitingID = roundID
         if presentsReply, input.turn != nil {
-            guard
-                try emitAction(
-                    Self.replyWaiting.call(["enabled": "true", "requestID": replyWaitingID]), for: input)
-            else { throw HarnessError.queueFull }
+            try emitReplyWaiting(true, requestID: replyWaitingID, for: input)
             activeReplyWaitingID = replyWaitingID
         }
         if let replyPresentation {

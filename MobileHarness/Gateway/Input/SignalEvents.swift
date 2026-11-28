@@ -171,7 +171,7 @@ public actor SignalEventTransport {
         endpoint: SignalEndpoint, channel: EventChannel, using descriptor: SignalEventProtocol<Event>
     ) async throws -> SignalEventPublisher<Event> {
         guard let transport else { throw SignalTransportError.closed }
-        try await transport.validateRequestEndpoint(endpoint)
+        try await transport.declareChannel(channel.id, kind: .pubSub, endpoint: endpoint)
         let definition = try bind(channel, descriptor: descriptor)
         producers = producers.filter { $0.value.endpoint.address != endpoint.address || $0.value.endpoint == endpoint }
         if let existing = producers.first(where: { $0.value.endpoint == endpoint && $0.value.channel == channel }) {
@@ -192,13 +192,13 @@ public actor SignalEventTransport {
         sources: Set<String>, variants: Set<String>? = nil, scope: String? = nil, sessionID: String? = nil
     ) async throws -> SignalEventSubscription {
         guard let transport else { throw SignalTransportError.closed }
-        try await transport.validateRequestEndpoint(endpoint)
-        let definition = try bind(channel, descriptor: descriptor)
         guard !sources.isEmpty, sources.count <= 16, sources.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 64 }),
             variants.map({ !$0.isEmpty && $0.isSubset(of: descriptor.variants) }) ?? true,
             scope.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true,
             sessionID.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
         else { throw SignalTransportError.invalidEnvelope }
+        try await transport.declareChannel(channel.id, kind: .pubSub, endpoint: endpoint)
+        let definition = try bind(channel, descriptor: descriptor)
         subscribers = subscribers.filter {
             $0.value.endpoint.address != endpoint.address || $0.value.endpoint == endpoint
         }
@@ -253,6 +253,9 @@ public actor SignalEventTransport {
             let definition = definitions[producer.channel], definition.type == ObjectIdentifier(Event.self),
             scope.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
         else { throw SignalTransportError.staleEndpoint }
+        if let name = envelope.explicitChannel, name != producer.channel.id {
+            throw SignalTransportError.channelUnavailable(name)
+        }
         let measured = try producer.measure(event)
         guard measured == envelope.payloadBytes else { throw SignalTransportError.invalidEnvelope }
         let variant = producer.variant(event)

@@ -1,5 +1,17 @@
 # Face、通用 Window 与 App 内灵动岛
 
+## Skill 能力目录清理（2026-11-28）
+
+灵动岛展示由各 Agent 经 Gateway 调用内部工具。此要求取代下文允许 Skill 共享控制展开状态的旧约定。Photography 与 ApplicationControl 的 `Skill.json` 移除 `UI.Island.setPresentation` 绑定及为其选择的 `ui.island`，并递增修订号。摄影 Skill 的英文和简体中文指令删除对应调用教学。按[调用方选择协议的契约](technical/Action-Execution-Lifecycle.md#调用方选择-action-或-tool2026-11-28)，Actions 为灵动岛函数提供两种调用入口，角色授权的内部调用使用 Tool 并接收真实回执。
+
+同步 Skill、Agents、Actions、UI Runtime 和总体技术 README 中的能力目录与展示链路。更新 `AgentTaskSkillTests.swift` 的目录预期，在 `IslandIntegrationTests.swift` 验证所有随包 Skill 目录均无灵动岛调用、摄影和应用控制的 State 选择，以及现有执行定义的 Tool 协议。使用现有检查和 iOS 构建入口验证。
+
+## 相机与视觉 Skill 合并（2026-11-28）
+
+摄像头相关模型能力集中到「相机与视觉」Skill，目录 ID 改为 `camera-and-vision`。复用 `Skills/Photography` 资源路径，在 `Catalog.json` 和 Photographer Agent 描述符切换 ID。将 ApplicationControl Skill 的四项 `Vision.*` 绑定迁入该资源，保留 `Vision` Channel、公开别名及独立感知生命周期。相机与视觉 Skill 选择实际相机和拍摄状态，应用控制 Skill 选择窗口状态并保留通用窗口、页面、设备与资源操作。
+
+更新两份 Skill 的中英文名称描述与摄影资源的中英文流程。教学区分后台视觉／跟随和相机窗口拍摄，组合操作按用户目标显式开启两路。相机窗口可见时持有镜头切换权。更新 Skill、角色、状态和总体技术 README，以及实际加载这两个 Skill 的自动化夹具。已有会话历史保留原目录 ID 和修订号，运行时重启沿现有恢复流程清除临时 Skill 并按新目录加载。验证基础 Skill 隔离、两路能力在新目录内保持独立入口与 Channel、应用控制范围、提示词和最终包资源。
+
 ## 2026-11-03 灵动岛黑色边缘与内容偶发错位
 
 已实施针对性修复：紧凑岛标题改用固定画布，消除会随计时宽度变化的独立header宿主尺寸；阻止多入口同步布局重入，并在有效动画结束时统一校正目标。两项新增回归、UI189项、串行运行时225项及四项iOS构建通过；全量check因3个范围外用例失败退出1，原生UI整组缺少结束摘要。用户截图的真机间歇触发链尚未复现，需继续视觉验收，详见[验证记录](../validation/Window-Camera.md)。

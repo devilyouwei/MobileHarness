@@ -347,7 +347,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     let ports = try root.configure()
     let execution = try await ActionExecutionTransport.connect(ports: ports, engine: engine)
     let signals = ports.signals
-    let photographer = try await signals.register(address: AgentID.photographer.rawValue, incarnation: "one") { _ in }
+    let visionPerception = try await signals.register(address: AgentID.visionPerception.rawValue, incarnation: "one") {
+        _ in
+    }
     let actionsEndpoint = try await signals.endpoint(address: "actions.execution")
     let owner = ExecutionOwner(endpoint: AgentID.visionPerception.rawValue, incarnation: "one", sessionID: "vision")
     _ = try await signals.register(address: owner.endpoint, incarnation: owner.incarnation) { _ in }
@@ -356,7 +358,7 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
         tool: .init(id: "pose", toolPath: posePath.description), context: context)
     let gaze = FunctionInvocation(
         tool: .init(id: "gaze", toolPath: gazePath.description), context: context)
-    let vision = VisionPerceptionContainer()
+    let vision = VisionCaptureSessionHost()
     let frames = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let presented = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingOldest(1))
     let open = try SignalRequestProtocol<Bool, Task<Void, any Error>>(
@@ -380,7 +382,8 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
         }
     }
     try await root.start()
-    let session = try await signals.request(source: photographer, target: actionsEndpoint, using: open, request: true)
+    let session = try await signals.request(
+        source: visionPerception, target: actionsEndpoint, using: open, request: true)
     frames.continuation.yield(())
     var receipts = presented.stream.makeAsyncIterator()
     #expect(await receipts.next() == true)
@@ -408,7 +411,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     _ = try await harness.execution.enqueue(invocation: gatewayJob())
     #expect(root.state == .configured)
     try await root.start()
-    let endpoint = try await ports.signals.register(address: "independent", incarnation: "one") { _ in }
+    let endpoint = try await ports.signals.register(
+        address: "independent", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { _ in }
     try await ports.signals.send(source: endpoint, target: endpoint, envelope: gatewaySignal(), payload: 1)
     try await root.stop()
     try await harness.stop()
@@ -419,7 +424,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     try await harness.root.start()
     let count = GatewayCounter()
     let source = try await harness.ports.signals.register(address: "source", incarnation: "first") { _ in }
-    let target = try await harness.ports.signals.register(address: "target", incarnation: "first") { signal in
+    let target = try await harness.ports.signals.register(
+        address: "target", incarnation: "first", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { signal in
         #expect((signal.payload as? String) == "data")
         await count.increment()
     }
@@ -436,7 +443,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     let harness = try await GatewayHarness()
     try await harness.root.start()
     let source = try await harness.ports.signals.register(address: "source", incarnation: "one") { _ in }
-    let target = try await harness.ports.signals.register(address: "target", incarnation: "one") { signal in
+    let target = try await harness.ports.signals.register(
+        address: "target", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { signal in
         #expect(signal.payload as? Int == 42)
     }
     try await harness.ports.signals.send(source: source, target: target, envelope: gatewaySignal(), payload: 42)
@@ -460,7 +469,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     let count = GatewayCounter()
     let harness = try await GatewayHarness(handler: { _ in await count.increment() })
     try await harness.root.start()
-    let endpoint = try await harness.ports.signals.register(address: "endpoint", incarnation: "one") { _ in }
+    let endpoint = try await harness.ports.signals.register(
+        address: "endpoint", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { _ in }
     harness.root.invalidate()
     await #expect(throws: GatewayContainerError.self) {
         try await harness.ports.signals.send(
@@ -484,7 +495,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     let release = GatewayTestGate()
     let harness = try await GatewayHarness()
     try await harness.root.start()
-    let endpoint = try await harness.ports.signals.register(address: "endpoint", incarnation: "one") { _ in
+    let endpoint = try await harness.ports.signals.register(
+        address: "endpoint", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { _ in
         await started.release()
         do { try await Task.sleep(for: .seconds(30)) } catch {
             await cleaning.release()
@@ -512,7 +525,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     let first = try harness.root.observations.open()
     #expect(throws: Error.self) { try harness.root.observations.open() }
     #expect(first.capabilities.signals !== harness.ports.signals)
-    let endpoint = try await first.capabilities.signals.register(address: "isolated", incarnation: "one") { _ in }
+    let endpoint = try await first.capabilities.signals.register(
+        address: "isolated", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { _ in }
     harness.root.invalidate()
     await #expect(throws: GatewayContainerError.self) {
         try await first.capabilities.signals.send(
@@ -563,7 +578,9 @@ func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws
     let transport = SignalTransport()
     let entered = GatewayTestGate()
     let release = GatewayTestGate()
-    let endpoint = try await transport.register(address: "receiver", incarnation: "one") { signal in
+    let endpoint = try await transport.register(
+        address: "receiver", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { signal in
         if !signal.envelope.cleanup {
             await entered.release()
             await release.wait()
@@ -599,7 +616,9 @@ func gatewaySendAndRequestRunConcurrentlyOnTheSameChannel() async throws {
     let release = GatewayTestGate()
     let acknowledged = GatewayCounter()
     let source = try await transport.register(address: "producer", incarnation: "one") { _ in }
-    let target = try await transport.register(address: "receiver", incarnation: "one") { signal in
+    let target = try await transport.register(
+        address: "receiver", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+    ) { signal in
         if signal.envelope.id == "first" {
             await entered.release()
             await release.wait()
@@ -607,8 +626,8 @@ func gatewaySendAndRequestRunConcurrentlyOnTheSameChannel() async throws {
         await acknowledged.increment()
     }
     let request = try integerSignalProtocol(timeout: .seconds(10))
-    try await transport.registerRequest(request, endpoint: target) { $0 + 1 }
     let channel = "fixture.requests"
+    try await transport.registerRequest(request, endpoint: target, channel: channel) { $0 + 1 }
     let first = Task {
         try await transport.send(
             source: source, target: target,
@@ -645,7 +664,9 @@ func gatewaySendAndRequestRunConcurrentlyOnTheSameChannel() async throws {
 func gatewaySendTimeoutCancelsReceiverAndReleasesCapacity() async throws {
     let transport = SignalTransport()
     let stopped = GatewayCounter()
-    let target = try await transport.register(address: "receiver", incarnation: "one") { signal in
+    let target = try await transport.register(
+        address: "receiver", incarnation: "one", sendChannels: ["fixture.timeout.v1"]
+    ) { signal in
         #expect(signal.envelope.expiresAt != nil)
         do {
             try await Task.sleep(for: .seconds(5))
@@ -672,7 +693,9 @@ func gatewaySendTimeoutCancelsReceiverAndReleasesCapacity() async throws {
             let entered = GatewayTestGate()
             let release = GatewayTestGate()
             let source = try await transport.register(address: "source", incarnation: "one") { _ in }
-            let target = try await transport.register(address: "target", incarnation: "one") { _ in
+            let target = try await transport.register(
+                address: "target", incarnation: "one", sendChannels: ["fixture.data", "fixture.cleanup"]
+            ) { _ in
                 await entered.release()
                 await release.wait()
                 if fails { throw GatewayTestError.cleanup }
@@ -1034,5 +1057,52 @@ private actor OwnedEventSubscription {
     }
     #expect(await values.values == [1, 2, 3])
     await events.cancel(subscription)
+    await transport.shutdown()
+}
+
+@Test func gatewayRejectsMissingAndWrongKindChannelsBeforeDelivery() async throws {
+    let transport = SignalTransport()
+    let count = GatewayCounter()
+    let source = try await transport.register(address: "source", incarnation: "one") { _ in }
+    let target = try await transport.register(address: "receiver", incarnation: "one", sendChannels: ["named.direct"]) {
+        _ in
+        await count.increment()
+    }
+    let descriptor = try SignalEventProtocol<Int>(id: "fixture.events.v1", maximumBytes: 8, measure: { _ in 8 })
+    let bus = try await transport.events()
+    let publisher = try await bus.registerProducer(
+        endpoint: source, channel: EventChannel("named.events"), using: descriptor)
+    await #expect(throws: SignalTransportError.channelUnavailable("named.direct")) {
+        try await transport.declareChannel("named.direct", kind: .pubSub, endpoint: source)
+    }
+    for name in ["absent.channel", "named.events"] {
+        await #expect(throws: SignalTransportError.channelUnavailable(name)) {
+            try await transport.send(
+                source: source, target: target,
+                envelope: .init(
+                    id: "id", sessionID: "session", contract: descriptor.id, channel: name, payloadBytes: 8), payload: 1
+            )
+        }
+    }
+    await #expect(throws: SignalTransportError.channelUnavailable("named.direct")) {
+        try await bus.publish(
+            1, from: publisher,
+            envelope: .init(
+                id: "id", sessionID: "session", contract: descriptor.id, channel: "named.direct", payloadBytes: 8))
+    }
+    let request = try integerSignalProtocol(timeout: .seconds(30))
+    try await transport.registerRequest(request, endpoint: target, channel: "named.direct") { value in
+        await count.increment()
+        return value
+    }
+    await #expect(throws: SignalTransportError.channelUnavailable("named.events")) {
+        try await transport.request(
+            source: source, target: target, using: request, request: 1,
+            envelope: .init(
+                id: "id", sessionID: "session", contract: request.id, channel: "named.events", payloadBytes: 8))
+    }
+    #expect(await count.count == 0)
+    #expect(try await transport.request(source: source, target: target, using: request, request: 3) == 3)
+    #expect(await count.count == 1)
     await transport.shutdown()
 }

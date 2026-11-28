@@ -57,6 +57,7 @@ public struct BehaviorAssembly: Sendable {
     public init(capabilityModules: [any CapabilityModule]) throws {
         let catalog = try CapabilityCatalog(modules: capabilityModules)
         let bindings = try ActionBindingCatalog(definitions: catalog.definitions.map(BehaviorProtocolBindings.bind))
+        // Route descriptors describe the requested protocol. The submitted Action carries its actual Channel.
         try self.init(
             actionModules: [
                 ScheduledActions(

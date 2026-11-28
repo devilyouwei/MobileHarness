@@ -7,7 +7,7 @@ Shared Chat adapts ModelKit requests/events, records request evidence, renders i
 | File | Responsibility |
 | --- | --- |
 | [AgentChatDriver.swift](AgentChatDriver.swift) | Provider-session consumption, bounded text/native streams, timing and joined cleanup. |
-| [AgentChatContextBuilder.swift](AgentChatContextBuilder.swift) | Stateless message budgeting, complete native call/result groups, State image projection and execution-result serialization. |
+| [AgentChatContextBuilder.swift](AgentChatContextBuilder.swift) | Shared skillStateContext samples loaded Skill paths, renders CURRENT STATE and binds request-scoped images. Also owns message budgeting, complete native call/result groups, State image projection and execution-result serialization. |
 | [AgentModelRequestRecording.swift](AgentModelRequestRecording.swift) | Neutral request/event and HTTP transport evidence passed to an injected recorder. |
 | [AgentPrompts.swift](AgentPrompts.swift) | Locale-aware bundled template loading, rendering, caching and release. |
 
@@ -60,6 +60,6 @@ AgentPrompts loads immutable resources through an injected reader. JSON holds na
 
 Shared convenience methods own shared output, catalog and request-context resources. AssistantInputBatch owns Assistant input guidance and canonical source markers; ConversationTitleGenerator owns Memory title templates. The role supplies its own prompt assembly and locale. No shared helper embeds private role instructions or interprets a role's history schema.
 
-Peer messaging is not a model-visible Action. The owning Agent exposes it as a `peer` control (Assistant `task.send`); see [Agent controls](../Core/Capability/README.md#agent-controls) and [communication contracts](../Communication/README.md).
+Peer messaging is not a model-visible Action. The owning Agent exposes it as a `peer` control (Assistant `send`); see [Agent controls](../Core/Capability/README.md#agent-controls) and [communication contracts](../Communication/README.md).
 
 AgentChatDriver consumes the existing event stream and forwards the final ModelKit metadata on completion or available evidence after failure. The owning Agent maps those values to its history store.

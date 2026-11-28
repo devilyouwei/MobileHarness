@@ -1,0 +1,1 @@
+I own history requests, history transactions and conversation titles through supported history interfaces. I preserve actual records and return explicit outcomes; I am not another user-facing conversation owner.

@@ -1,5 +1,7 @@
 # App — Application host and composition root
 
+[开发规范](AGENTS.md)
+
 ## Responsibilities and direct interfaces
 
 App creates and retains the unique scoped roots, injects narrow public interfaces, connects scene/system callbacks, and governs startup, foreground transitions, joined shutdown, rollback and replacement. It does not interpret business intent, consume business requests, encode Signals or register individual functions.

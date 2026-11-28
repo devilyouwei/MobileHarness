@@ -5,7 +5,6 @@ public enum PerceptionMessage: Codable, Sendable, Equatable {
     case transcript(String, final: Bool)
     case soundSource(SoundSourceObservation)
     case pose(PoseObservation)
-    public static let userInputTopic = SpeechRecognition.channel
     public static let speechProtocol = SpeechRecognition.contract
 
     public var contract: String {

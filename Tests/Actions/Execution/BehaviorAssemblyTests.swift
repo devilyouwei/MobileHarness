@@ -50,6 +50,8 @@ private actor BehaviorEndpoint: UIPresentationCapability, UIUpdateCapability, Sp
     private(set) var emotion: UIActions.Emotion?
     private(set) var gaze: UIActions.Gaze?
     private(set) var pose: Actions.PoseOverlay?
+    func setVolume(_ volume: Double) { volumes.append(volume) }
+    private(set) var volumes: [Double] = []
     func play(audioID: String, invocation: any FunctionInput) async throws {}
     func present(_ text: String, invocation: any FunctionInput) async throws {}
     func presentTranscript(_ text: String, invocation: any FunctionInput) async throws {}
@@ -100,6 +102,10 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         shakeBase: { _, _ in throw CancellationError() },
         aim: { _, _, _ in throw ActionExecutionFailure(code: .handlerFailed, message: "Fixture dependency unavailable")
         })
+    let scheduledPaths = Set(assembly.actions.bindings.map { $0.path.description })
+    #expect(!scheduledPaths.isEmpty)
+    #expect(assembly.toolPaths == scheduledPaths)
+    #expect(Set(await assembly.tools.bindings().map { $0.path.description }) == scheduledPaths)
     for binding in assembly.bindings {
         if binding.protocols.contains(.action) {
             #expect({ if case .scheduled = binding.executionPolicy { true } else { false } }())
@@ -115,17 +121,15 @@ private func behaviorInvocation(_ function: String, parameters: [String: String]
         actions: assembly.actions, toolPaths: assembly.toolPaths,
         capabilities: [
             AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
-            SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities),
-            VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities),
-            PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities),
+            SpeechPerceptionAgent.runtimeCapabilities(),
+            VisionPerceptionAgent.runtimeCapabilities(),
             try ApplicationControlAgent(
                 sessionID: UUID().uuidString,
                 context: try AgentContextRepository(
                     agent: AgentID(rawValue: "applicationControl"), scope: UUID().uuidString,
                     state: ApplicationControlContextState())
             ).descriptor.capabilities,
-            MemoryAgent.runtimeCapabilities(
-                AgentConfigurations.load(named: "Memory").capabilities),
+            MemoryAgent.runtimeCapabilities(),
         ])
     let executor = ActionExecutor(registry: assembly.actions)
     await #expect(throws: UIActions.ExpressionError.invalidEmotion) {
@@ -357,7 +361,7 @@ private func endpointInvocation(source: String, session: String, decision: Strin
             guard invocation.context.sessionID == "active-turn" else { throw CommunicationError.scopeClosed }
         })
     let receipt = try await endpoint.savePhoto(
-        nil, invocation: endpointInvocation(source: "photographer", session: "root"))
+        nil, invocation: endpointInvocation(source: "visionPerception", session: "root"))
     #expect(receipt == native.receipt)
     #expect(sessionChecks == 0 && native.calls == 1)
     _ = try await endpoint.savePhoto(
@@ -370,7 +374,7 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     #expect(native.calls == 3)
     native.failure = CameraControlError.permissionDenied
     await #expect(throws: CameraControlError.permissionDenied) {
-        try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "photographer", session: "root"))
+        try await endpoint.savePhoto(nil, invocation: endpointInvocation(source: "visionPerception", session: "root"))
     }
 }
 
@@ -405,6 +409,8 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     ) async throws {}
     func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws {}
     func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws {}
+    func setVolume(_ volume: Double) { volumes.append(volume) }
+    private(set) var volumes: [Double] = []
     func play(audioID: String, invocation: any FunctionInput) async throws { plays += 1 }
     func present(_ text: String, invocation: any FunctionInput) throws { captions += 1 }
     func presentTranscript(_ text: String, invocation: any FunctionInput) throws {}
@@ -430,7 +436,11 @@ private func endpointInvocation(source: String, session: String, decision: Strin
     let first = EndpointVoiceFixture()
     let replacement = EndpointVoiceFixture()
     let invocation = endpointInvocation(source: "assistant", session: "root")
+    await endpoints.speech.setVolume(0.35)
     try endpoints.bindVoice(first)
+    #expect(first.volumes == [0.35])
+    await endpoints.speech.setVolume(1)
+    #expect(first.volumes == [0.35, 1])
     #expect(throws: ActionHostError.scopeClosed) { try endpoints.bindVoice(replacement) }
     endpoints.unbindVoice(replacement)
     try await endpoints.speech.play(audioID: "audio", invocation: invocation)

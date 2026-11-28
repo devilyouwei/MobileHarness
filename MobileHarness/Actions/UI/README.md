@@ -29,7 +29,7 @@ Gateway 通过注册函数调用本域，Agents 决定请求与策略，App 注�
 ## 接口与完成语义
 | 模块 | 函数与参数 | 完成边界 |
 | --- | --- | --- |
-| Expression | express/setExpression：emotion；内部 setReplyWaiting：enabled/requestID | express 加入呈现与恢复；setExpression 接纳持续基础状态 |
+| Expression | express/setExpression：emotion；等待动画 Tool setReplyWaiting：enabled/requestID | express 加入呈现与恢复；setExpression 接纳持续基础状态 |
 | Caption | beginReplyTurn/finishTranscript 无参数；print/setTranscript：text | 端点接纳本轮或文字更新 |
 | VoiceState | setVoiceState：listening/hearing/processing | 显示状态接纳，不产生麦克风效果 |
 | Gaze | moveEyes：有限 x/y，均为 −1…1 | 视线目标接纳 |
@@ -65,3 +65,5 @@ Runtime中的IslandActions.execute统一注册的UI.Island调用，IslandPresent
 [`Support/`](Support/)
 
 [UIPresentationCapabilities.swift](Support/UIPresentationCapabilities.swift) 将转写与回复呈现交给各自的端口。会话控制器验证 `beginReplyTurn` 并更新回复字幕槽。共用文字、语音状态、视线值与错误见 [UIPresentationTypes.swift](../Support/Contracts/UIPresentationTypes.swift)。
+
+等待开关按模型请求身份关联。独立 Tool 早于对应的 beginReplyTurn Action 到达时，呈现端保留该请求最新的开关值，在回复开始时应用。

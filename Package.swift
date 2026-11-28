@@ -497,7 +497,8 @@ let package = Package(
             name: "UI", dependencies: [],
             path: "MobileHarness/UI",
             exclude: [
-                "README.md", "Root/README.md", "Shared/README.md", "Camera/README.md", "Components/README.md",
+                "AGENTS.md", "README.md", "Root/README.md", "Shared/README.md", "Camera/README.md",
+                "Components/README.md",
                 "Conversation/README.md",
                 "Components/Island/README.md", "Components/RuntimeLog/README.md", "Components/Window/README.md",
                 "Components/Island/IslandStatus.xcstrings",
@@ -557,7 +558,7 @@ let package = Package(
             name: "Gateway",
             path: "MobileHarness/Gateway",
             exclude: [
-                "README.md", "Input/README.md",
+                "AGENTS.md", "README.md", "Input/README.md",
             ]),
         .target(
             name: "Actions",
@@ -569,6 +570,7 @@ let package = Package(
             ],
             path: "MobileHarness/Actions",
             exclude: [
+                "AGENTS.md",
                 "Camera/README.md",
                 "Web/README.md", "Artifacts/README.md",
                 "History/README.md",
@@ -614,18 +616,20 @@ let package = Package(
             ],
             path: "MobileHarness/Agents",
             exclude: [
+                "AGENTS.md",
                 "ApplicationControl/README.md", "Assistant/README.md", "Memory/README.md",
-                "Writer/README.md", "Photographer/README.md", "README.md",
+                "Writer/README.md", "README.md",
                 "SpeechPerception/README.md",
                 "Support/Chat/README.md",
                 "Support/Communication/README.md", "Support/Context/README.md", "Support/Core",
                 "Support/README.md", "VisionPerception/README.md",
+                "Resources/README.md", "Resources/AgentAuthoring.md", "Resources/SkillAuthoring.md",
             ],
             resources: [.copy("Resources/Agents"), .copy("Resources/Skills"), .copy("Resources/Catalog.json")]),
         .target(
             name: "StorageCore", dependencies: [], path: "MobileHarness/Storage",
             exclude: [
-                "README.md", "StorageContainer.swift", "Cache", "Files", "Database",
+                "AGENTS.md", "README.md", "StorageContainer.swift", "Cache", "Files", "Database",
                 "Support/README.md", "Support/Contracts/README.md", "Support/Memory/README.md",
             ], sources: ["StorageFailure.swift", "Support/Contracts", "Support/Memory"]),
         .target(
@@ -653,7 +657,7 @@ let package = Package(
             name: "Storage",
             dependencies: ["StorageCore", "StorageCache", "StorageFiles", "StorageDatabase"],
             path: "MobileHarness/Storage",
-            exclude: ["README.md", "StorageFailure.swift", "Cache", "Files", "Database", "Support"],
+            exclude: ["AGENTS.md", "README.md", "StorageFailure.swift", "Cache", "Files", "Database", "Support"],
             sources: ["StorageContainer.swift"]),
         .target(
             name: "AppStorage",
@@ -673,7 +677,7 @@ let package = Package(
         .target(
             name: "ModelKit", dependencies: [], path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "ModelContainer.swift", "Language/README.md", "Language/JEV/README.md",
+                "AGENTS.md", "README.md", "ModelContainer.swift", "Language/README.md", "Language/JEV/README.md",
                 "Language/JEV/D3Decision.swift", "Language/JEV/VelaDecision.swift",
                 "Language/JEV/Vela31Decision.swift", "Language/JEV/LayaDecision.swift",
                 "Speech/Enhancement/README.md", "Speech/Enhancement/DeepFilterNet3",
@@ -713,7 +717,7 @@ let package = Package(
             ] + localChatDependencies,
             path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "ModelFailure.swift", "Language", "Speech", "Vision",
+                "AGENTS.md", "README.md", "ModelFailure.swift", "Language", "Speech", "Vision",
                 "Support/README.md", "Support/Core", "Support/Backends", "Support/Speech",
                 "Support/Management/README.md", "Support/Management/HuggingFace",
                 "Support/Management/ModelManager.swift", "Support/Management/ModelRegistration.swift",
@@ -750,7 +754,8 @@ let package = Package(
         .target(
             name: "ModelKitAppleSpeech", dependencies: ["ModelKit"], path: "MobileHarness/ModelKit",
             exclude: [
-                "README.md", "ModelContainer.swift", "ModelFailure.swift", "Language", "Vision", "Support/README.md",
+                "AGENTS.md", "README.md", "ModelContainer.swift", "ModelFailure.swift", "Language", "Vision",
+                "Support/README.md",
                 "Support/Core", "Support/Backends",
                 "Support/Management", "Support/Config", "Support/Speech/README.md", "Speech/README.md",
                 "Speech/ASR/README.md", "Speech/TTS/README.md", "Speech/ASR/Apple/README.md",
@@ -809,7 +814,8 @@ let package = Package(
         .target(
             name: "PlatformKit", dependencies: [], path: "MobileHarness/PlatformKit",
             exclude: [
-                "README.md", "Audio/README.md", "Vision/README.md", "Core/README.md", "Connectivity/README.md",
+                "AGENTS.md", "README.md", "Audio/README.md", "Vision/README.md", "Core/README.md",
+                "Connectivity/README.md",
                 "Connectivity/NexArm/README.md",
             ]),
         organizedTestTarget(name: "FunctionContractTests", dependencies: ["FunctionContracts"]),

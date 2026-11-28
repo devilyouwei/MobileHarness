@@ -262,7 +262,7 @@ public actor NexArmActionController {
         try Task.checkCancellation()
         guard (1...3).contains(repetitions) else { throw NexArmExecutionError.invalidArguments }
         if compatibilityPolicy == .passiveBLE, gesture == nil || gesture?.motorID != nil {
-            // Ordinary reset home is independent of the elevated Photographer tracking rest.
+            // Ordinary reset home is independent of the elevated VisionPerception tracking rest.
             let configured = NexArmGesture.referenceHomeJoints
             let home = gesture == nil ? configured : (cachedJoints.count == 6 ? cachedJoints : configured)
             let frames: [NexArmGesture.TestFrame]

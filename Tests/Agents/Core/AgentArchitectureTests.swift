@@ -113,15 +113,15 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog, .timeLimit(.minutes(1)))
     func saturatedPhotographerContextPreservesAdmittedCameraRequest() async throws {
-        let seed = try saturatedEvidenceContext(agent: .photographer, state: PhotographerContextState())
+        let seed = try saturatedEvidenceContext(agent: .visionPerception, state: CameraTransactionContextState())
         let context = try AgentContextRepository(
             agent: seed.agentID, scope: seed.scopeID, state: seed.state,
             persistence: .init(load: { seed }, commit: { _, _ in })
         )
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(sessionID: session, context: context)
+        let agent = try VisionPerceptionAgent(sessionID: session, context: context)
         try await agent.start()
-        let intent = PhotographerCameraIntent(.open, requestID: UUID().uuidString)
+        let intent = CameraCaptureIntent(.open, requestID: UUID().uuidString)
         try await agent.receive(intent.input(sessionID: session))
         var outputs = agent.outputs.makeAsyncIterator()
         let output = try #require(await outputs.next())
@@ -136,7 +136,7 @@ extension LiveRuntimeTests {
         #expect(first.evictedRecordCount == 4097 && first.evictedBatchCount == 4097)
         #expect(first.state.cameraRequestID == intent.requestID)
         try await agent.receive(
-            PhotographerCameraIntent(.cancel, requestID: intent.requestID).input(sessionID: session))
+            CameraCaptureIntent(.cancel, requestID: intent.requestID).input(sessionID: session))
         let second = try await context.snapshot()
         #expect(second.evictedRecordCount == 4098 && second.evictedBatchCount == 4098)
         #expect(second.state.cameraRequestID == nil)
@@ -975,7 +975,7 @@ extension LiveRuntimeTests {
     }
     let trusted = input(origin: .agent, incarnation: "registered-assistant")
     #expect(throws: CommunicationError.unauthorized) {
-        try AgentFixedTaskInput.unwrap(signal, input: trusted, executor: .photographer, decode: decode)
+        try AgentFixedTaskInput.unwrap(signal, input: trusted, executor: .visionPerception, decode: decode)
     }
     #expect(decoded == 0)
     let forwarded = try AgentFixedTaskInput.unwrap(signal, input: trusted, executor: .memory, decode: decode)
@@ -1079,10 +1079,9 @@ private struct ControlAgnosticChatState: AssistantChatState {
     }
     for registry in try AgentConfigurations.skillRegistries() { add(registry) }
     add(try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities))
-    add(try SpeechPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "SpeechPerception").capabilities))
-    add(try VisionPerceptionAgent.runtimeCapabilities(AgentConfigurations.load(named: "VisionPerception").capabilities))
-    add(try PhotographerAgent.runtimeCapabilities(AgentConfigurations.load(named: "Photographer").capabilities))
-    add(try MemoryAgent.runtimeCapabilities(AgentConfigurations.load(named: "Memory").capabilities))
+    add(try SpeechPerceptionAgent.runtimeCapabilities())
+    add(try VisionPerceptionAgent.runtimeCapabilities())
+    add(try MemoryAgent.runtimeCapabilities())
     add(
         try ApplicationControlAgent(
             sessionID: UUID().uuidString,

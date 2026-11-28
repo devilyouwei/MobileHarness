@@ -193,7 +193,7 @@ extension LiveRuntimeTests {
         #expect(configuration.communication.publications.map(\.protocol) == ["perception.audio.source.v1"])
         #expect(original.communication.subscriptions.isEmpty)
         #expect(
-            original.communication.publications.map(\.protocol) == [
+            Set(original.communication.publications.map(\.protocol)) == [
                 SpeechRecognition.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
                 "perception.audio.source.v1",
             ])
@@ -949,5 +949,43 @@ extension LiveRuntimeTests {
             #expect(try await retiring.value)
             await speech.stop()
         }
+    }
+}
+
+extension LiveRuntimeTests {
+    @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+    func microphoneSpectrumUpdatesWhileRecognitionIsBlocked() async throws {
+        let microphone = DirectSoundMicrophone()
+        let vad = NativePacketVAD()
+        let ui = UI.UIContainer()
+        try ui.start()
+        let state = ui.home.conversation
+        let session = UUID().uuidString
+        let speech = try SpeechPerceptionAgent(
+            recognition: NoSoundASR(), vad: NativePacketVADCapability(session: vad), sessionID: session,
+            microphoneInput: microphone, microphoneSpectrum: MicrophoneSpectrumPresentation(state: state),
+            context: AgentContextRepository(
+                agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
+        try await speech.start()
+        try await speech.startInput(sessionID: session)
+        try microphone.source.send(.init(samples: Array(repeating: 0, count: 1536), sampleRate: 16000, sequence: 0))
+        for _ in 0..<1000 where await !vad.entered { try await Task.sleep(for: .milliseconds(2)) }
+        #expect(await vad.entered)
+        let tone = (0..<1536).map { Float(sin(2 * Double.pi * 1000 * Double($0) / 16000)) * 0.2 }
+        for sequence in 1...10 where state.microphoneSpectrum.allSatisfy({ $0 == 0 }) {
+            try microphone.source.send(
+                .init(
+                    samples: tone, sampleRate: 16000, sequence: UInt64(sequence),
+                    timestamp: 0.096 * Double(sequence)))
+            try await Task.sleep(for: .milliseconds(40))
+        }
+        #expect(state.microphoneSpectrum.contains { $0 > 0 })
+        #expect(await !vad.completed)
+        await vad.release()
+        await microphone.finishCapture()
+        try await speech.waitForInput()
+        #expect(state.microphoneSpectrum.allSatisfy { $0 == 0 })
+        await speech.stop()
+        await ui.stop()
     }
 }

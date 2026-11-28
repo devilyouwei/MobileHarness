@@ -1,8 +1,7 @@
 {
-  "version": 3,
-  "id": "photography",
-  "revision": 47,
-  "description": "Photo/video capture, camera controls, photo saving and video save/ignore. Tracking: application-control.",
+  "version": 4,
+  "id": "camera-and-vision",
+  "revision": 49,
   "dependencies": [],
   "useActions": [
     {
@@ -120,12 +119,6 @@
       "channel": "Window"
     },
     {
-      "path": "UI.Island.setPresentation",
-      "callType": "action",
-      "alias": "Island.setPresentation",
-      "channel": "Island"
-    },
-    {
       "path": "Camera.Capture.loadPreviewImage",
       "callType": "action",
       "alias": "loadPreviewImage",
@@ -136,6 +129,30 @@
       "callType": "action",
       "alias": "unloadPreviewImage",
       "channel": "Camera"
+    },
+    {
+      "path": "Camera.Perception.openVision",
+      "callType": "action",
+      "alias": "Vision.open",
+      "channel": "Vision"
+    },
+    {
+      "path": "Camera.Perception.closeVision",
+      "callType": "action",
+      "alias": "Vision.close",
+      "channel": "Vision"
+    },
+    {
+      "path": "Camera.Perception.flipVision",
+      "callType": "action",
+      "alias": "Vision.flip",
+      "channel": "Vision"
+    },
+    {
+      "path": "Camera.Perception.retryVision",
+      "callType": "action",
+      "alias": "Vision.retry",
+      "channel": "Vision"
     }
   ],
   "useStates": [
@@ -144,7 +161,6 @@
     "ui.album",
     "ui.windows",
     "platform.vision.camera",
-    "ui.island",
     "actions.camera.preview"
   ],
   "useInstructions": [

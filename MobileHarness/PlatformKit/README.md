@@ -1,5 +1,7 @@
 # PlatformKit — Native capabilities and system facts
 
+[开发规范](AGENTS.md)
+
 ## Responsibilities and boundaries
 
 PlatformKit is an independent foundation SDK using system frameworks only. It owns native audio, camera, connectivity, typed observations, platform admission, native errors and passive system facts. It imports no Agent, Gateway, Actions, UI, Storage, ModelKit or application composition code. App constructs its single scoped root and controls lifetime; business consent, resource arbitration, interpretation and execution policy remain above the SDK.

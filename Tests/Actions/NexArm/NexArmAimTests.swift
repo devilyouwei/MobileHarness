@@ -11,6 +11,13 @@ import Testing
 
 @testable import Agents
 
+extension VisionPerceptionAgent {
+    fileprivate func trackFixture(_ input: AgentInput) async throws {
+        guard case .pose(let pose)? = input.payload.perception else { throw HarnessError.unsupportedInput }
+        try await track(pose, input: input)
+    }
+}
+
 private func pose(
     noseX: Float, noseY: Float, noseConfidence: Float = 0.9, others: Float = 50,
     sequence: UInt64, timestamp: TimeInterval, people: Int = 1
@@ -123,25 +130,26 @@ private func armSpeeds(in frame: [UInt8]) throws -> [Int] {
     #expect(leveler.elbow(forLift: home[1] - 50) == home[2] + 50)
 }
 
-@Test(.actionCatalog) func photographerPolicyAcceptsVisionPose() throws {
+@Test(.actionCatalog) func visualTrackingDoesNotSubscribeToItsOwnPose() throws {
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication,
         configurations: AgentConfigurations.all())
     let input = observation(
         try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: UUID().uuidString)
-    #expect(policy.destinations(for: input) == [.photographer])
+    #expect(!policy.destinations(for: input).contains(.visionPerception))
 }
 
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func photographerOnTheLeftAimsBaseAndHoldsTheOtherJoints() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
         var stream = agent.outputs.makeAsyncIterator()
         let aimed = try #require(await stream.next())
@@ -174,23 +182,24 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func photographerFreshnessUsesActualPoseAdmissionAndStopsWithLifecycle() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
         #expect(await !agent.hasFreshPose())
         // A future sensor timestamp cannot prolong physical input freshness.
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 1e12), session: session))
         #expect(await agent.hasFreshPose(maximumAge: .milliseconds(200)))
         try await Task.sleep(for: .milliseconds(250))
         #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 50, noseY: 50, sequence: 2, timestamp: 1e12, people: 0), session: session))
         #expect(await !agent.hasFreshPose(maximumAge: .milliseconds(200)))
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 50, noseY: 50, sequence: 3, timestamp: 1e12), session: session))
         #expect(await agent.hasFreshPose())
         try await agent.pause()
@@ -205,14 +214,15 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func hiddenNoseUsesTheVisibleJointMidpoint() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
         let body = try pose(noseX: 0, noseY: 0, noseConfidence: 0.1, others: 80, sequence: 1, timestamp: 0)
-        try await agent.receive(observation(body, session: session))
+        try await agent.trackFixture(observation(body, session: session))
         var stream = agent.outputs.makeAsyncIterator()
         let aimed = try #require(await stream.next())
         guard case .toolCall(let call) = aimed.output else {
@@ -233,14 +243,15 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func emptyPoseDoesNotAim() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
         let empty = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 0, rotation: 1, people: [])
-        try await agent.receive(observation(empty, session: session))
+        try await agent.trackFixture(observation(empty, session: session))
         var stream = agent.outputs.makeAsyncIterator()
         await agent.stop()
         #expect(await stream.next() == nil)
@@ -250,13 +261,14 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func centeredPersonDoesNotAim() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 50, noseY: 50, sequence: 1, timestamp: 0), session: session))
         var stream = agent.outputs.makeAsyncIterator()
         await agent.stop()
@@ -267,15 +279,16 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func baseKeepsSteppingWhileThePersonStaysOffCenter() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.25), session: session))
         var stream = agent.outputs.makeAsyncIterator()
         let first = try #require(await stream.next())
@@ -296,15 +309,16 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func aimWaitsForTimeAndMovement() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.02), session: session))
         var stream = agent.outputs.makeAsyncIterator()
         _ = try #require(await stream.next())
@@ -320,7 +334,7 @@ extension LiveRuntimeTests {
         let call = ToolCall(
             id: UUID().uuidString, toolPath: "NexArm.Tracking.aim", arguments: ["base": "nan", "pitch": "0"])
         let envelope = OutputEnvelope(
-            source: .photographer, context: input.context, output: .toolCall(call), taskScope: input.taskScope)
+            source: .visionPerception, context: input.context, output: .toolCall(call), taskScope: input.taskScope)
         await #expect(throws: NexArmActions.AimError.invalidAngle) {
             try await NexArmActions.aim(
                 invocation: ActionInvocation(
@@ -401,21 +415,22 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func photographerOverflowRejectsWithoutStoppingOrReplacingAcceptedAims() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true, outputCapacity: 8,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
         for index in 0..<8 {
-            try await agent.receive(
+            try await agent.trackFixture(
                 observation(
                     try pose(
                         noseX: index.isMultiple(of: 2) ? 10 : 90, noseY: 50,
                         sequence: UInt64(index + 1), timestamp: Double(index)), session: session))
         }
         await #expect(throws: HarnessError.queueFull) {
-            try await agent.receive(
+            try await agent.trackFixture(
                 observation(
                     try pose(noseX: 10, noseY: 50, sequence: 9, timestamp: 8), session: session))
         }
@@ -430,10 +445,11 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func photographerRejectsMalformedDecodedPoseBeforeIndexingJoints() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
         let pose = try JSONDecoder().decode(
@@ -441,7 +457,7 @@ extension LiveRuntimeTests {
             from: Data(
                 #"{"width":100,"height":100,"sequence":1,"timestamp":0,"rotation":1,"people":[[]]}"#.utf8))
         await #expect(throws: CommunicationError.invalidPayload) {
-            try await agent.receive(observation(pose, session: session))
+            try await agent.trackFixture(observation(pose, session: session))
         }
         #expect(await agent.status().processedInputs == 0)
         await agent.stop()
@@ -466,16 +482,17 @@ extension LiveRuntimeTests {
     @Test(.actionCatalog) func photographerSuppressesOfflineCommandsAndResumesFromFreshPose() async throws {
         let session = UUID().uuidString
         let availability = ArmAvailability()
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true, controlAvailable: { await availability.ready },
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 1, timestamp: 0), session: session))
         await availability.enable()
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 10, noseY: 50, sequence: 2, timestamp: 0.1), session: session))
         await agent.stop()
         var sequences: [UInt64] = []
@@ -504,20 +521,21 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func rejectedTrackingOutputDoesNotAdvanceAccumulatedTarget() async throws {
         let session = UUID().uuidString
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true, outputCapacity: 8,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         try await agent.start()
         for sequence in 1...8 {
-            try await agent.receive(
+            try await agent.trackFixture(
                 observation(
                     try pose(noseX: 43, noseY: 50, sequence: UInt64(sequence), timestamp: Double(sequence)),
                     session: session))
         }
         await #expect(throws: HarnessError.queueFull) {
-            try await agent.receive(
+            try await agent.trackFixture(
                 observation(try pose(noseX: 43, noseY: 50, sequence: 9, timestamp: 9), session: session))
         }
         var iterator = agent.outputs.makeAsyncIterator()
@@ -530,7 +548,7 @@ extension LiveRuntimeTests {
             }
             lastBase = try #require(Double(call.arguments["base"] ?? ""))
         }
-        try await agent.receive(
+        try await agent.trackFixture(
             observation(try pose(noseX: 43, noseY: 50, sequence: 10, timestamp: 10), session: session))
         let resumed = try #require(await iterator.next())
         guard case .toolCall(let call) = resumed.output else {
@@ -659,7 +677,7 @@ private func registeredSpeed(_ packet: NexArmPacket, motor: Int) throws -> Int {
 }
 
 @Test func photographerTracksAtTwentyHertzWithoutBacklogOrStallCatchUp() throws {
-    var policy = PhotographerTrackingPolicy()
+    var policy = PoseTrackingPolicy()
     var times: [Double] = []
     var last = (base: 0.0, pitch: 0.0)
     // A much faster source cannot create an unbounded stream of aim publications.
@@ -683,7 +701,7 @@ private func registeredSpeed(_ packet: NexArmPacket, motor: Int) throws -> Int {
 
 @Test func photographerRateAndFilterDependOnTimeInsteadOfFrameCount() throws {
     func result(hz: Int, changeError: Bool) throws -> Double {
-        var policy = PhotographerTrackingPolicy()
+        var policy = PoseTrackingPolicy()
         var final = 0.0
         for tick in 0...hz {
             let timestamp = Double(tick) / Double(hz)
@@ -780,11 +798,11 @@ extension LiveRuntimeTests {
         let gateway = await OutputGateway(
             manager: manager, requests: input, tools: tools, actions: ChannelScheduler(registry: ActionRegistry()),
             policy: policy, sink: { _ in })
-        let agent = try PhotographerAgent(
+        let agent = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: .photographer, scope: UUID().uuidString, state: PhotographerContextState()))
-        let host = PhotographerExecutionSession(
+                agent: .visionPerception, scope: UUID().uuidString, state: CameraTransactionContextState()))
+        let host = VisionPerceptionExecutionSession(
             manager: manager, output: gateway, agent: agent, report: { Issue.record("\($0)") })
         func waitFor(_ predicate: @Sendable () async -> Bool) async throws {
             let deadline = ContinuousClock.now + .seconds(8)
@@ -795,11 +813,11 @@ extension LiveRuntimeTests {
         }
         do {
             try await host.attachTracking(sessionID: session)
-            try await agent.receive(
+            try await agent.trackFixture(
                 observation(try pose(noseX: 90, noseY: 50, sequence: 1, timestamp: 0), session: session))
             try await waitFor { await probe.targets.count == 1 }
             for index in 1...20 {
-                try await agent.receive(
+                try await agent.trackFixture(
                     observation(
                         try pose(noseX: 90, noseY: 50, sequence: UInt64(index + 1), timestamp: Double(index) / 20),
                         session: session))

@@ -49,17 +49,21 @@ private func islandInput(_ function: String, parameters: [String: String], sourc
     }
     #expect(state.activities.count == 1)
 }
-@Test(.actionCatalog) func islandSkillsExposeOnlyDisplayControlAndKeepBasicUnchanged() throws {
-    let fixed = try AgentConfigurations.load(named: "Assistant").capabilities
-    let registry = try AgentSkillLoader.registry(["photography", "application-control"], fixed: fixed)
-    #expect(
-        registry.actions.filter { $0.path.description.hasPrefix("UI.Island.") }.map(\.alias) == [
-            "Island.setPresentation"
-        ])
-    #expect(
-        try !AgentSkillLoader.registry(["basic-interaction"], fixed: fixed).actions.contains {
-            $0.path.description.hasPrefix("UI.Island.")
-        })
+@Test(.actionCatalog) func islandControlsStayOutsideSkillCatalogs() throws {
+    for registry in try AgentConfigurations.skillRegistries() {
+        #expect(!registry.actions.contains { $0.path.description.hasPrefix("UI.Island.") })
+        #expect(!registry.tools.contains { $0.path.hasPrefix("UI.Island.") })
+    }
+    #expect(try !AgentSkillLoader.useStates(["camera-and-vision", "application-control"]).contains("ui.island"))
+}
+
+@Test @MainActor func islandModuleSupportsBothCallRoutesAndReturnsToolReceipts() throws {
+    let module = IslandModule(island: IslandPresentationService(state: IslandState()))
+    for definition in module.definitions {
+        let binding = try BehaviorProtocolBindings.bind(definition)
+        #expect(binding.protocols == [.action, .tool])
+        #expect(binding.directResultPolicy == .returning)
+    }
 }
 @MainActor private final class IslandNativeIntegrationProbe: IslandSystemDriving {
     var onStatus: (@MainActor (UUID, IslandSystemStatus) -> Void)?
@@ -406,15 +410,15 @@ func photographerAndApplicationControlPublishOwnActivitiesWithoutAssistant() asy
     let assembly = try BehaviorAssembly(capabilityModules: [IslandModule(island: service)])
     let output = await OutputGateway(
         manager: manager, requests: input, tools: assembly.tools, policy: policy, sink: { _ in })
-    let photographer = try PhotographerAgent(
+    let visionPerception = try VisionPerceptionAgent(
         sessionID: UUID().uuidString, uiCamera: ui.camera,
         context: AgentContextRepository(
-            agent: .photographer, scope: UUID().uuidString, state: PhotographerContextState()))
+            agent: .visionPerception, scope: UUID().uuidString, state: CameraTransactionContextState()))
     let application = try ApplicationControlAgent(
         sessionID: UUID().uuidString,
         context: AgentContextRepository(
             agent: .applicationControl, scope: UUID().uuidString, state: ApplicationControlContextState()))
-    let cameraSession = PhotographerExecutionSession(manager: manager, output: output, agent: photographer)
+    let cameraSession = VisionPerceptionExecutionSession(manager: manager, output: output, agent: visionPerception)
     let applicationSession = ApplicationControlExecutionSession(manager: manager, output: output, agent: application)
     try await cameraSession.prepareForInteraction()
     try await applicationSession.prepareForInteraction()
@@ -424,23 +428,23 @@ func photographerAndApplicationControlPublishOwnActivitiesWithoutAssistant() asy
         try #require(condition())
     }
     ui.camera.present(.countdown(3))
-    try await wait { ui.island.headerActivity?.owner.hasPrefix("photographer:") == true }
+    try await wait { ui.island.headerActivity?.owner.hasPrefix("visionPerception:") == true }
     #expect(ui.island.headerActivity?.content.title == "Photo countdown")
     try await application.observeConnection(.init(availability: .available, phase: .connected, recovery: .idle))
     try await wait { ui.island.activities.contains { $0.owner.hasPrefix("applicationControl:") } }
     ui.camera.present(.countdown(nil))
-    try await wait { !ui.island.activities.contains { $0.owner.hasPrefix("photographer:") } }
+    try await wait { !ui.island.activities.contains { $0.owner.hasPrefix("visionPerception:") } }
     try await application.observeConnection(.init(availability: .poweredOff, phase: .idle, recovery: .idle))
     try await wait {
         ui.island.activities.contains { $0.owner.hasPrefix("applicationControl:") && $0.content.tone == .warning }
     }
     try await wait { ui.island.activities.isEmpty }
     ui.camera.present(.photoBusy(true))
-    try await wait { ui.island.activities.contains { $0.owner.hasPrefix("photographer:") } }
+    try await wait { ui.island.activities.contains { $0.owner.hasPrefix("visionPerception:") } }
     await cameraSession.shutdown()
     await applicationSession.shutdown()
     #expect(ui.island.activities.isEmpty)
-    #expect(await photographer.presentationFailure == nil)
+    #expect(await visionPerception.presentationFailure == nil)
     #expect(await application.presentationFailure == nil)
     await output.shutdown()
     await ui.stop()

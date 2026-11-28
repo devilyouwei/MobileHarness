@@ -15,7 +15,7 @@ func writerSkillsAreScopedToTheirOwner(id: String) throws {
         try AgentSkillLoader.registry([id], fixed: CapabilityRegistry())
     }
     let overview = try AgentConfigurations.skillOverview()
-    #expect(overview.contains("photography"))
+    #expect(overview.contains("camera-and-vision"))
     #expect(!overview.contains(id))
     let capabilities = try AgentConfigurations.load(named: "Writer").capabilities
     #expect(
@@ -155,7 +155,7 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
 
 @Test(.actionCatalog) func bundledConfigurationsSeparateFixedAndSkillFunctions() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    #expect(config.version == 9 && config.agentID == .assistant)
+    #expect(config.version == 10 && config.agentID == .assistant)
     #expect(config.capabilities.actions.contains { $0.alias == "express" })
     #expect(config.capabilities.controls.isEmpty)
     #expect(!config.capabilities.actions.contains { $0.path.domain == "Agent" })
@@ -178,10 +178,11 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
     #expect(
         Set(registry.internalActions.map { $0.path.description }) == [
             "Speech.Playback.speak", "UI.Caption.beginReplyTurn", "UI.Caption.print",
-            "UI.Expression.setReplyWaiting",
         ])
     #expect(
-        Set(registry.internalTools.map(\.path)) == ["Speech.Playback.setVolume", "UI.Island.present", "UI.Island.end"])
+        Set(registry.internalTools.map(\.path)) == [
+            "Speech.Playback.setVolume", "UI.Expression.setReplyWaiting", "UI.Island.present", "UI.Island.end",
+        ])
     #expect(registry.tools.isEmpty)
     #expect(!registry.actions.contains { $0.path.description == "UI.Expression.setReplyWaiting" })
     #expect(!registry.internalTools.contains { $0.path == "Speech.Listening.update" })
@@ -206,9 +207,10 @@ func agentConfigurationRejectsInvalidDocuments(_ mutation: String) throws {
                     CallRejection(kind: .action, alias: name, reason: .unknownCapability))
             ])
     }
-    for name in ["SpeechPerception", "VisionPerception"] {
-        let other = try AgentConfigurations.load(named: name)
-        #expect(other.capabilities.actions.isEmpty && other.capabilities.tools.isEmpty)
+    for name in ["SpeechPerception", "VisionPerception", "ApplicationControl", "Memory"] {
+        let capabilities = try AgentConfigurations.load(named: name).capabilities
+        #expect(try AgentConfigurations.baseSkills(named: name).isEmpty)
+        #expect(capabilities.actions.isEmpty && capabilities.tools.isEmpty)
     }
     #expect(throws: AgentConfigurationError.resourceMissing("MissingAgent")) {
         try AgentConfigurations.load(named: "MissingAgent")
@@ -462,13 +464,13 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
             "resetArm", "moveMotor", "resetMotor",
         ])
     #expect(robot.allSatisfy { $0.defaultChannel == "Robot" })
-    let settings = try AgentConfigurations.load(named: "ApplicationControl").capabilities
+    let settings = try AgentSkillLoader.registry(["application-control"], fixed: CapabilityRegistry())
     let settingsRobot = settings.actions.filter { $0.path.domain == "NexArm" }
     #expect(settingsRobot.isEmpty && !settings.channels.contains("Robot"))
     let composed = try AgentSkillLoader.registry(
         ["robot-interaction", "application-control"], fixed: CapabilityRegistry())
     #expect(composed.actions.filter { $0.path.domain == "NexArm" }.map(\.path) == robot.map(\.path))
-    for name in ["Photographer"] {
+    for name in ["VisionPerception"] {
         let other = try AgentConfigurations.load(named: name).capabilities
         #expect(!other.actions.contains { $0.path.domain == "NexArm" })
         for action in robot {
@@ -479,11 +481,13 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
     }
     #expect(!assistant.actions.contains { $0.path.domain == "Camera" })
     #expect(
-        try AgentConfigurations.load(named: "Photographer").capabilities.actions.contains { $0.alias == "takePhoto" })
+        try AgentSkillLoader.registry(["camera-and-vision"], fixed: CapabilityRegistry()).actions.contains {
+            $0.alias == "takePhoto"
+        })
 }
 
-@Test(.actionCatalog) func photographerCameraModelCallsUseScheduledActions() throws {
-    let capabilities = try AgentConfigurations.load(named: "Photographer").capabilities
+@Test(.actionCatalog) func assistantCameraSkillUsesScheduledActions() throws {
+    let capabilities = try AgentSkillLoader.registry(["camera-and-vision"], fixed: CapabilityRegistry())
     #expect(capabilities.tools.isEmpty)
     for alias in ["openCamera", "closeCamera", "flipCamera", "retryCamera", "takePhoto", "savePhoto"] {
         let registration = try #require(capabilities.actions.first { $0.alias == alias })
@@ -495,7 +499,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
 @Test(.actionCatalog) func typedUIRequestsSubscribeOnlyAtTheirBusinessOwner() throws {
     let configurations = try AgentConfigurations.all()
     let owners: [String: AgentID] = [
-        "photography.camera": .photographer, "history.intent": .memory,
+        "photography.camera": .visionPerception, "history.intent": .memory,
         "app.interaction": .applicationControl, "model.resource.intent": .applicationControl,
         "provider.settings": .applicationControl, "provider.discovery": .applicationControl,
     ]
@@ -505,7 +509,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         }.map(\.agentID)
         #expect(subscribers.isEmpty)
     }
-    let controls = try AgentConfigurations.load(named: "ApplicationControl").capabilities
+    let controls = try AgentSkillLoader.registry(["application-control"], fixed: CapabilityRegistry())
     #expect(
         try controls.resolveAction("openPage", parameters: ["destination": "settings"]).actionPath
             .description == "UI.Navigation.open")
@@ -520,8 +524,7 @@ func threeLevelConfigurationRejectsAmbiguousBindings(_ mutation: String) throws 
         #expect(Set(tools).count == tools.count)
         #expect(Set(actions).isDisjoint(with: Set(tools)))
     }
-    let configuration = try AgentConfigurations.load(named: "ApplicationControl")
-    let catalog = configuration.capabilities
+    let catalog = try AgentSkillLoader.registry(["application-control"], fixed: CapabilityRegistry())
     #expect(
         try catalog.resolveAction("openPage", parameters: ["destination": "settings"]).actionPath.description
             == "UI.Navigation.open")
@@ -566,17 +569,25 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
     #expect(throws: AgentConfigurationError.self) { try decode(old) }
 }
 
-@Test(.actionCatalog) func bundledAgentResourceDescriptionsProjectToExistingFunctionContract() throws {
-    for name in [
-        "Assistant", "Writer", "Memory", "Photographer", "ApplicationControl", "SpeechPerception",
-        "VisionPerception",
-    ] {
-        let configuration = try AgentConfigurations.load(named: name)
-        let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
-        let resource = try AgentConfigurations.decodeResource(data, expectedID: configuration.agentID)
-        #expect(resource.version == 12 && configuration.version == 9)
-        #expect(!resource.description.isEmpty && resource.description.utf8.count <= 2048)
-        #expect(try AgentConfigurations.publicDescription(named: name) == resource.description)
+@Test(.actionCatalog) func bundledDescriptionsUseTheOwnersLocalizedMarkdown() throws {
+    let data = try AgentConfigurations.data("Catalog.json")
+    let catalog = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    for group in ["agents", "skills"] {
+        let owners = try #require(catalog[group] as? [String: String])
+        for (name, path) in owners {
+            for language in ["en", "zh-Hans"] {
+                let file = language == "en" ? "Description.md" : "Description.zh-Hans.md"
+                let sibling = (path as NSString).deletingLastPathComponent + "/" + file
+                let expected = try String(decoding: AgentConfigurations.data(sibling), as: UTF8.self)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let text = try AgentPrompts.$language.withValue(language) {
+                    try group == "agents"
+                        ? AgentConfigurations.publicDescription(named: name)
+                        : AgentConfigurations.skillDescription(name)
+                }
+                #expect(!expected.isEmpty && text == expected)
+            }
+        }
     }
 }
 
@@ -588,22 +599,12 @@ func skillUseStateRejectsInvalidDeclarations(_ mutation: String) throws {
     #expect(communication.subscriptions.isEmpty)
 }
 
-@Test(
-    .actionCatalog,
-    arguments: [
-        "missing", "empty", "blank", "wrongType", "oversize", "multibyteOversize", "oldVersion", "unknownField",
-        "wrongID",
-    ])
-func invalidPublicAgentDescriptionsFailExplicitly(failure: String) throws {
+@Test(.actionCatalog, arguments: ["inlineDescription", "oldVersion", "unknownField", "wrongID"])
+func invalidAgentResourceMetadataFailsExplicitly(failure: String) throws {
     let data = try AgentConfigurations.data("Agents/Writer/Agent.json")
     var resource = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     switch failure {
-    case "missing": resource.removeValue(forKey: "description")
-    case "empty": resource["description"] = ""
-    case "blank": resource["description"] = " \n\t"
-    case "wrongType": resource["description"] = ["text": "writer"]
-    case "oversize": resource["description"] = String(repeating: "a", count: 2049)
-    case "multibyteOversize": resource["description"] = String(repeating: "写", count: 683)
+    case "inlineDescription": resource["description"] = "Use the Markdown resource"
     case "oldVersion": resource["version"] = 8
     case "unknownField": resource["privateInstructions"] = "must not be public"
     case "wrongID": resource["id"] = "assistant"
@@ -613,11 +614,23 @@ func invalidPublicAgentDescriptionsFailExplicitly(failure: String) throws {
     #expect(throws: (any Error).self) { try AgentConfigurations.decodeResource(mutated, expectedID: .writer) }
 }
 
+@Test(arguments: ["VisionPerception", "SpeechPerception", "ApplicationControl", "Memory"])
+func fixedWorkflowsRejectModelSkills(name: String) throws {
+    let data = try AgentConfigurations.data("Agents/" + name + "/Agent.json")
+    var resource = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let id = try #require(resource["id"] as? String)
+    resource["skills"] = ["basic-interaction"]
+    #expect(throws: AgentConfigurationError.invalidField("skills: " + id)) {
+        try AgentConfigurations.decodeResource(
+            JSONSerialization.data(withJSONObject: resource), expectedID: .init(rawValue: id))
+    }
+}
+
 @Test(.actionCatalog) func bundledAgentsDeclareTheirCategories() throws {
     let expected: [String: AgentCategory] = [
         "Assistant": .cognition, "Writer": .cognition, "Memory": .cognition,
         "SpeechPerception": .perception, "VisionPerception": .perception,
-        "Photographer": .perception, "ApplicationControl": .perception,
+        "ApplicationControl": .perception,
     ]
     #expect(try AgentConfigurations.all().count == expected.count)
     for (name, category) in expected {
@@ -689,7 +702,7 @@ func agentCategoryRejectsInvalidResourceAndCompiledConfiguration(mutation: Strin
 }
 
 @Test(.actionCatalog) func taskReportPublicationDeclarationsMatchTheirCodeOwners() throws {
-    for name in ["Assistant", "Writer", "Memory", "Photographer", "ApplicationControl"] {
+    for name in ["Assistant", "Writer", "Memory", "VisionPerception", "ApplicationControl"] {
         let configuration = try AgentConfigurations.load(named: name)
         #expect(
             configuration.communication.publications.contains {

@@ -92,7 +92,7 @@ struct FixedPlatformState: PlatformStateReading {
                     facts: try JSONEncoder().encode(["latestPreviewID": id]),
                     images: id.map { [.init(id: $0, width: 1, height: 1, data: Data([1]))] } ?? [])
             }, reset: { _ in })
-        try AssistantStateBindings.register(in: context, names: ["platform.vision.camera"]) { _ in
+        try AgentStateBindings.register(in: context, names: ["platform.vision.camera"]) { _ in
             let value = camera()
             return PlatformStateSnapshot(
                 path: "platform.vision.camera",
@@ -101,7 +101,7 @@ struct FixedPlatformState: PlatformStateReading {
                     "facing": .text(value.selectedFacing),
                 ])
         }
-        try AssistantStateBindings.register(in: context, names: sourceNames) { path in
+        try AgentStateBindings.register(in: context, names: sourceNames) { path in
             guard let raw = path.split(separator: ".").last,
                 let source = PlatformStateSource(rawValue: String(raw))
             else { throw ContainerContextError.missing }

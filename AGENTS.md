@@ -2,65 +2,66 @@
 
 These instructions apply to all work in this repository.
 
+- Before writing or modifying code, establish what each candidate directory owns and which development rules apply there. To do this, read the relevant technical READMEs and check each directory from the repository root through the candidate directory for an `AGENTS.md`. Read every applicable guide. For changes spanning directories, do this for each affected path.
+- If the target directory has no `AGENTS.md` of its own, follow the inherited rules and use neighboring files in that directory as a guide to its coding style and responsibilities.
+
 ## 1. Read and Maintain Documentation
 
-Read the relevant documentation before designing or implementing a change. Documentation has three distinct responsibilities:
+Read the relevant documentation before designing or implementing a change. Before editing a document, read its outline and the surrounding sections. Place the update in the section that owns the topic and follow the document's structure, terminology and style.
+
+Write documentation in English. When editing a document, translate existing non-English prose into English. Preserve original wording where it matters for accuracy, such as a localized UI string, a verbatim quotation or an original source artifact.
 
 | Location | Responsibility |
 | --- | --- |
-| `docs/` | Requirements, plans, decisions, change history, and validation evidence. Follow `docs/README.md` for classification and placement. |
-| `MobileHarness/README.md` | Overall technical design: core modules, the complete framework, cross-module flows, data flow, and key architectural designs. |
-| Code-directory `README.md` files | Detailed technical design and implementation for the owning directory, with increasing detail at deeper levels. |
+| `docs/` | Requirements, proposed technical designs, implementation plans, decision records, change history, validation results and supporting materials. Follow `docs/README.md` for classification and placement. |
+| `MobileHarness/README.md` | The architecture as implemented, including module boundaries, dependencies, cross-module interfaces, control flow and data flow. |
+| `MobileHarness/<Module>/AGENTS.md` | Development rules for the entire first-level directory, including ownership by subdirectory, dependency boundaries, constraints, pitfalls, templates and working examples. |
+| Code-directory `README.md` files | The implementation within the owning module or directory, including concrete interfaces, responsibilities, data flow, state and algorithms. |
 
-- Keep documentation under `MobileHarness/` aligned with the latest code. Technical documentation under MobileHarness/, including module and nested directory documents, describes implemented designs only and uses no implementation status markers. Keep proposed designs, plans and outstanding work in docs/; remove superseded descriptions from the current design contract.
+- Link each module README to its development guide. Keep technical READMEs aligned with the current code. Replace superseded descriptions in place and omit implementation status markers.
 - Each first-level module and each directory with a distinct technical design owns a `README.md`. A simple leaf directory may be described in its immediate parent README, with a relative link to the directory and its purpose, current interfaces and implementation constraints.
 - Each first-level module README must describe responsibilities and boundaries, direct upstream/downstream relationships and interfaces, internal submodule designs and relationships, data flow, and key technical decisions. Include a diagram of its direct upstream and downstream interfaces and a separate diagram of its internal flow. Describe external relationships one level deep only.
 - Nested READMEs must focus on their own directory: interfaces, algorithms, state, lifecycle, failure handling, and constraints as applicable. Link to other documentation instead of duplicating it.
-- Update the overall design when a change affects module boundaries or cross-module flows. Update the relevant `docs/` documents when requirements, plans, decisions, or validation records change.
-- Keep historical evidence distinct from current implementation claims. Preserve `docs/Technical_Design.docx` as the original design source.
+- Preserve `docs/Technical_Design.docx` as the original design source.
 
 ## 2. Keep Modules Independent and Responsibilities Clear
 
-- First-level directories under `MobileHarness/` represent the application's core modules. Keep them highly decoupled, with explicit ownership and clear responsibilities.
+- First-level directories under `MobileHarness/` own the application's core modules and App-level packaged resources. Keep them highly decoupled, with explicit ownership and clear responsibilities.
 - ModelKit, PlatformKit, UI, and Storage are foundational capability modules. They must not depend on other project modules or own upper-layer business logic or application orchestration.
 - Use explicit module interfaces. Do not introduce circular dependencies, duplicate ownership, or reach into another module's implementation details.
-- Consult the architecture and dependency sections in `MobileHarness/README.md` and the owning module README for dependency and flow design before choosing where code belongs.
+- Consult the architecture and dependency sections in `MobileHarness/README.md`, the owning module's `AGENTS.md` and its README before choosing where code belongs.
 - Treat existing dependencies that conflict with these principles as outstanding migration work, not as precedent for new dependencies.
 
 ### Source Organization
 
-- 根目录放模块入口和整体契约；Shared／Support 放可复用机制；具体能力跟随所属目录。
-- Keep module roots and module-wide contracts (such as structured failures and state snapshots) discoverable together. Shared/Support owns reusable mechanisms; capability-specific interfaces, child containers, state and rendering stay with their capability owner.
+- Once the directory's responsibility and development rules are clear, write or modify code there only if the change belongs to that directory, following its rules. If the change belongs elsewhere, find the appropriate existing directory and check its rules first. If ownership is still unclear, ask the developer before writing code. Follow §3 when proposing a new directory for authored files.
+- Keep module entry points and module-wide contracts together at the module root. Shared or Support owns reusable mechanisms. Place capability-specific interfaces, child containers, state and rendering with their capability owner.
 - Decide placement by responsibility, not merely by `public` visibility, reuse count, or a fixed number of root files. Keep closely related small declarations together rather than introducing a file for every type.
 - Preserve existing compiled-target and dependency boundaries. A documented shared-contract target may own module-wide contracts in Support/Contracts; application composition may keep its root in Composition. Do not relocate these solely for visual symmetry.
-- A UI Root directory owns root-page composition and navigation; it is distinct from the UI module's root API directory.
 
 ## 3. Obtain Approval Before Adding Directories or Modules
 
-- Obtain explicit user approval before creating any new directory, including a new first-level module under `MobileHarness/`.
+- Obtain explicit user approval before adding a directory to organize authored files, including source modules, tests, scripts, documentation and experiment tasks.
+- Builds, downloads and existing tasks may create directories for their artifacts, caches, downloaded models and per-run results without separate directory approval. For example, adding a new experiment task directory requires approval. Running that task may create its results directory automatically.
 - Prefer an existing module or directory whenever its responsibilities cover the change. Do not add a module merely to accommodate a new feature.
 - Before requesting approval, explain the proposed purpose and ownership, why existing directories cannot accommodate it, and its relationships with existing modules.
 
 ## 4. Update Documentation Before Code
 
-- For every feature or fix, document intended changes in the relevant docs/ requirements or plans before editing code. Describe affected files, responsibilities, behavior, interfaces and flows. Keep MobileHarness/ technical READMEs limited to implemented designs.
-- For changes spanning directories, plan changes to each owning design document and cross-module boundaries in docs/. After implementation, update each affected README and the overall design.
-- Track pending implementation in docs/ only. After implementation, reconcile technical documentation with the actual result without status markers.
-- If the design changes during implementation, revise the documentation before continuing code changes.
+- Before coding a feature or fix, record its intended behavior, affected files, responsibilities, interfaces and flows in the relevant `docs/` requirement or plan. Identify the owning READMEs and any cross-module design that will need updating.
+- If the design changes during implementation, revise the plan before continuing.
 
 ## 5. Reconcile Documentation and Remove Obsolete Code
 
-Before completing a code change:
-
-- Verify that affected documentation accurately describes the latest design, actual implementation; track remaining work in docs/.
-- Remove replaced code, redundant or duplicate implementations, and stale references within the scope of the change.
-- Do not leave old and new implementations side by side without a documented migration need. Describe the actual transitional behavior and its reason in the owning README; track remaining cleanup in docs/.
+- After changing code, check each affected code directory for a `README.md`. Where one exists, update the relevant sections to describe the implementation as it now works. If a parent README documents a leaf directory, update that description there.
+- Update `MobileHarness/README.md` when module boundaries or cross-module flows change. Keep requirements, pending work, change history and validation results in `docs/`, including after delivery.
+- Remove superseded code, duplicates and stale references within the scope of the change. If a migration requires both implementations, explain the current behavior and its reason in the owning README and track remaining cleanup in `docs/`.
 
 ## 6. Validate Changes and Report Evidence
 
 - Run checks appropriate to the change. For code changes, run `./scripts/check.sh` and, when full Xcode is available, `./scripts/build-ios.sh`. For documentation-only changes, verify accuracy, referenced paths, and diff formatting; builds are not required.
 - Add or update tests when behavior changes or a regression needs coverage. Test observable behavior and failure cases rather than duplicating implementation details.
-- Report what was verified, what failed, and what could not run. Do not describe unavailable checks as passing.
+- Report pass, fail or not run separately for engineering tests, builds, research-tool regressions and real-model experiments. Preserve individual subtask failures in batch results. Run timing-sensitive tests separately from heavy model experiments. Default engineering checks exclude real-model matrices.
 - Distinguish build and automated-test results from real model, native UI, and physical-device acceptance. Label demo and stub behavior explicitly.
 
 ## 7. Make Runtime and Failure Contracts Explicit
@@ -78,20 +79,12 @@ Before completing a code change:
 
 ## 9. Agent Validation Workflow and Directory Ownership
 
-Before changing or running experiments, read [experiments/AGENTS.md](experiments/AGENTS.md) and the owning task README. That file defines experiment execution, data ownership and report placement. Raw outputs belong in `experiments/<Task>/results/`; authored experiment reports belong in `docs/validation/` and link to those outputs.
+| Owner | Scope |
+| --- | --- |
+| [Tests](Tests/README.md) | Swift tests for App behavior, contracts, cross-module flows and model integration. A single model and fewer than ten requests may verify communication and flow. Engineering fixtures belong with their tests. |
+| [experiments](experiments/AGENTS.md) | Python model evaluations, prompt comparisons, accuracy and performance measurements, with task-owned datasets, scoring and runner regressions. Read the experiment guide and task README before changing or running an experiment. |
+| [scripts](scripts/README.md) | Batch orchestration, including configuration, concurrency, timeouts and exit status. Read the script guide and target README before running a task. Prefer an existing entry point or invoke the owning task directly. |
+| [Models](Models/README.md) | The only shared artifact location for tests and experiments. Pin the source and version, verify size and hash, and reuse valid artifacts. |
 
-- `scripts/` 是供开发 agent 使用的批处理与自动化入口：选择模块/任务，调用 Tests 或 experiments 的执行入口，传递配置、限制并发/超时、收集退出状态。批处理代码放这里；断言、评分、提示词和业务夹具放所属目录。不得把 scripts 做成双方共用的业务库。
-- `Tests/` 使用 Swift 验证 App 模块功能、接口及跨模块链路。允许单模型、个位数请求验证通信与业务通顺；不运行模型效果矩阵。
-- `experiments/<任务>/` 使用 Python 直接运行模型 case、提示词对照、准确率与性能实验；自有脚本、配置、Datasets 和 Results。运行器自身的离线回归也由这里维护。
-- Tests 与 experiments 不互相导入，不读取对方代码、配置、数据或结果，不通过 scripts 间接共享这些内容。允许各自重复实现；双方可独立运行。
-- `Models/<模型名>/` 是双方唯一共享的制品位置：从 Hugging Face 或其他明确 URL 下载，固定版本、校验大小/哈希，复用已有有效制品，避免重复下载。这里不放项目共享业务库、评估集或运行结果。
-- `docs/` 保存人工撰写或汇总的方法、结论、计划、验证报告及文档附件；原始实验数据归 experiments。`MobileHarness/` 拥有 App 生产实现。
-- 执行前先读 `scripts/README.md` 和目标目录 README，优先使用现有脚本入口；缺少批处理入口时，可直接调用所属目录入口，新增批处理仅做编排，不复制验证逻辑。不要假设存在统一实验命令。
-- 工程检查使用 `./scripts/check.sh`，构建使用 `./scripts/build-ios.sh`；模型实验显式选择任务、模型/版本、case、请求预算和输出路径。默认工程检查不触发真实模型矩阵；凭据不写入脚本或结果。
-- 工程测试、构建、研究工具回归、真实模型实验分别记录成功/失败/未执行。批处理保留子任务失败状态，不以其他任务通过掩盖失败；计时敏感工程测试与重模型实验串行运行。
-
-### Validation scope
-
-- `Tests/`: Swift only. Own App unit tests, business logic, module contracts and cross-module flows, including App model management, deployment and inference integration. A few model requests may verify communication and flow correctness; prompt quality, case matrices and model comparisons belong in experiments.
-- `experiments/`: Python only. Evaluate model cases, prompts, accuracy and inference performance. Local experiments use Apple Core AI / Core ML artifacts through Python interfaces, without launching Swift, App code or Tests. Explicit cloud and Apple system-model backends also run directly from Python. Keep task inputs in Datasets and raw outputs in Results.
-- `docs/`: Authored or summarized documentation and reports, including agent-written documents. No executable tests, experiment runners, datasets, runtime configurations, raw responses or machine-generated metrics. Engineering fixtures belong in Tests; experimental data belongs in experiments.
+- Keep tests and experiments independently runnable. Neither may import or read the other's code, configuration, datasets or results, directly or through scripts. Each may implement its own helpers.
+- Write raw experiment outputs to `experiments/<Task>/results/`. Put authored reports in `docs/validation/` and link to the raw outputs. Keep executable code, datasets, runtime configurations and machine-generated metrics with their respective owners.

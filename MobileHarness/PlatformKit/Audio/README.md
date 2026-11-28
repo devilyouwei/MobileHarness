@@ -57,6 +57,8 @@ flowchart TB
 
 ## 频谱、转换与反馈
 
+同一采集代际提供有序识别帧与最新频谱帧。显示支路容量为一，更新覆盖尚未消费的显示帧；采集结束会关闭两个流。
+
 AudioSpectrum 每次最多2048样本，measureOffMain 在通用执行器运行、前后可取消；同步计算保留供明确调用。播放频谱只在MainActor取tap快照和token，计算后复核同一播放；取消／替换返回nil，无播放返回静音。
 
 StreamingMonoPCMResampler 持有连续AVAudioConverter，输入为有限mono、8…192kHz；格式变化重建转换器，reset清状态。多声道提取和VAD／ASR策略属于调用者，不在转换失败后伪造PCM。

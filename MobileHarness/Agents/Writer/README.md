@@ -20,14 +20,14 @@ Assistant 不参与创作循环或通过聆听/对话关闭终止 Writer；应�
 
 | 文件 | 职责 |
 | --- | --- |
-| [WriterAgent.swift](WriterAgent.swift) | AgentCore 角色：收件、准入、执行 worker、工具端口绑定与 agent.task.events.v1 回报队列。状态全部 private，同一编译目标内的 Assistant 不可访问。 |
+| [WriterAgent.swift](WriterAgent.swift) | 角色入口、依赖、注册及生命周期。任务接纳归 [Input](Input/README.md)，任务执行归 [Workflow](Workflow/README.md)，工具派发与回报队列归 [Output](Output/README.md)。 |
 | [WriterWorkflow.swift](Workflow/WriterWorkflow.swift) | 控制/内容模型循环、收件意图判定（inboxIntent）及 WriterBudget 字节预算。 |
 | [WriterTools.swift](Workflow/WriterTools.swift) | 宿主绑定的 WriterTools 端口、工具结果、控制域和本地工具声明，以及共享的 WriterToolGroup 工具分组。 |
 | [WriterContainer.swift](WriterContainer.swift) | 根拥有的注册、暂停、恢复、关闭与存储装配。 |
-| [WriterRecords.swift](State/WriterRecords.swift) | 设置页记录读模型：委托、工作区、请求详情与导出。 |
-| [WriterRequestNaming.swift](Input/WriterRequestNaming.swift) | 请求行标题与状态推导。 |
-| [WriterHistory.swift](State/WriterHistory.swift) / [WriterRecovery.swift](Workflow/WriterRecovery.swift) / [WriterDiagnostics.swift](State/WriterDiagnostics.swift) | 请求历史与恢复上下文、有界恢复、失败分类。 |
-| [WriterPreview.swift](Output/WriterPreview.swift) / [WriterIslandPresentation.swift](Output/WriterIslandPresentation.swift) / [WriterNotifications.swift](WriterNotifications.swift) | 预览刷新、自有灵动岛、终态持久投递。 |
+| [WriterRecordQueries.swift](Output/WriterRecordQueries.swift) | 设置页记录读模型：委托、工作区、请求详情与导出。 |
+| [WriterRequestPresentation.swift](Output/WriterRequestPresentation.swift) | 请求行标题与状态推导。 |
+| [WriterRequestHistory.swift](Workflow/WriterRequestHistory.swift) / [WriterRecovery.swift](Workflow/WriterRecovery.swift) / [WriterFailureRecording.swift](Workflow/WriterFailureRecording.swift) | 请求历史与恢复上下文、有界恢复、失败分类。 |
+| [WriterPreview.swift](Output/WriterPreview.swift) / [WriterIslandPresentation.swift](Output/WriterIslandPresentation.swift) / [WriterTaskReports.swift](Output/WriterTaskReports.swift) | 预览刷新、自有灵动岛、终态持久投递。 |
 
 对等 Agent 通过 `agent.task.v1` 提交委派，通过 `agent.task.events.v1` 接收回报。作品导出端口 WriterArtifactsControlling 由宿主经 AgentContainer.writerArtifacts 直接提供给设置页，Writer 不持有 UI 导出能力。
 
@@ -103,13 +103,13 @@ WriterWorkflow 为控制/内容的每次实际请求创建独立 ChatTiming，�
 
 生成指标使用所选调用的日志证据，缺少参数或耗时可独立呈现。新委托的完成结果归属显式 finish 工具调用。历史宿主收尾按模型调用 ID 读取。
 
-WriterRequestNaming（[WriterRequestNaming.swift](Input/WriterRequestNaming.swift)）只识别规范英文阶段名，从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
+WriterRequestNaming（[WriterRequestPresentation.swift](Output/WriterRequestPresentation.swift)）只识别规范英文阶段名，从工具与控制域派生请求行标题，包括作品查询、进入、创建、呈现、文件编辑与保存。文件内容阶段按目标路径命名，多工具按顺序去重合并，过长/含源码标记的instruction不作标题。没有操作事实时使用中性描述，不请求模型生成标题。请求失败/取消/中断优先保留，其后才判断工具失败、取消和在途状态；模型结束不等同工具操作成功。完整证据始终在请求详情。
 
 ## 委托与主动事件
 
 Writer 经认证的 agent.task.events.v1 发送接纳、追问及两类精选里程碑。首批文件改动完成检查点和工具记录后发送 draftUpdated，首次模型/写入重试或渲染检查异常发送 recovering。两种里程碑各保留一次，跨暂停和补充续作去重。逐轮进度、临时预览和普通读写观察由 Writer 自身呈现。投递队列每个事件类别最多保留一项待送达事实，另有一个不可变在途事件；每项只发布一次。终态释放过期的待送达进度，单独发布一次。
 
-Writer 通过 task.send(agent_id=writer,text) 接收认证正文，收件队列最多八项，满时拒绝。收件 worker 串行处理，暂停时保留待处理输入。空闲的新目标由 Writer 申请内部授权并建立任务。活跃期间每条消息都由 Writer 自己的模型（inboxIntent）区分当前目标的补充、停止和无关新目标，不做关键词匹配。可信追问关联必须匹配当前任务和问题，迟到答复回报拒绝。判定为停止的请求进入取消清理。
+Writer 通过 send(agent_id=writer,text) 接收认证正文，收件队列最多八项，满时拒绝。收件 worker 串行处理，暂停时保留待处理输入。空闲的新目标由 Writer 申请内部授权并建立任务。活跃期间每条消息都由 Writer 自己的模型（inboxIntent）区分当前目标的补充、停止和无关新目标，不做关键词匹配。可信追问关联必须匹配当前任务和问题，迟到答复回报拒绝。判定为停止的请求进入取消清理。
 
 AgentTaskContent.event 携带通用 AgentTaskEvent（版本 1）：UUID eventID、递增 sequence、kind、当前目标、可选窗口身份和失败诊断。工作区身份（workspace_N）经 AgentTaskContent.artifactID 传递，正文不再拼接工作区前缀。运行阶段由 reportWorker 投递 started、draftUpdated、recovering、userInput 和 inputAccepted，通过 AgentMessaging.publish 按需发布 agent.task.events.v1，Agent.json 的 publications 声明该生产能力，启动校验声明与代码及订阅配对；调用方不初始化业务发布会话。只等待 Gateway 接纳；不查询订阅、接收方状态或消费结果，不能触发对方订阅。进度、终态和拒绝回报均只发布一次，不补发、不重试、无回退，失败只记入运行时快照 deliveryFailure；Writer 不把事件或拒绝写入 agent_messages。completed、declined、failed 和 cancelled 在终态保存后经 agent.task.events.v1 发布。
 
@@ -139,7 +139,7 @@ Artifacts 使用 WorkspaceID(workspace_N)。显式 create 建立空目录并准�
 
 ## 失败诊断
 
-WriterDiagnostics.swift 分类模型网络、HTTP、响应协议、模型配置、工具、存储、工作流、取消和清理错误。每次控制/内容请求保留阶段、模型、输入ID、尝试次数和单调耗时；WriterDiagnosticCapture保存最新未恢复请求失败，成功请求清除过期原因，不拥有重试。工具失败附实际命令/路径并区分读取、编辑、渲染和发布。清理失败独立保留原始原因及清理原因，不覆盖主错误。
+WriterFailureRecording.swift 分类模型网络、HTTP、响应协议、模型配置、工具、存储、工作流、取消和清理错误。每次控制/内容请求保留阶段、模型、输入ID、尝试次数和单调耗时；WriterDiagnosticCapture保存最新未恢复请求失败，成功请求清除过期原因，不拥有重试。工具失败附实际命令/路径并区分读取、编辑、渲染和发布。清理失败独立保留原始原因及清理原因，不覆盖主错误。
 
 通信使用通用 AgentTaskFailure；Writer目录显式投影为 StorageChat.ModelFailureDiagnostic，存入请求/工具 evidence，另将分类摘要保存到任务 failure。失败经 Gateway control 输出 AgentFailureDiagnostic，同时通过 AgentTaskEvent.failure 传给 Assistant。首页显示简短摘要，请求历史展示结构化分类/阶段/字段；无法从过去仅有 transport 字符串的记录反推已丢失的 URLError。
 
@@ -231,7 +231,7 @@ workspace.create(title,entry) 直接处理明确新建请求。入口路径在�
 
 ## 私有指令与公开介绍
 
-Agents/Resources/Agents/Writer/Agent.json.description 提供公开用途。Instructions.md 保存私有控制身份及通用追问和完成规则。Prompts.json 的 control.library 和 control.workspace 管理作品库和编辑两个控制域。已加载 Skill 的教学标题由共用 [SkillCatalog.json](../Resources/Agents/Shared/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复加载当前域的调用与结果配对。
+Agents/Resources/Agents/Writer/Description.md 提供公开用途。Instructions.md 保存私有控制身份及通用追问和完成规则。Prompts.json 的 control.library 和 control.workspace 管理作品库和编辑两个控制域。已加载 Skill 的教学标题由共用 [SkillCatalog.json](../Resources/Agents/Shared/SkillCatalog.json) 提供。每个控制请求持久化域标识，恢复加载当前域的调用与结果配对。
 
 ## 请求与恢复模板
 
@@ -246,3 +246,5 @@ WriterLocalTools owns the native ask/finish/enter/create declarations and Writer
 Writer 模型由显式本地/云端选择决定：本地使用所选的工具型 Chat，云端使用所选 Provider/Model；未配置报错。Gemma 提供原生工具适配；完整工具声明与历史超出本地窗口时明确失败，不自动选择云端。其他缺少原生工具的模型仍沿 unsupportedModel 路径结束。
 
 Task admission authenticates the original requester rather than an Assistant/Writer sender pair. Follow-up and cancellation must match the original sender and task association; the live role additionally verifies session ownership. Progress, terminal and rejection reports are published once to that requester. Assistant is the current user-facing caller, not protocol-level authority.
+
+容器快照的 `business.lifecyclePhase` 公开本角色生命周期，取值见[角色 State 契约](../README.md#reflexive-state-reads-and-disclosure)。

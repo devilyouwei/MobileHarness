@@ -2,7 +2,7 @@ import AgentCore
 import Foundation
 import PlatformKit
 
-extension VisionPerceptionAgent {
+extension PoseInferenceWorkflow {
     /// The capture owner supplies one generation; inference never controls the camera.
     func consumeCamera(_ frames: MediaSignalListener<CameraFrame>, generation: String) async throws {
         for try await frame in frames {

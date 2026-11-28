@@ -1,27 +1,29 @@
 {
-  "version": 12,
+  "version": 14,
   "category": "perception",
   "id": "applicationControl",
-  "description": "I own application settings, provider and model-resource configuration, device administration and diagnostic presentation through supported application interfaces.",
-  "skills": [
-    "application-control"
-  ],
   "states": [],
-  "signals": {
-    "requests": [
-      "agent.task.v1"
-    ],
-    "feedback": [],
-    "publications": [
-      {
-        "channel": "agent.interruption",
-        "protocol": "agent.interruption.v1"
-      },
-      {
-        "channel": "agent.task",
-        "protocol": "agent.task.events.v1"
-      }
-    ],
-    "subscriptions": []
-  }
+  "channels": {
+    "agent.task.v1": {
+      "type": "send",
+      "name": "agent.request",
+      "receive": true
+    },
+    "agent.interruption.v1": {
+      "type": "pubSub",
+      "name": "agent.interruption",
+      "publish": true
+    },
+    "agent.task.events.v1": {
+      "type": "pubSub",
+      "name": "agent.task",
+      "publish": true
+    },
+    "runtime.delivery.v1": {
+      "type": "send",
+      "name": "runtime.agent",
+      "receive": true
+    }
+  },
+  "feedback": []
 }

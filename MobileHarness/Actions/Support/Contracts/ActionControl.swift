@@ -1,6 +1,9 @@
 import Foundation
 
 public struct ActionControl: Codable, Equatable, Sendable {
+    public static let contract = "action.control.v1"
+    public static let channel = "action.control"
+
     public enum Command: String, Codable, CaseIterable, Sendable {
         case pause
         case resume

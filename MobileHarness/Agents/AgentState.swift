@@ -1,3 +1,4 @@
+import AgentCore
 import Foundation
 
 /// Module-local, explicitly projected facts. This type never inspects private storage.
@@ -121,5 +122,12 @@ public struct AgentStateSnapshot: Codable, Sendable {
         self.issues = issues
         self.children = children
         collectedAt = Date()
+    }
+}
+
+extension AgentStateSnapshot.Value {
+    static func lifecyclePhase(_ lifecycle: AgentLifecycle?, closed: Bool) -> Self {
+        if let lifecycle { return .text(lifecycle.rawValue) }
+        return .text(closed ? AgentLifecycle.stopped.rawValue : "notInstalled")
     }
 }

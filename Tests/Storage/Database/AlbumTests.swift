@@ -292,12 +292,12 @@ func albumUIRequestsExecuteThroughPhotographerAndGateway() async throws {
         tools: try ToolRegistry(modules: [AlbumTools(definitions: [binding])]),
         actions: ChannelScheduler(registry: try ActionRegistry(definitions: [])),
         policy: policy, sink: { _ in })
-    let session = PhotographerExecutionSession(
+    let session = VisionPerceptionExecutionSession(
         manager: manager, output: gateway,
-        agent: try PhotographerAgent(
+        agent: try VisionPerceptionAgent(
             sessionID: "album-ui", uiAlbum: ui.album,
             context: AgentContextRepository(
-                agent: .photographer, scope: UUID().uuidString, state: PhotographerContextState())))
+                agent: .visionPerception, scope: UUID().uuidString, state: CameraTransactionContextState())))
     try await session.prepareForInteraction()
     guard case .page(let items, _) = try await ui.album.requests.submit(.page(nil)) else {
         Issue.record("Missing page")

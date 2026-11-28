@@ -107,6 +107,8 @@ public struct WriterBackgroundExecution: Sendable {
     }
     public func stateSnapshot() async throws -> AgentStateSnapshot {
         if let agent { return await agent.observationSnapshot() }
-        return .init(path: "agents.writer", runtime: ["installed": .flag(false)])
+        return .init(
+            path: "agents.writer", business: ["lifecyclePhase": .lifecyclePhase(nil, closed: closed)],
+            runtime: ["installed": .flag(false)])
     }
 }

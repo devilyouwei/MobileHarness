@@ -15,7 +15,6 @@ public struct SpeechActivity: Codable, Sendable, Equatable {
     public enum Energy: String, Codable, Sendable { case low, medium, high }
 
     public static let contract = "perception.speech.activity.v1"
-    public static let channel = "perception.speech.activity"
     public static let progressWindowCount = 64
 
     public let kind: Kind

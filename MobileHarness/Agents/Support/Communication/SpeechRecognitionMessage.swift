@@ -6,7 +6,6 @@ public struct SpeechRecognition: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable { case partial, final }
 
     public static let contract = "user.input.speech.v1"
-    public static let channel = "user.input.speech"
     public let kind: Kind
     public let text: String
     public let generation: String?

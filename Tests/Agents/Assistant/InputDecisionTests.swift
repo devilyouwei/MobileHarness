@@ -132,7 +132,7 @@ func multiSourceBatchQueuesIdleUsersWithoutDecisionAndPersistsAttribution() asyn
     try await agent.start()
     try await agent.pause()
     let scope = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .photographer,
+        id: UUID().uuidString, requester: .assistant, executor: .visionPerception,
         sessionID: "batch", execution: .background)
     try await context.update { try $0.tasks.register(scope) }
     let report = try AgentTaskContent(text: "照片已经拍好", stage: .completed).signal(
@@ -144,7 +144,8 @@ func multiSourceBatchQueuesIdleUsersWithoutDecisionAndPersistsAttribution() asyn
         .init(
             id: "peer", sessionID: "batch", payload: peer,
             metadata: .init(
-                payload: peer, source: "photographer", incarnation: "photographer-live", origin: .agent, rootID: "peer")
+                payload: peer, source: "visionPerception", incarnation: "visionPerception-live", origin: .agent,
+                rootID: "peer")
         ))
     #expect(await queueProbe.ready == 1)
     #expect(await queueProbe.classifying == 0)
@@ -183,7 +184,7 @@ func multiSourceBatchQueuesIdleUsersWithoutDecisionAndPersistsAttribution() asyn
     let entries = body.components(separatedBy: "\n\n")
     #expect(
         entries.map { $0.components(separatedBy: " ｜ ").first } == [
-            "拍一张照片\n等一下，先别拍\nUser (ASR)", "照片已经拍好\nAgent (photographer)", "总结一下\nUser",
+            "拍一张照片\n等一下，先别拍\nUser (ASR)", "照片已经拍好\nAgent (visionPerception)", "总结一下\nUser",
         ])
     #expect(entries.allSatisfy { $0.range(of: #" ｜ [0-9]{2}:[0-9]{2}:[0-9]{2}$"#, options: .regularExpression) != nil })
     for internalField in ["batch_id", "decision_route", "sender_role", "asr-old", "asr-new", scope.id] {
@@ -591,7 +592,7 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(order: String) as
     for _ in 0..<500 where volumeCalls.withLock({ $0.isEmpty }) { try await Task.sleep(for: .milliseconds(2)) }
     let volume = try #require(volumeCalls.withLock { $0.first })
     guard case .toolCall(let volumeCall) = volume.output else { throw HarnessError.invalidTransition }
-    #expect(volumeCall.arguments == ["volume": "0.35", "executionID": playbackExecutionID])
+    #expect(volumeCall.arguments == ["volume": "0.35"])
     #expect(volume.roundID == nil && volume.callID == nil)
     try await agent.receive(
         speechSignal(SpeechActivity(.energyChanged, generation: "capture", utterance: "command", energy: .low)))
@@ -659,7 +660,14 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(order: String) as
     #expect(await classifier.requests.count == 1)
     #expect(await interrupts.count == 1)
     #expect(adjustments.withLock({ $0.count }) == 3)
-    #expect(volumeCalls.withLock({ $0.count }) == 2)
+    let gains = volumeCalls.withLock { calls in
+        calls.compactMap { envelope -> String? in
+            guard case .toolCall(let call) = envelope.output else { return nil }
+            return call.arguments["volume"]
+        }
+    }
+    // A low-energy event restores gain even after the reply is interrupted.
+    #expect(gains == ["0.35", "1", "1"])
     let keyword = log.decisions.first { $0.route == .keyword }
     let model = log.decisions.first { $0.id == "command-final" }
     if keywordWins {
@@ -963,7 +971,7 @@ private func speechSignal(_ activity: SpeechActivity, session: String = "s") -> 
         id: id, sessionID: session, payload: payload,
         metadata: InputMetadata(
             payload: payload, source: AgentID.speechPerception.rawValue, incarnation: "i", origin: .agent, rootID: id,
-            topic: SpeechActivity.channel))
+            topic: "perception.speech.activity"))
 }
 
 private func finishVADWindow(
@@ -996,7 +1004,7 @@ private func keywordSignal(
         id: id, sessionID: "s", payload: payload,
         metadata: .init(
             payload: payload, source: "speechPerception", incarnation: "i", origin: .agent, rootID: id,
-            topic: SpeechKeywordMatch.channel),
+            topic: "perception.speech.keyword"),
         turn: .init(id: utterance, ordinal: 1))
 }
 
@@ -1021,7 +1029,7 @@ func speechActivityIsAcceptedOnlyFromTheSubscribedPerceptionAgent() async throws
         id: forged.id, sessionID: "s", payload: forged.payload,
         metadata: InputMetadata(
             payload: forged.payload, source: "writer", incarnation: "i", origin: .agent, rootID: forged.id,
-            topic: SpeechActivity.channel))
+            topic: "perception.speech.activity"))
     await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(impostor) }
     try await agent.receive(
         speechSignal(SpeechActivity(.onsetConfirmed, generation: "capture", utterance: "u")))
@@ -1427,15 +1435,29 @@ func interruptedReplyPersistsCompletedActionsAcrossTracks(keepCompleted: Bool, k
                 turn: envelope.turn))
     }
 
-    @Sendable func complete(_ envelope: OutputEnvelope, status: ActionResult.Status) async throws {
+    @Sendable func complete(_ envelope: OutputEnvelope, status: ActionResult.Status, beforeInterrupt: Bool = true)
+        async throws
+    {
         guard case .actionCall(let call) = envelope.output else { throw HarnessError.unsupportedInput }
+        let executionID = UUID().uuidString
+        let testPlayback = beforeInterrupt && call.actionPath == FixtureNativeAgent.playback.path
+        if testPlayback {
+            try await feedback(
+                .executionFeedback(
+                    .actionStarted(
+                        roundID: round, callID: envelope.callID,
+                        executionID: executionID, controlCapabilities: ["pause", "resume"], path: call.actionPath)),
+                from: envelope)
+            #expect(await agent.activePlaybackExecutionID == executionID)
+        }
         let receipt = ActionResult(
-            executionID: UUID().uuidString,
+            executionID: executionID,
             owner: .init(agent: envelope.source, incarnation: "fixture", sessionID: envelope.sessionID),
             path: call.actionPath, causality: SignalCausality(envelope: envelope), status: status,
             effect: status == .succeeded ? .contractCompleted : .unknown, completion: .completed,
             callID: envelope.callID, roundID: round)
         try await feedback(.executionFeedback(.actionFinished(receipt)), from: envelope)
+        if testPlayback { #expect(await agent.activePlaybackExecutionID == nil) }
     }
 
     let success: ActionResult.Status = keepCompleted ? .succeeded : .cancelled
@@ -1446,8 +1468,8 @@ func interruptedReplyPersistsCompletedActionsAcrossTracks(keepCompleted: Bool, k
     try await complete(actions[2], status: .cancelled)
     await agent.bindFixtureInputInterruption { session in
         // A valid terminal delivered during cleanup still contributes to the settled reply.
-        try await complete(actions[3], status: success)
-        try await complete(actions[4], status: success)
+        try await complete(actions[3], status: success, beforeInterrupt: false)
+        try await complete(actions[4], status: success, beforeInterrupt: false)
         try await feedback(.executionFeedback(.roundFinished(.init(id: round, reason: .interrupted))), from: seal)
         try await agent.receive(AssistantSessionControl.interruptSession.input(sessionID: session))
     }
@@ -2067,4 +2089,64 @@ func keywordAndFinalOrderingPreservesSpeechWithoutDuplicateDecision(scenario: St
     await decision.stop()
     pump.cancel()
     _ = await pump.result
+}
+
+@Test(.actionCatalog) @MainActor
+func independentPlaybackTerminalRetiresOnlyItsOwnVolumeTarget() async throws {
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, speechSessionID: "s",
+        chat: DeferredBooleanChat(blocksFirst: true), context: context)
+    let reply = AgentInput(id: "reply", sessionID: "s", payload: .text("Reply"))
+    await agent.beginDecisionTurn(reply)
+    let id = UUID().uuidString
+    func feedback(_ payload: InputPayload) -> AgentInput {
+        .init(
+            id: UUID().uuidString, sessionID: "s", payload: payload,
+            metadata: .init(payload: payload, source: "runtime", origin: .runtime, rootID: "reply", parentID: "reply"))
+    }
+    let path = FixtureNativeAgent.playback.path
+    let started = feedback(
+        .executionFeedback(
+            .actionStarted(
+                roundID: nil, callID: nil, executionID: id,
+                controlCapabilities: ["pause", "resume"], path: path)))
+    try await agent.bindPlaybackExecution(id, input: started)
+    for target in [UUID().uuidString, id] {
+        let result = ActionResult(
+            executionID: target, owner: .init(agent: agent.descriptor.id, incarnation: "fixture", sessionID: "s"),
+            path: path, causality: .root(id: "reply"), status: .succeeded, effect: .contractCompleted,
+            completion: .completed)
+        try await agent.acceptActionTerminal(result, input: feedback(.executionFeedback(.actionFinished(result))))
+        #expect(await agent.activePlaybackExecutionID == (target == id ? nil : id))
+    }
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1)))
+func idleSpeechVolumeChangesAreAppliedInOrderWithoutARound() async throws {
+    let context = try AgentContextRepository(
+        agent: FixtureNativeChatState.agentID, scope: UUID().uuidString, state: FixtureNativeChatState())
+    let agent = try FixtureNativeAgent(
+        fullDuplex: true, speechSessionID: "s",
+        chat: DeferredBooleanChat(blocksFirst: true), context: context)
+    try await agent.start()
+    for energy in [SpeechActivity.Energy.medium, .low] {
+        try await agent.receive(
+            speechSignal(
+                SpeechActivity(
+                    .energyChanged, generation: "capture", utterance: "one", energy: energy)))
+    }
+    await agent.stop()
+    let volumes = Mutex([String]())
+    try await AssistantGenerationTransport.consume(agent.outputs) { envelope in
+        guard case .toolCall(let call) = envelope.output, call.toolPath == FixtureNativeAgent.playbackVolume.path else {
+            return
+        }
+        #expect(envelope.roundID == nil && call.arguments.keys.sorted() == ["volume"])
+        let volume = try #require(call.arguments["volume"])
+        if volume == "0.35" { try await Task.sleep(for: .milliseconds(30)) }
+        volumes.withLock { $0.append(volume) }
+    }
+    #expect(volumes.withLock { $0 } == ["0.35", "1"])
 }

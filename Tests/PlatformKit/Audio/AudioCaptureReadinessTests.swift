@@ -323,3 +323,21 @@ func captureConfigurationChangeRetiresPCMBeforeAndAfterFirstFrame(ready: Bool) a
 func duplexRequiresConfirmedCombinedVoiceProcessing(echo: AudioCaptureContext.EchoCancellation) {
     #expect(AudioCaptureDuplexSelection.supportsFullDuplex(echoCancellation: echo) == (echo == .voiceProcessing))
 }
+
+@Test func microphoneMeterReceivesLatestFrameWhileOrderedConsumerIsIdle() async throws {
+    let source = MicrophoneCapture()
+    let capture = try source.subscribe()
+    let meterFrames = try #require(capture.meterFrames)
+    var meter = meterFrames.makeAsyncIterator()
+    var ordered = capture.frames.makeAsyncIterator()
+    for sequence in 0..<4 {
+        try source.send(.init(samples: [0.1], sampleRate: 16000, sequence: UInt64(sequence)))
+    }
+    #expect(await meter.next()?.sequence == 3)
+    source.finish()
+    #expect(await meter.next() == nil)
+    for sequence in 0..<4 {
+        #expect(try await ordered.next()?.sequence == UInt64(sequence))
+    }
+    #expect(try await ordered.next() == nil)
+}

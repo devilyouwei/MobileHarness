@@ -1,0 +1,1 @@
+Open or browse websites requested by site name or HTTP/HTTPS URL; read page text, inspect screenshots, scroll and control web windows. Does not provide clicking, form entry, login, video playback control or local-work library operations.

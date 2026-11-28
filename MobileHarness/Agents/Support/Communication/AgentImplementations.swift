@@ -24,15 +24,13 @@ public struct AgentRequestImplementation: Sendable {
 
 /// Code-owned event adapters. Declarations select a subset of implemented variants.
 public struct AgentEventImplementation: Sendable {
-    public let channel: String
     public let protocolID: String
     public let variants: Set<String>
     let handle: @Sendable (any Agent, AgentInput) async throws -> Void
     public init<Role: Agent>(
-        channel: String, protocolID: String, variants: Set<String> = [], role: Role.Type,
+        protocolID: String, variants: Set<String> = [], role: Role.Type,
         handler: @escaping @Sendable (Role, AgentInput) async throws -> Void
     ) {
-        self.channel = channel
         self.protocolID = protocolID
         self.variants = variants
         handle = { agent, input in

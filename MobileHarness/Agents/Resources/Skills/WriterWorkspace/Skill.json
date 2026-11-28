@@ -1,8 +1,7 @@
 {
-  "version": 3,
+  "version": 4,
   "id": "writer-workspace",
-  "revision": 8,
-  "description": "Find saved works and select, show, create or delete a workspace.",
+  "revision": 9,
   "owner": "writer",
   "dependencies": [],
   "useActions": [

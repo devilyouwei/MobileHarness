@@ -208,3 +208,13 @@ NexArm/Bluetooth 最终定向回归退出 0：一个目标 11 tests / 0.006 秒�
 | `./scripts/build-ios.sh` | BUILD SUCCEEDED（验证脚本改为跳过无 `templates` 的 Controls.json） |
 
 新增测试：`waitIsACatalogActionWhileControlGuidanceFollowsTheOwnerControls`（wait 条目、指南顺序、中文回退、无 Action 与 control 时不渲染）。未执行：真实模型对新提示词选择的评估（属 experiments）与实机验收；`./scripts/check.sh` 未整体运行，其各步骤已分别执行，其中测试因上述既有失败退出非 0。
+
+## Agent v14 信道声明（2026-11-28）
+
+六个打包角色共声明 9 个实际信道，2 个为 send，7 个为 pubSub。同名声明的类型一致。跨 Agent 测试使用与业务协议键不同的传输名称，核对接收元数据中的实际名称。
+
+- 9 项定向 Swift 回归通过，覆盖信道缺失与类型冲突、请求直接应答、发布订阅、取消与超时释放、运行时活动和任务停止通知，以及相机请求返回后 Vision 再调用呈现工具。
+- iOS 模拟器的五个 scheme 均构建成功。打包验证通过，包括 105 项 Agent/Skill 资源及中英文应用、UI 和 Live Activity 资源。
+- 工程检查脚本在 ModelKit 模块边界检查通过后，因生产模型清单校验失败退出。HEAD 中模型清单已有 kokoro-82m、smart-turn 和 zipformer-kws，检查脚本的预期集合未列出这三项。
+- 扩展通信测试包含的 Action 授权清单断言失败，实际未授予条目中含 UI.Island.setPresentation。未执行真实模型推理或物理设备摄像头验收。
+- 常规 Swift 测试中，IntegrationTests 的 1311 项有两个测试函数报告失败：上述 Action 授权清单断言，以及语音识别失败后的恢复测试。后者单独重跑时，开始识别失败与结束识别失败两个参数场景均通过。

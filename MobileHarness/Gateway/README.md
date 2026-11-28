@@ -1,5 +1,7 @@
 # Gateway — Internal Signal communication
 
+[开发规范](AGENTS.md)
+
 ## Ownership and interfaces
 
 GatewayContainer owns the App-scoped transport, admission and bounded observation scopes. SignalTransport owns endpoint identity, envelope validation, addressed Send, typed Request/Reply and channel-ordered best-effort Pub/Sub. The Gateway target uses system libraries and has no project dependencies. Endpoint owners register handlers and supply their payload types, size policies and deadlines.
@@ -46,3 +48,5 @@ SignalTransport bounds endpoints to 128, active deliveries to 256 and reserved b
 ## Reflexive state reads
 
 Gateway state reports transport phase, endpoint and delivery counts, bytes, publications, branches and observers. State readers are independent actor-isolated snapshots. Execution, resource and role state belong to their respective owners.
+
+Gateway 提供 send 和 pubSub 两种信道。调用方声明名称及传输类型，Gateway 在投递前检查绑定并对缺失或类型不符的信道抛出 channelUnavailable。 [channel declaration contract](../Agents/Resources/AgentAuthoring.md#channels--信道声明)

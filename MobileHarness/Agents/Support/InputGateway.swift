@@ -59,25 +59,31 @@ public actor InputGateway {
     private var requestBindings: [AgentID: (SignalEndpoint, Task<Void, any Error>)] = [:]
     @discardableResult func bindEndpoint(_ agent: any Agent, incarnation: String) async throws -> SignalEndpoint {
         let id = agent.descriptor.id
-        let port = try await signals.register(address: id.rawValue, incarnation: incarnation) {
+        let runtimeChannel = policy.map { $0.runtimeChannel(for: id) } ?? CommunicationContracts.runtimeDelivery
+        let channels = Set([runtimeChannel].compactMap { $0 })
+        let port = try await signals.register(address: id.rawValue, incarnation: incarnation, sendChannels: channels) {
             [weak self, manager] signal in
             guard let self else { throw CommunicationError.scopeClosed }
             guard let value = signal.payload as? AgentInput else { throw CommunicationError.invalidPayload }
             _ = try await self.validatePayload(value)
             if let source = signal.source {
-                guard value.metadata.origin == .agent, value.metadata.source == source.address,
-                    value.metadata.incarnation == source.incarnation
+                guard signal.envelope.channel != runtimeChannel, value.metadata.origin == .agent,
+                    value.metadata.source == source.address,
+                    value.metadata.incarnation == source.incarnation, value.metadata.topic == signal.envelope.channel,
+                    value.metadata.contract == signal.envelope.contract
                 else { throw CommunicationError.unauthorized }
                 try await manager.validate(
                     .init(rawValue: source.address), incarnation: source.incarnation, sessionID: value.sessionID)
             } else {
-                guard value.metadata.origin == .runtime else { throw CommunicationError.unauthorized }
+                guard value.metadata.origin == .runtime, signal.envelope.channel == runtimeChannel else {
+                    throw CommunicationError.unauthorized
+                }
             }
             try await manager.validate(id, incarnation: incarnation, sessionID: value.sessionID)
             guard agent.descriptor.inputs.contains(value.payload.kind) else { throw HarnessError.unsupportedInput }
             if value.metadata.origin == .agent,
                 let implementation = self.eventImplementations[id]?.first(where: {
-                    $0.protocolID == value.metadata.contract && $0.channel == value.metadata.topic
+                    $0.protocolID == value.metadata.contract
                 })
             {
                 try await implementation.handle(agent, value)
@@ -92,9 +98,19 @@ public actor InputGateway {
         let enabled = policy?.agents[id]?.requests ?? []
         let declaration = policy?.agents[id]
         let task = Task { [signals] in
+            if let declaration {
+                for channel in Set(declaration.sendChannels.values) {
+                    try await signals.declareChannel(channel, kind: .send, endpoint: port)
+                }
+                for channel in Set(declaration.eventChannels.values) {
+                    try await signals.declareChannel(channel, kind: .pubSub, endpoint: port)
+                }
+            }
             for protocolID in enabled {
                 let descriptor = try Self.requestDescriptor(protocolID)
-                try await signals.registerContextualRequest(descriptor, endpoint: port) { request, context in
+                try await signals.registerContextualRequest(
+                    descriptor, endpoint: port, channel: declaration?.sendChannels[protocolID]
+                ) { request, context in
                     let input = request.input
                     guard context.source.address == input.metadata.source,
                         context.source.incarnation == input.metadata.incarnation,
@@ -145,7 +161,7 @@ public actor InputGateway {
         return bus
     }
     private func eventDescriptor(_ protocolID: String) throws -> SignalEventProtocol<AgentInput> {
-        guard let contracts = policy?.contracts, let definition = contracts[protocolID], definition.channel != nil
+        guard let contracts = policy?.contracts, let definition = contracts[protocolID], definition.isPublication
         else {
             throw CommunicationError.unsupportedContract
         }
@@ -326,7 +342,8 @@ public actor InputGateway {
     func subscribe(_ filter: AgentEventFilter, consumer: AgentID, incarnation: String) async throws
         -> AgentEventSubscription
     {
-        guard !closed, let definition = policy?.contracts[filter.protocolID], definition.channel == filter.channel,
+        guard !closed, let definition = policy?.contracts[filter.protocolID], definition.isPublication,
+            policy?.permitsScopedSubscription(filter, consumer: consumer) == true,
             !filter.sources.isEmpty, !filter.sessionID.isEmpty
         else { throw CommunicationError.unsupportedContract }
         guard try await manager.identity(consumer) == incarnation else { throw CommunicationError.unauthorized }
@@ -417,7 +434,9 @@ public actor InputGateway {
         try Task.checkCancellation()
         let bytes = try validatePayload(input)
         guard input.metadata.origin == .agent, let incarnation = input.metadata.incarnation,
-            let definition = policy?.contracts[input.metadata.contract], let channel = definition.channel
+            let channel = policy?.agents[.init(rawValue: input.metadata.source)]?.publications.first(where: {
+                $0.protocol == input.metadata.contract
+            })?.channel, input.metadata.topic == channel
         else { throw CommunicationError.unauthorized }
         let sourceID = AgentID(rawValue: input.metadata.source)
         try await manager.validate(sourceID, incarnation: incarnation, sessionID: input.sessionID)
@@ -813,7 +832,7 @@ public actor InputGateway {
                                 envelope: SignalEnvelope(
                                     id: input.id, sessionID: input.sessionID,
                                     contract: input.metadata.contract,
-                                    channel: policy?.contracts[input.metadata.contract]?.channel,
+                                    channel: input.metadata.topic,
                                     version: input.metadata.version, hops: input.metadata.hops,
                                     payloadBytes: encodedBytes,
                                     expiresAt: input.metadata.deadline,
@@ -830,7 +849,8 @@ public actor InputGateway {
                                 source: sourcePort, target: targetPort,
                                 envelope: SignalEnvelope(
                                     id: input.id, sessionID: input.sessionID, contract: input.metadata.contract,
-                                    channel: policy?.contracts[input.metadata.contract]?.channel,
+                                    channel: policy.map { $0.runtimeChannel(for: target) }
+                                        ?? CommunicationContracts.runtimeDelivery,
                                     version: input.metadata.version, hops: input.metadata.hops,
                                     payloadBytes: encodedBytes,
                                     expiresAt: input.metadata.deadline,

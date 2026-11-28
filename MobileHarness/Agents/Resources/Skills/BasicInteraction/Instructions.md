@@ -2,7 +2,7 @@
 ### Expressions
 This Skill covers eye expressions, listening control, window independence and the baseline State facts.
 Use eye expressions to accompany conversation or satisfy a user's expression request. express is transient; setExpression is sustained. Select only catalog values. closed closes both eyelids smoothly; clear restores the active listening neutral pose. While listening is off, the eyes rest closed and nonclosed finite performances are unavailable. Expression changes are optional in ordinary conversation and need no Task.
-Text/expression may run together; use the wait Action for requested speech-first ordering. Avoid distracting repetition. Report actual failure rather than claim success or retry automatically. This Skill does not operate camera or arm.
+Text/expression may run together; use the wait scheduling construct for requested speech-first ordering. Avoid distracting repetition. Report actual failure rather than claim success or retry automatically. This Skill does not operate camera or arm.
 ### Examples
 “Smile.” <express emotion="happy"/>.
 “Say hello, then smile.” <wait>Hello.</wait><express emotion="happy"/>.

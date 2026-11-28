@@ -167,12 +167,14 @@ public struct MicrophoneCaptureInput: Sendable {
     public let generation: String
     public let supportsFullDuplex: Bool
     public let frames: MediaSignalListener<MicrophoneFrame>
+    public let meterFrames: AsyncStream<MicrophoneFrame>?
     public init(
         generation: String, frames: AsyncThrowingStream<MicrophoneFrame, any Error>, supportsFullDuplex: Bool = false,
-        detach: @escaping @Sendable () async -> Void
+        meterFrames: AsyncStream<MicrophoneFrame>? = nil, detach: @escaping @Sendable () async -> Void
     ) {
         self.generation = generation
         self.supportsFullDuplex = supportsFullDuplex
+        self.meterFrames = meterFrames
         self.frames = MediaSignalListener(
             source: .init(
                 producer: "platform.audio.microphone", generation: generation, delivery: .ordered(capacity: 64)),
@@ -190,6 +192,7 @@ final class MicrophoneCapture: Sendable {
         var subscribed = false
     }
     private let state = Mutex(State())
+    private let meter = AsyncStream<MicrophoneFrame>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private let supportsFullDuplex: Bool
     init(supportsFullDuplex: Bool = false) {
         self.supportsFullDuplex = supportsFullDuplex
@@ -204,23 +207,28 @@ final class MicrophoneCapture: Sendable {
             $0.subscribed = true
             return MicrophoneCaptureInput(
                 generation: generation, frames: frames, supportsFullDuplex: supportsFullDuplex,
-                detach: { [weak self] in self?.finish() })
+                meterFrames: meter.stream, detach: { [weak self] in self?.finish() })
         }
     }
     @discardableResult func send(_ frame: MicrophoneFrame) throws -> Bool {
         try state.withLock {
             guard $0.active else { return false }
             switch continuation.yield(frame) {
-            case .enqueued: return true
+            case .enqueued:
+                meter.continuation.yield(frame)
+                return true
             case .dropped:
                 $0.active = false
+                meter.continuation.finish()
                 continuation.finish(throwing: AudioIOError.overflow)
                 throw AudioIOError.overflow
             case .terminated:
                 $0.active = false
+                meter.continuation.finish()
                 return false
             @unknown default:
                 $0.active = false
+                meter.continuation.finish()
                 continuation.finish(throwing: AudioIOError.invalidFormat)
                 throw AudioIOError.invalidFormat
             }
@@ -230,10 +238,14 @@ final class MicrophoneCapture: Sendable {
         state.withLock {
             guard $0.active else { return }
             $0.active = false
+            meter.continuation.finish()
             continuation.finish(throwing: error)
         }
     }
-    deinit { continuation.finish() }
+    deinit {
+        meter.continuation.finish()
+        continuation.finish()
+    }
 }
 
 /// Bounded native playback history for capture-time policy. Ended periods can supply a short onset tail.

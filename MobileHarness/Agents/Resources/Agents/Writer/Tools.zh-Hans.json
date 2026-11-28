@@ -1,10 +1,10 @@
 {
   "entries": {
     "ask": {
-      "description": "向用户询问继续工作所需的必要信息。",
+      "description": "暂停工作，向用户询问继续所需的信息。",
       "parameters": {
         "question": {
-          "description": "用户需回答的具体问题。"
+          "description": "非空问题，最多 2048 个 UTF-8 字节。"
         }
       }
     },
@@ -12,7 +12,7 @@
       "description": "创建工作区、初始化空入口并进入编辑。独立回合调用。",
       "parameters": {
         "entry": {
-          "description": "工作区相对入口文件路径，例如 flowchart.html。"
+          "description": "相对工作区的文件路径，扩展名为 .html、.md 或 .txt，例如 flowchart.html 或 docs/flowchart.md。只传路径，文件内容用 edit 写入。"
         },
         "title": {
           "description": "使用用户语言的非空显示标题。"
@@ -20,10 +20,10 @@
       }
     },
     "enter": {
-      "description": "进入已经确认的工作区以编辑（修改已有作品必须先调用）。切换时保留旧草稿，独立回合调用。",
+      "description": "进入已保存的工作区进行编辑，或切换到另一个已保存的工作区。单独调用。",
       "parameters": {
         "workspaceID": {
-          "description": "真实工作区 ID。"
+          "description": "用户、当前上下文或 workspace.search 提供的准确 workspace_N。"
         }
       }
     },
@@ -31,7 +31,7 @@
       "description": "独立回合结束当前委托并报告真实结果。",
       "parameters": {
         "outcome": {
-          "description": "委托结果类型。使用当前声明的值。"
+          "description": "发布作品或完成作品库操作用 artifact，完成答复用 explanation，工作不可行用 declined，用户要求停止用 cancelled。cancelled 保留草稿且不发布。"
         },
         "summary": {
           "description": "简短且真实的结果摘要。"

@@ -9,6 +9,7 @@ public enum AgentCategory: String, Codable, Sendable {
 public struct AgentDescriptor: Sendable {
     public let category: AgentCategory
     public let id: AgentID
+    public let publicationChannels: [String: String]
     public let name: String
     public let version: String
     public let inputs: Set<InputKind>
@@ -16,10 +17,12 @@ public struct AgentDescriptor: Sendable {
     public let capabilities: CapabilityRegistry
 
     public init(
-        category: AgentCategory, id: AgentID, name: String, version: String = "0.1.0", inputs: Set<InputKind>,
+        category: AgentCategory, publicationChannels: [String: String] = [:], id: AgentID, name: String,
+        version: String = "0.1.0", inputs: Set<InputKind>,
         outputs: Set<OutputKind>, capabilities: CapabilityRegistry = try! CapabilityRegistry()
     ) {
         self.category = category
+        self.publicationChannels = publicationChannels
         self.id = id
         self.name = name
         self.version = version

@@ -11,7 +11,7 @@ speed/acceleration are native position-mode parameters, not degrees/s, seconds o
 “TO absolute90°” needs a defined zero: clarify, NO motion. Never assume target1024 or substitute deltaDegrees90.
 
 ### Selection and examples (only when ready)
-resetMotor homes one axis(default1–5); resetArm excludes gripper. Gestures return home; moveMotor stays at target. Add no unrequested home. Robot serializes: emit EVERY unconditional step in ONE response, not just the first.
+resetMotor homes the specified axis (1–5 have defaults; motor 6 requires a configured home); resetArm excludes gripper. Gestures return home; moveMotor stays at target. Add no unrequested home. Robot serializes: emit EVERY unconditional step in ONE response, not just the first.
 “Turn the base right 90 degrees” → <moveMotor motor="1" deltaDegrees="90"/>
 “Turn the base left 45 degrees at speed 400” → <moveMotor motor="1" deltaDegrees="-45" speed="400"/>
 “Move motor 1 to 3072 counts” → <moveMotor motor="1" target="3072"/>

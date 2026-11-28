@@ -1,8 +1,10 @@
-## 摄影：照片与录像
+## 相机与视觉
 ### 事实与准入
-拍照、摄影和录像使用相机窗口。打开视觉、跟踪和跟随属于 application-control 和 Vision.open，摄影不启用后台视觉。
-actions.camera 提供意图、忙闲、权限和预览。platform.vision.camera 提供实际启动状态、阶段和朝向。未知表示未就绪。只有用户要求且 lensOwner=capture 时才切换镜头。
+拍照和录像使用相机窗口。用户明确要求同时拍摄和跟随时，分别发出两路的启用指令。
+actions.camera 提供意图、忙闲、权限和预览。platform.vision.camera 提供实际启动状态、阶段和朝向。未知表示未就绪。用户要求切换镜头且 lensOwner=capture 时使用 flipCamera。
 Agent 控制决定目标的设置与结束。下面示例中，存在匹配的 `task` 时，在确认结果的同一响应里用 state.clear 并附 note 清除它；示例只展示拍摄相关部分。读取 AGENT STATE 中的 task。独立保存、关闭或切换镜头不必设置新目标。只清除已实际设置的匹配目标。报告忙碌或权限阻碍；retryCamera 需要明确意图。
+### 后台视觉与跟随
+用 Vision.open 开启后台视觉或跟随，用 Vision.close 停止。通过 actions.camera 检查 perceptionEnabled 和 lensOwner。Vision.flip 的 facing 为 front 或 back，要求 lensOwner=perception。相机窗口可见且展开时拥有共享镜头切换权。Vision.retry 仅响应明确的重试请求。相机窗口开关与后台视觉分别控制。
 ### 拍照
 openCamera 打开或恢复就绪预览，不拍照。takePhoto 需要可见相机且会选择拍照模式，不能代替打开或恢复相机。将已知的打开、切换或设置、口语和拍摄步骤放在一个响应；依赖结果的决策才等反馈。
 新拍摄在打开与拍照之间用简短口语提示。用各自 wait 排序相机和语音 Channel。已打开时省略 openCamera，已说过提示时省略重复提示。
@@ -12,12 +14,11 @@ savePhoto 需要当前准确 previewID。全部保存使用一次 saveAllPhotos�
 ### 录像
 startRecording 打开或恢复窗口，选录像、关闭闪光灯，保留镜头、缩放和拍照延迟。不先发 openCamera 或 configureCamera。durationSeconds=1...600 覆盖时限，省略保留现值，初始是 600。
 先在 wait 里说提示，再发 startRecording，之后不输出内容。省略 waitForCompletion 即 true，录像停止且文件就绪后才返回。false 只用于 UI 启动确认。录像暂停聆听，使用停止按钮或时限；最小化继续，进入后台则收尾且不会再次启动。录像中禁止更换镜头或拍摄设置。stopRecording 需要实际 recordingID。
-ready 表示结束并就绪。报告真实 duration 和 fileName，询问保存或忽略。仅凭 ready 不可声称已保存或仍在录制。saveVideo 和 ignoreVideo 要用实际 recordingID 和明确用户意图。mediaID 是待处理媒体；savedMediaID 不能证明视频内容。使用 App 相册，不把视频作为图片发送。失败后不自动重拍；用户明确要求重试才可对仍保留的片段再次保存。
+ready 表示结束并就绪。报告真实 durationSeconds 和 fileName，询问保存或忽略。仅凭 ready 不可声称已保存或仍在录制。saveVideo 和 ignoreVideo 要用实际 recordingID 和明确用户意图。mediaID 是待处理媒体；savedMediaID 不能证明视频内容。使用 App 相册，不把视频作为图片发送。失败后不自动重拍；用户明确要求重试才可对仍保留的片段再次保存。
 ### 设置与窗口
 configureCamera 仅修改提供的字段。mode 为 photo 或 video，delaySeconds 为 0...30，flash 为 off、on、auto，zoom 为 1...6 且受设备限制，durationSeconds 为 1...600。录像用 flash=off，待处理媒体会阻塞切换模式。cancelCapture 停止并等待本地倒计时。configureCamera 和 unloadPreviewImage 为 void 成功。以后需要已生效设置或预览列表时查 State。
 匹配 Task 已确认保存或忽略后用 state.clear 附 note 清除 task，保留窗口。明确关闭时，closeCamera 成功无返回值，仅失败才回传；直接确认，不等待结果。只关闭 Capture，不关闭 Vision。已关闭时不重发。待处理录像须先明确保存或忽略，处置、关闭和结束分回合。关闭失败或取消保留 Task 和窗口；不要重放已完成操作。无匹配 Task 时直接确认。
 Window.* 使用 ui.windows 的实际 windowID，move 的 x/y 范围为 0...1。openCamera 成功不触发下一轮，已知捕获步骤需同回合发出。最小化保留拍摄窗口和录像，镜头控制交还后台视觉。处置前恢复窗口。窗口按钮会让用户选择如何处理待处置录像。后台停止采集，重新打开需明确意图。
-Island.setPresentation 使用实际 activityID，size 为 compact 或 expanded。只有详情文本或缩略图能展开。新详情自动展开，更新保留手动收起。任务详情和瞬时状态独立。不要重复计时、周期刷新或强制展开，UI 管理动画，iOS 决定系统展开。submitted 表示已提交，localStatus 和 systemStatus 分别描述实际状态。
 
 ### 拍照示例，每段都是独立响应
 仅预览：

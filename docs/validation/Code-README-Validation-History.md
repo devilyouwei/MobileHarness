@@ -186,7 +186,7 @@ Agent-internal errors terminate the input. Otherwise the decision is `roundCoord
 
 ## MobileHarness/Resources/Agents/README.md
 
-[现行 README](../../MobileHarness/Resources/Agents/README.md)
+[现行资源规范](../../MobileHarness/Agents/Resources/AgentAuthoring.md)
 
 ````markdown
 ## Agent request failure continuation
@@ -196,7 +196,7 @@ Agent-internal errors terminate the input. Otherwise the decision is `roundCoord
 
 ## MobileHarness/Resources/Skills/README.md
 
-[现行 README](../../MobileHarness/Resources/Skills/README.md)
+[现行资源规范](../../MobileHarness/Agents/Resources/SkillAuthoring.md)
 
 ````markdown
 ## 职责与边界

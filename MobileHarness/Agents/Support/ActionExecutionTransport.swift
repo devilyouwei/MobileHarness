@@ -32,7 +32,7 @@ public final class ActionExecutionTransport: ActionExecutionEngine {
                     }
                 })
             control = try .init(
-                id: "action.control.v1", maximumRequestBytes: 1024, maximumReplyBytes: nil,
+                id: ActionControl.contract, maximumRequestBytes: 1024, maximumReplyBytes: nil,
                 requestSize: { try JSONEncoder().encode($0).count })
         }
 
@@ -126,7 +126,8 @@ public final class ActionExecutionTransport: ActionExecutionEngine {
         var feedbackEndpoint: SignalEndpoint?
         do {
             let feedback = try await signals.register(
-                address: "agents.execution.results", incarnation: UUID().uuidString, replaceExisting: false
+                address: "agents.execution.results", incarnation: UUID().uuidString, replaceExisting: false,
+                sendChannels: [CallResultSignal.channel, ActionExecutionEventSignal.channel]
             ) { signal in
                 guard signal.source == target else { throw CommunicationError.unauthorized }
                 switch signal.payload {
@@ -169,13 +170,19 @@ public final class ActionExecutionTransport: ActionExecutionEngine {
                     channel: ActionExecutionEventSignal.channel, from: target, to: feedback, over: signals)
             }
             let receiver = ActionExecutionEndpoint(engine: engine, deliverResult: deliver)
-            try await signals.registerContextualRequest(contracts.action, endpoint: target) { request, context in
+            try await signals.registerContextualRequest(
+                contracts.action, endpoint: target, channel: ActionCallSignal.channel
+            ) { request, context in
                 try await receiver.receive(request, owner: owner(of: context))
             }
-            try await signals.registerContextualRequest(contracts.tool, endpoint: target) { request, context in
+            try await signals.registerContextualRequest(
+                contracts.tool, endpoint: target, channel: ToolCallSignal.channel
+            ) { request, context in
                 try await receiver.receive(request, owner: owner(of: context))
             }
-            try await signals.registerContextualRequest(contracts.control, endpoint: target) { request, context in
+            try await signals.registerContextualRequest(
+                contracts.control, endpoint: target, channel: ActionControl.channel
+            ) { request, context in
                 try await receiver.receive(request, owner: owner(of: context))
             }
             try engine.bindSignals(
@@ -294,7 +301,7 @@ public final class ActionExecutionTransport: ActionExecutionEngine {
         defer { activeControls.withLock { $0 -= 1 } }
         do {
             return try await request(
-                control, using: contracts.control, channel: "action.control", id: control.controlID.uuidString,
+                control, using: contracts.control, channel: ActionControl.channel, id: control.controlID.uuidString,
                 owner: owner, control: true)
         } catch SignalTransportError.capacityExceeded {
             return .init(control, status: .busy)

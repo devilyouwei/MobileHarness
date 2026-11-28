@@ -136,7 +136,7 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
     let inspection = ApplicationStateInspection()
     try inspection.registerRoot("platform", readers: { try await root.stateReaders() })
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { path in try await inspection.snapshot(path: path) }
+    try AgentStateBindings.register(in: context) { path in try await inspection.snapshot(path: path) }
     try context.open(session: "state-session")
     let before = try await context.snapshot(
         session: "state-session", names: ["platform.system.time", "platform.system.network"])
@@ -159,7 +159,7 @@ private func nativeObject(_ data: Data) throws -> [String: Any] {
 @Test func assistantPlatformContextMarksMalformedUnknownAndRejectsOversizeOrClosedReads() async throws {
     let mode = FixtureFactCell(0)
     let context = AgentStateContext()
-    try AssistantStateBindings.register(in: context) { _ in
+    try AgentStateBindings.register(in: context) { _ in
         if mode.read() == 0 { return [true] }
         return String(repeating: "x", count: 256 * 1024 + 1)
     }

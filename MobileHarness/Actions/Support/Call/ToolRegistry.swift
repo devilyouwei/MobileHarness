@@ -4,11 +4,12 @@ import FunctionContracts
 
 /// Direct-protocol projection over canonical executable definitions.
 public actor ToolRegistry {
+    private static let definitionCapacity = 256
     private var functions = FunctionRegistry()
     private var definitions: [String: ActionBinding] = [:]
     public init() {}
 
-    /// Explicit completion-only native registration for isolated hosts; production uses host profiles.
+    /// Completion-only native registration for isolated hosts.
     public init(modules: [any CapabilityModule]) throws {
         let catalog = try CapabilityCatalog(modules: modules)
         let bindings = try ActionBindingCatalog(
@@ -22,7 +23,9 @@ public actor ToolRegistry {
         guard modules.count <= 32 else { throw ToolRegistryError.queueFull }
         var entries: [String: ActionBinding] = [:]
         for module in modules {
-            guard module.definitions.count <= 128 - entries.count else { throw ToolRegistryError.queueFull }
+            guard module.definitions.count <= Self.definitionCapacity - entries.count else {
+                throw ToolRegistryError.queueFull
+            }
             for definition in module.definitions {
                 try Self.validate(definition)
                 let path = definition.path.description
@@ -50,7 +53,7 @@ public actor ToolRegistry {
         try Self.validate(definition)
         let path = definition.path.description
         guard definitions[path] == nil else { throw ToolRegistryError.duplicateHandler }
-        guard definitions.count < 128 else { throw ToolRegistryError.queueFull }
+        guard definitions.count < Self.definitionCapacity else { throw ToolRegistryError.queueFull }
         functions = try functions.registering(definition.function)
         definitions[path] = definition
     }

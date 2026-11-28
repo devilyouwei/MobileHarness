@@ -6,5 +6,4 @@ The execution log presents `agents.assistant.listening` as JSON with the Boolean
 
 | File | Responsibility |
 | --- | --- |
-| [AssistantStateBindings.swift](AssistantStateBindings.swift) | Business-only exact-path State adaptation. |
-| [AssistantChatStatus.swift](AssistantChatStatus.swift) | Signal preparation, status, resident context, effective capabilities and decision metadata. |
+| [AssistantChatStatus.swift](AssistantChatStatus.swift) | Lifecycle, reply activity, resident context, visible variables and effective capabilities. |

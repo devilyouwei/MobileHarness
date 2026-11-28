@@ -6,6 +6,40 @@ import StorageCore
 
 /// Preserve provider call/result blocks when interleaving independent task rounds.
 public enum AgentChatContextBuilder {
+    public struct SkillStateContext: Sendable {
+        public let paths: [String]
+        public let messages: [ChatMessage]
+        public let prompt: String
+        public let ephemeralImageIDs: Set<String>
+        public let imageScopes: [String: String]
+        public let resourceBindings: [String: String]
+    }
+
+    /// Sample the active Skills' container state once for this model request.
+    public static func skillStateContext(
+        skills: [String], from context: AgentStateContext, session: String, dialog: String,
+        messages: [ChatMessage], user: String, supportsImages: Bool
+    ) async throws -> SkillStateContext {
+        let paths = try AgentSkillLoader.useStates(skills)
+        await context.synchronize(session: session, dialog: dialog)
+        let snapshot = try await context.multimodalSnapshot(session: session, names: paths)
+        let projection = try applyingStateImages(
+            snapshot.images, to: messages, user: user, supportsImages: supportsImages)
+        let templates = try AgentPrompts.stateContext()
+        var prompt =
+            try templates.render("frame")
+            + templates.render("skillState", variables: ["state": String(decoding: snapshot.facts, as: UTF8.self)])
+        if let manifest = projection.manifest {
+            prompt += try templates.render("images", variables: ["manifest": manifest])
+        }
+        return SkillStateContext(
+            paths: paths, messages: projection.messages, prompt: prompt, ephemeralImageIDs: projection.ephemeralIDs,
+            imageScopes: Dictionary(
+                uniqueKeysWithValues: snapshot.images.compactMap { image in
+                    image.resourceScope.map { (image.id, $0) }
+                }), resourceBindings: snapshot.resourceBindings)
+    }
+
     struct StateImageProjection {
         let messages: [ChatMessage]
         let manifest: String?

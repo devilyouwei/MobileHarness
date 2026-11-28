@@ -51,6 +51,7 @@ public struct SignalRequestContext: Sendable {
 }
 
 struct SignalRequestHandler: Sendable {
+    let channel: String
     let maximumRequestBytes: Int
     let maximumReplyBytes: Int?
     let timeout: Duration
@@ -82,20 +83,25 @@ enum SignalRequestChain {
 extension SignalTransport {
     /// Binding a handler neither activates a receiver nor grants business permissions.
     public func registerRequest<Request, Reply>(
-        _ descriptor: SignalRequestProtocol<Request, Reply>, endpoint: SignalEndpoint,
+        _ descriptor: SignalRequestProtocol<Request, Reply>, endpoint: SignalEndpoint, channel: String? = nil,
         handler: @escaping @Sendable (Request) async throws -> Reply
     ) throws {
-        try registerContextualRequest(descriptor, endpoint: endpoint) { value, _ in try await handler(value) }
+        try registerContextualRequest(descriptor, endpoint: endpoint, channel: channel) { value, _ in
+            try await handler(value)
+        }
     }
     public func registerContextualRequest<Request, Reply>(
-        _ descriptor: SignalRequestProtocol<Request, Reply>, endpoint: SignalEndpoint,
+        _ descriptor: SignalRequestProtocol<Request, Reply>, endpoint: SignalEndpoint, channel: String? = nil,
         handler: @escaping @Sendable (Request, SignalRequestContext) async throws -> Reply
     ) throws {
         try validateRequestEndpoint(endpoint)
         guard requestHandlers[endpoint]?[descriptor.id] == nil else { throw SignalTransportError.duplicateProtocol }
         guard (requestHandlers[endpoint]?.count ?? 0) < 32 else { throw SignalTransportError.capacityExceeded }
+        let channel = channel ?? descriptor.id
+        try declareSendChannel(channel, endpoint: endpoint)
         requestHandlers[endpoint, default: [:]][descriptor.id] = SignalRequestHandler(
-            maximumRequestBytes: descriptor.maximumRequestBytes, maximumReplyBytes: descriptor.maximumReplyBytes,
+            channel: channel, maximumRequestBytes: descriptor.maximumRequestBytes,
+            maximumReplyBytes: descriptor.maximumReplyBytes,
             timeout: descriptor.timeout,
             measureRequest: { value in
                 guard let value = value as? Request else { throw SignalTransportError.schemaMismatch }
@@ -120,6 +126,7 @@ extension SignalTransport {
         try Task.checkCancellation()
         try validateRequestEndpoint(source)
         try validateRequestEndpoint(target)
+        if let name = envelope?.explicitChannel { try validateSendChannel(name, target: target) }
         guard let handler = requestHandlers[target]?[descriptor.id] else {
             throw SignalTransportError.unsupportedProtocol
         }
@@ -136,8 +143,12 @@ extension SignalTransport {
         let metadata =
             envelope
             ?? SignalEnvelope(
-                id: UUID().uuidString, sessionID: source.incarnation, contract: descriptor.id, payloadBytes: size)
+                id: UUID().uuidString, sessionID: source.incarnation, contract: descriptor.id, channel: handler.channel,
+                payloadBytes: size)
         guard metadata.contract == descriptor.id else { throw SignalTransportError.schemaMismatch }
+        guard metadata.channel == handler.channel else {
+            throw SignalTransportError.channelUnavailable(metadata.channel)
+        }
         try validateEnvelope(metadata)
         let timeout = ContinuousClock.now.advanced(by: descriptor.timeout)
         let deadline = metadata.expiresAt.map { min($0, timeout) } ?? timeout

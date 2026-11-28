@@ -400,13 +400,64 @@ private let engineResource = ResourceID(rawValue: "fixture.writer")
         self.root = root
     }
 }
-private func engineJob(id: String = UUID().uuidString) throws -> ScheduledAction {
+private func engineJob(id: String = UUID().uuidString, parameters: [String: String] = [:]) throws -> ScheduledAction {
     let context = ActionExecutionContext(source: "producer", sessionID: "session", inputID: id)
     return try ScheduledAction(
         envelope: .init(
             source: context.source, sessionID: context.sessionID,
-            inputID: id, schedulingScope: .input(id), context: context), call: .init(actionPath: containerPath),
+            inputID: id, schedulingScope: .input(id), context: context),
+        call: .init(actionPath: containerPath, parameters: parameters),
         channel: "main", owner: .init(endpoint: "producer", incarnation: "generation", sessionID: "session"))
+}
+
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func callerSelectsChannelOrderingOrConcurrentDirectExecutionForTheSameFunction() async throws {
+    let firstActionStarted = ContainerGate()
+    let firstToolStarted = ContainerGate()
+    let releaseAction = ContainerGate()
+    let releaseTool = ContainerGate()
+    let calls = ContainerCounter()
+    let harness = try EngineHarness { invocation in
+        let value = try ActionArguments(invocation.call.parameters).requiredInt("value", range: 1...4)
+        await calls.record(value)
+        if value == 1 {
+            await firstActionStarted.release()
+            await releaseAction.wait()
+        } else if value == 3 {
+            await firstToolStarted.release()
+            await releaseTool.wait()
+        }
+    }
+    let watchdog = Task {
+        try? await Task.sleep(for: .seconds(5))
+        await releaseAction.release()
+        await releaseTool.release()
+        await firstActionStarted.release()
+        await firstToolStarted.release()
+    }
+    defer { watchdog.cancel() }
+    let input = "shared-input"
+    let first = try engineJob(id: input, parameters: ["value": "1"])
+    let owner = try #require(first.owner)
+    _ = try await harness.engine.enqueue(invocation: first)
+    await firstActionStarted.wait()
+    _ = try await harness.engine.enqueue(invocation: engineJob(id: input, parameters: ["value": "2"]))
+
+    func tool(_ value: String) -> FunctionInvocation {
+        FunctionInvocation(
+            tool: .init(id: UUID().uuidString, toolPath: containerPath.description, arguments: ["value": value]),
+            context: first.envelope.context)
+    }
+    let pending = Task { try await harness.engine.execute(tool("3"), owner: owner) }
+    await firstToolStarted.wait()
+    #expect(try await harness.engine.execute(tool("4"), owner: owner) == .completed)
+    #expect(await calls.values == [1, 3, 4])
+    await releaseAction.release()
+    await releaseTool.release()
+    #expect(try await pending.value == .completed)
+    try await harness.engine.finish(scope: .input(input), source: owner.endpoint)
+    #expect(await calls.values == [1, 3, 4, 2])
+    try await harness.root.stop()
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor

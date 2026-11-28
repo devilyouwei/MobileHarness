@@ -7,12 +7,14 @@ public final class SpeechExecutionEndpoint: SpeechPlaybackCapability, SpeechList
     SpeechListeningGestureCapability, AudioDetectionCapability, UIFeedbackCapability
 {
     private let rootSessionID: String
+    private var targetVolume: Double = 1
     private weak var voice: (any VoiceOutputHandling)?
     public weak var audioDetection: AudioDetectionPresentation?
     public init(rootSessionID: String) { self.rootSessionID = rootSessionID }
     public func bind(_ value: any VoiceOutputHandling) throws {
         guard voice == nil else { throw ActionHostError.scopeClosed }
         voice = value
+        value.setVolume(targetVolume)
     }
     public func unbind(_ value: any VoiceOutputHandling) {
         if voice === value { voice = nil }
@@ -53,9 +55,9 @@ public final class SpeechExecutionEndpoint: SpeechPlaybackCapability, SpeechList
         guard let voice else { throw ActionHostError.scopeClosed }
         try await voice.play(audioID: audioID, invocation: invocation)
     }
-    public func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) async throws {
-        guard let voice else { throw ActionHostError.scopeClosed }
-        try voice.setVolume(volume, executionID: executionID, invocation: invocation)
+    public func setVolume(_ volume: Double) {
+        targetVolume = volume
+        voice?.setVolume(volume)
     }
 
     public func runDetection(invocation: any FunctionInput) async throws {

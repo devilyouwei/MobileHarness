@@ -258,7 +258,7 @@ func playbackControlUsesExecutionIdentityAndKeepsSpeakRunning(scenario: Playback
     let feedback = Mutex([ActionControlFeedback.Event]())
     let starts = Mutex([ExecutionStart]())
     let results = Mutex([ExecutionResult]())
-    let requestedVolumes = Mutex([(Double, UUID?)]())
+    let requestedVolumes = Mutex([Double]())
     let definition = SpeechActions.speakDefinition(handler: { _ in
         guard let register = ActionControlRegistration.register else { throw ActionHostError.unavailable }
         try await register(playback)
@@ -269,11 +269,8 @@ func playbackControlUsesExecutionIdentityAndKeepsSpeakRunning(scenario: Playback
         }
     }).supportingControls([.pause, .resume, .cancel])
     let volumeDefinition = SpeechActions.setVolumeDefinition(handler: { invocation in
-        try await SpeechActions.setVolume(invocation: invocation) { volume, executionID, input in
-            #expect(input.executionOwner?.endpoint == "assistant")
-            #expect(input.executionOwner?.incarnation == "incarnation")
-            #expect(input.executionOwner?.sessionID == "session")
-            requestedVolumes.withLock { $0.append((volume, executionID)) }
+        try await SpeechActions.setVolume(invocation: invocation) { volume in
+            requestedVolumes.withLock { $0.append(volume) }
         }
     })
     try actions.configure(
@@ -339,9 +336,9 @@ func playbackControlUsesExecutionIdentityAndKeepsSpeakRunning(scenario: Playback
             let volumeInvocation = FunctionInvocation(
                 tool: .init(
                     id: UUID().uuidString, toolPath: "Speech.Playback.setVolume",
-                    arguments: ["volume": "0.42", "executionID": executionID]), context: volumeContext)
+                    arguments: ["volume": "0.42"]), context: volumeContext)
             #expect(try await execution.execute(volumeInvocation, owner: owner) == .completed)
-            #expect(requestedVolumes.withLock { $0.first?.0 == 0.42 && $0.first?.1?.uuidString == executionID })
+            #expect(requestedVolumes.withLock { $0 == [0.42] })
             #expect(await playback.commands == [.pause])
         }
         if scenario == .cancelWhilePaused {

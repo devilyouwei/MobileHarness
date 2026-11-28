@@ -350,18 +350,18 @@ import Testing
             let resources = try ResourceCoordinator(
                 definitions: (1...6).map {
                     ResourceDefinition(
-                        id: ResourceID(rawValue: "nexarm.motor.\($0)"), allowedOwners: [.assistant, .photographer]
+                        id: ResourceID(rawValue: "nexarm.motor.\($0)"), allowedOwners: [.assistant, .visionPerception]
                     ) {}
                 })
             let manager = AgentManager()
             let session = UUID().uuidString
-            let photographer = try PhotographerAgent(
+            let visionPerception = try VisionPerceptionAgent(
                 sessionID: session, controlsArm: true, controlAvailable: { await workflow.trackingAvailable },
                 context: try AgentContextRepository(
-                    agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString,
-                    state: PhotographerContextState())
+                    agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                    state: CameraTransactionContextState())
             )
-            try await manager.register(photographer, sessionID: session)
+            try await manager.register(visionPerception, sessionID: session)
             let policy = try CommunicationPolicy(
                 contracts: AgentContracts.communication,
                 configurations: AgentConfigurations.all())
@@ -394,8 +394,8 @@ import Testing
                         workflow: workflow, expected: .succeeded)
                 }
                 workflow.withMotorResources = bluetoothResourceGuard(resources)
-                try await photographer.start()
-                var iterator = photographer.outputs.makeAsyncIterator()
+                try await visionPerception.start()
+                var iterator = visionPerception.outputs.makeAsyncIterator()
                 let baseline = workflow.state.joints
                 let before = await link.writes
                 for index in 1...6 {
@@ -411,7 +411,7 @@ import Testing
                             metadata: InputMetadata(
                                 payload: payload, source: "runtime", sequence: sequence,
                                 rootID: UUID().uuidString)),
-                        to: .photographer)
+                        to: .visionPerception)
                     try #require(delivery.rejected.isEmpty)
                     let envelope = try #require(await iterator.next())
                     print("SERIAL PHOTOGRAPHER TOOL \(envelope.output)")
@@ -425,7 +425,7 @@ import Testing
                 try #require(baseline[0] - workflow.state.joints[0] >= 30)
                 try #require(abs(baseline[4] - workflow.state.joints[4]) <= 4)
                 try #require(abs(baseline[5] - workflow.state.joints[5]) <= 4)
-                let results = await output.executionResults(source: .photographer)
+                let results = await output.executionResults(source: .visionPerception)
                 try #require(results.outputs.count == 6 && results.outputs.allSatisfy { !$0.isError })
                 try #require(await failures.failure == nil)
                 print(
@@ -456,7 +456,7 @@ import Testing
                                 metadata: InputMetadata(
                                     payload: payload, source: "runtime", sequence: sequence,
                                     rootID: UUID().uuidString))
-                            let delivery = try await manager.receiveLocally(observation, to: .photographer)
+                            let delivery = try await manager.receiveLocally(observation, to: .visionPerception)
                             try #require(delivery.rejected.isEmpty)
                             let base: Double
                             switch phase {
@@ -466,7 +466,7 @@ import Testing
                             }
                             let call = try permission.call(["base": String(base), "pitch": "0"])
                             let envelope = OutputEnvelope(
-                                source: .photographer, context: observation.context, output: .toolCall(call),
+                                source: .visionPerception, context: observation.context, output: .toolCall(call),
                                 sequence: sequence, taskScope: observation.taskScope)
                             let result = try await output.execute(envelope)
                             try #require(!result.isError)
@@ -501,7 +501,7 @@ import Testing
                 }
 
                 await output.shutdown()
-                await photographer.stop()
+                await visionPerception.stop()
                 workflow.disconnect()
                 await workflow.waitUntilIdle()
                 observer.cancel()
@@ -511,7 +511,7 @@ import Testing
                 workflow.stopMotorControl()
                 await workflow.stopActions()
                 await output.shutdown()
-                await photographer.stop()
+                await visionPerception.stop()
                 workflow.disconnect()
                 await workflow.waitUntilIdle()
                 observer.cancel()

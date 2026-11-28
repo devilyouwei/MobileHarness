@@ -54,7 +54,7 @@ AgentFixedTaskInput.unwrap 只接受 request／input，核对已认证来源为 
 
 Native CameraFrame/PCM and typed UI/container observations reach their owning roles directly. This directory owns derived semantic messages and role-originated coordination, not a universal external-media Signal format. Perception and cognition use the same Agent communication boundary; neither denotes a new module or container. Execution requests are separate from role messages and share Gateway only for their respective transport/scheduling facilities. The cross-module view is maintained in the [overall input and Signal design](../../../README.md#native-input-and-internal-signals).
 
-Assistant 通过 `task.send(agent_id,text)` 发送 `agent.task.v1`，载荷为 AgentTaskRequest。新目标、补充、答复和停止请求共用该正文契约。Writer 校验已持久化的消息后接收入队；决定开启新任务时，以原消息 ID 作为委托 ID 申请执行授权。Writer 统一发送 `agent.task.events.v1`，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
+Assistant 通过 `send(agent_id,text)` 发送 `agent.task.v1`，载荷为 AgentTaskRequest。新目标、补充、答复和停止请求共用该正文契约。Writer 校验已持久化的消息后接收入队；决定开启新任务时，以原消息 ID 作为委托 ID 申请执行授权。Writer 统一发送 `agent.task.events.v1`，包含接纳、进度、追问、答复接纳、消息拒绝及任务终态。
 
 AgentTaskEvent 只携带事件身份、顺序、kind、目标、窗口与失败事实；产物引用（如 workspace_N）由 AgentTaskContent.artifactID 携带，执行身份即 scope.id，接收端认证 scope 并校验事件顺序。当前委托的补充和追问答复沿用原 scope；任务终态后再次委托，即使复用同一个工作区，也使用新消息 ID 建立新 scope。历史请求保存稳定身份，实时传输/去重使用执行身份。
 
@@ -71,3 +71,7 @@ AgentTaskEvent version 1 carries the event identity, sequence, kind, current goa
 ## 公开委派适配
 
 AgentTaskMessaging 供角色目录与发送端校验已实现的后台消息路由。目标须启用 agent.task.v1 并具备真实文本适配器；当前文本适配器由 Writer 实现，不以发送者/目标配对授权。Gateway 校验实际身份，Writer 决定业务准入。
+
+角色的请求和发布适配器按业务协议查找当前配置的信道。定向请求的 Reply 随原请求返回，任务进度和终态通过已绑定的发布信道投递。 [channel declaration contract](../../Resources/AgentAuthoring.md#channels--信道声明)
+
+Compiled v9 configuration remains readable for programmatic callers. Its directed requests resolve the receiver by protocol. Bundled Agent.json uses v14 and compiles to v10 with explicit endpoint names.

@@ -331,6 +331,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     let manager = AgentManager()
     try await manager.register(sink, sessionID: session)
     try await manager.register(writer)
+    #expect(await writer.observationSnapshot().business["lifecyclePhase"] == .text("registered"))
     let policy = try CommunicationPolicy(
         contracts: AgentContracts.communication, configurations: AgentConfigurations.all())
     let gateway = await GatewayContainer()
@@ -354,6 +355,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     try await output.bindCommunications(records.agentMessages)
     await writer.bind(try await output.consumer(for: writer), messaging: try await output.messaging(for: .writer))
     try await manager.start(.writer)
+    #expect(await writer.observationSnapshot().business["lifecyclePhase"] == .text("running"))
     let message = AgentTaskRequest(text: "写一段问候")
     let scope = AgentTaskScope(
         id: message.id, requester: .assistant, executor: .writer, sessionID: session, execution: .background)
@@ -362,6 +364,7 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
         port: try await output.messaging(for: .assistant), receiver: sink, records: records)
     func stopFixture() async throws {
         await writer.stop()
+        #expect(await writer.observationSnapshot().business["lifecyclePhase"] == .text("stopped"))
         await messaging.close()
         await output.shutdown()
         try await gateway.stop()
@@ -478,8 +481,10 @@ func writerBackgroundRoleUsesDirectGatewayAndPublishesActualArtifact(mode: Int)
     // Exercise producer pause independently of that consumer scheduling race.
     if !asks, !pausedDelivery {
         try await writer.pause()
+        #expect(await writer.observationSnapshot().business["lifecyclePhase"] == .text("paused"))
         #expect(await writer.status().lifecycle == .paused)
         try await writer.resume()
+        #expect(await writer.observationSnapshot().business["lifecyclePhase"] == .text("running"))
         pausedDelivery = true
     }
     if startBackground != nil {

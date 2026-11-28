@@ -20,25 +20,25 @@ public actor MemoryAgent: Agent {
     var uiInputs = AgentUIInputs()
     var uiExecution = AgentUIExecution()
     var historyReadWorkers: [String: Task<HistoryReply, any Error>] = [:]
-    private let contextRepository: AgentContextRepository<MemoryContextState>
-    private let preprocessor = MemorySignalPreprocessor()
-    private let contextBuilder = MemoryContextBuilder()
+    let contextRepository: AgentContextRepository<MemoryContextState>
+    let preprocessor = MemorySignalPreprocessor()
+    let contextBuilder = MemoryContextBuilder()
 
-    private let continuation: AsyncStream<OutputEnvelope>.Continuation
+    let continuation: AsyncStream<OutputEnvelope>.Continuation
     let sessionID: String
-    private var lifecycle = AgentLifecycle.registered
+    var lifecycle = AgentLifecycle.registered
     var processed = 0
-    private var sequence: UInt64 = 0
-    private var history = MemoryHistoryWorkflow()
+    var sequence: UInt64 = 0
+    var history = MemoryHistoryWorkflow()
 
-    private let taskCoordinator: AgentFixedTaskCoordinator<MemoryContextState>
-    private var fixedTaskInputs: [String: AgentInput] = [:]
-    private let admission = AgentAdmissionGate(capacity: 32)
+    let taskCoordinator: AgentFixedTaskCoordinator<MemoryContextState>
+    var fixedTaskInputs: [String: AgentInput] = [:]
+    let admission = AgentAdmissionGate(capacity: 32)
 
     // MARK: - Registration
 
-    public static func runtimeCapabilities(_ capabilities: CapabilityRegistry) throws -> CapabilityRegistry {
-        try MemoryHistoryWorkflow.runtimeCapabilities(capabilities)
+    public static func runtimeCapabilities() throws -> CapabilityRegistry {
+        try MemoryHistoryWorkflow.runtimeCapabilities()
     }
 
     public init(
@@ -53,10 +53,10 @@ public actor MemoryAgent: Agent {
         let configuration = try configuration ?? AgentConfigurations.load(named: "Memory")
         guard configuration.agentID == .memory else { throw AgentConfigurationError.identityMismatch }
         descriptor = AgentDescriptor(
-            category: configuration.category,
+            category: configuration.category, publicationChannels: configuration.communication.publicationChannels,
             id: .memory, name: "Memory", inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control],
-            capabilities: try Self.runtimeCapabilities(configuration.capabilities))
+            outputs: [.communication, .toolCall, .control],
+            capabilities: try Self.runtimeCapabilities())
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
         let stream = AsyncStream<OutputEnvelope>.makeStream(
@@ -134,115 +134,21 @@ public actor MemoryAgent: Agent {
 
     public func receive(_ input: AgentInput) async throws {
 
-        var input = input
-        if case .observation(let message) = input.payload, let signal = message.content(as: AgentTaskSignal.self) {
-            if signal.kind == .cancel,
-                let original = fixedTaskInputs.values.first(where: { $0.taskScope?.id == signal.scope.id })
-            {
-                try await taskCoordinator.admitFixedTask(signal, input: input)
-                try await contextRepository.update { $0.state.pendingRequestIDs.removeAll() }
-                history.reset()
-                fixedTaskInputs[original.id] = nil
-                try emit(.control("agent.error: task cancelled"), for: original)
-                try await taskCoordinator.reportFixedTask(
-                    signal.scope, input: original,
-                    result: ToolResult(callID: original.id, value: "Task cancelled", isError: true), status: .cancelled)
-                return
-            }
-            if signal.kind == .cancel || signal.businessContract == "runtime.taskTermination"
-                || signal.businessContract == AgentTaskContent.contract
-                || signal.businessContract == "agent.parentCommitted"
-            {
-                try await taskCoordinator.receive(input)
-                return
-            }
-            let fixed = try AgentFixedTaskInput.unwrap(
-                signal, input: input, executor: descriptor.id, decode: MemoryHistoryIntent.taskMessage)
-            guard fixedTaskInputs.count < 32 else { throw CommunicationError.capacityExceeded }
-            try await taskCoordinator.admitFixedTask(signal, input: input)
-            fixedTaskInputs[fixed.id] = fixed
-            input = fixed
-        }
-
-        try await admission.acquire()
-        defer { admission.release() }
-        try Task.checkCancellation()
-        let cleanup: Bool
-        if case .observation(let message) = input.payload, case .cancel? = message.historyIntent {
-            cleanup = input.metadata.origin == .local && input.metadata.source == "runtime"
-        } else {
-            cleanup = false
-        }
-        guard lifecycle == .running || (lifecycle == .paused && cleanup) else { throw HarnessError.invalidTransition }
-        guard input.sessionID == sessionID || input.taskScope?.executor == .memory else {
-            throw CommunicationError.unauthorized
-        }
-        guard !input.metadata.expired else { throw CommunicationError.invalidPayload }
-        let selection = AgentDecisionContext(snapshot: try await contextRepository.snapshot(), input: input)
-        let decision = try contextBuilder.build(state: selection, batch: selection.batch())
-        var next = history
-        let steps = try next.receive(decision.input)
-        try await prepareSignal(input, pending: next.pendingRequestIDs)
-        guard lifecycle == .running else { throw HarnessError.notRunning }
-        history = next
-        for step in steps {
-            try emit(step.output, for: step.input)
-        }
-        processed += 1
+        if case .toolResult = input.payload { throw CommunicationError.invalidPayload }
+        try await processInput(input)
     }
 
-    // MARK: - Output
-
-    private func emit(_ output: AgentOutput, for input: AgentInput) throws {
-        sequence += 1
-        let envelope = OutputEnvelope(
-            source: descriptor.id, context: input.context, output: output, sequence: sequence,
-            taskScope: input.taskScope)
-        if try uiExecution.capture(envelope) { return }
-        guard case .enqueued = continuation.yield(envelope) else {
-            history.reset()
-            lifecycle = .failed
-            continuation.finish()
-            throw CommunicationError.capacityExceeded
-        }
-    }
-
-    private func relay(_ envelope: OutputEnvelope) -> Bool {
-        sequence += 1
-        let input = AgentInput(
-            id: envelope.inputID, sessionID: envelope.sessionID, payload: .event("relay"),
-            metadata: envelope.inputMetadata,
-            turn: envelope.turn, taskScope: envelope.taskScope)
-        let result = continuation.yield(
-            OutputEnvelope(
-                source: descriptor.id, context: input.context,
-                output: envelope.output, sequence: sequence, roundID: envelope.roundID, callID: envelope.callID,
-                taskScope: input.taskScope, resourceBindings: envelope.resourceBindings))
-        if case .enqueued = result { return true }
-        lifecycle = .failed
-        continuation.finish()
-        return false
-    }
-
-    // MARK: - Context
-
-    private func prepareSignal(_ input: AgentInput, pending: [String]) async throws {
-        let snapshot = try await contextRepository.snapshot()
-        let disposition = try preprocessor.classify(input, state: snapshot.state)
-        if input.payload.kind == .audio || input.payload.kind == .image { return }
-        if case .replaceLatest = disposition { return }
-        try await contextRepository.recordSignal(
-            input, disposition: disposition, admissionSequence: snapshot.revision + 1,
-            consumed: disposition != .feedback, retainingLast: MemorySignalPreprocessor.evidenceCapacity
-        ) { context in
-            context.state.pendingRequestIDs = pending
-        }
+    func clearPending(for inputID: String) async throws {
+        guard history.pendingInputID == inputID else { return }
+        history.reset()
+        try await contextRepository.update { $0.state.pendingRequestIDs.removeAll() }
     }
 
     public func completeFixedTask(inputID: String, value: String?, failure: String? = nil) async throws {
         guard let original = fixedTaskInputs.removeValue(forKey: inputID), let scope = original.taskScope else {
             return
         }
+        if failure != nil { try await clearPending(for: original.id) }
         try await taskCoordinator.reportFixedTask(
             scope, input: original,
             result: ToolResult(callID: inputID, value: failure ?? value ?? "Completed", isError: failure != nil))
@@ -261,5 +167,23 @@ public actor MemoryAgent: Agent {
 
     public func contextSnapshot() async throws -> AgentContext<MemoryContextState> {
         try await contextRepository.snapshot()
+    }
+}
+
+public struct MemoryContextState: AgentTaskContextState {
+    public static let agentID = AgentID.memory
+    public static let configurationName = "Memory"
+
+    public var taskViews: [String: AgentTaskView]?
+
+    public var pendingRequestIDs: [String] = []
+    public init() {}
+    public func validateContextState() throws {
+        try validateTaskState()
+        guard pendingRequestIDs.count <= 1 else { throw CommunicationError.invalidPayload }
+    }
+    public mutating func recoverInterruptedWork() {
+        recoverTaskState()
+        pendingRequestIDs.removeAll()
     }
 }

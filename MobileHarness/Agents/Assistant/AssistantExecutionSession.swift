@@ -108,7 +108,7 @@ public actor AssistantExecutionSession {
                 pump = Task {
                     do {
                         try await AssistantGenerationTransport.consume(
-                            agent.outputs, contracts: AgentContracts.communication
+                            agent.outputs, publicationChannels: agent.descriptor.publicationChannels
                         ) { envelope in
                             do {
                                 let outcome: OutputExecutionResult

@@ -17,6 +17,7 @@
             return AgentStateSnapshot(
                 path: "agents.applicationcontrol",
                 business: [
+                    "lifecyclePhase": .lifecyclePhase(status?.lifecycle, closed: closed),
                     "modelPreparation": environment.map { .text($0.modelPreparation) } ?? .unknown,
                     "taskPhases": context?.state.taskViews.map { .texts($0.values.map { $0.stage.rawValue }.sorted()) }
                         ?? .unknown,

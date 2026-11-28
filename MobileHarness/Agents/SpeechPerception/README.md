@@ -27,7 +27,7 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
 | [SpeechPerceptionMicrophone.swift](Input/SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
 | [SpeechPerceptionSoundSource.swift](Output/SpeechPerceptionSoundSource.swift) | 声源观测的最新值发布：单发布任务、500 ms 新鲜度、替换与拒绝计数；与识别链路无共享队列 |
-| [SpeechPerceptionProcessing.swift](Workflow/SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
+| [SpeechPerceptionContextState.swift](SpeechPerceptionContextState.swift) | 感知角色私有 Context 与中断恢复 |
 | [SpeechPCMPreparation.swift](Workflow/SpeechPCMPreparation.swift) | Capture-scoped optional enhancement and 48/16 kHz resampling; clears history at full-utterance boundaries |
 | [SpeechRecognitionTurn.swift](Workflow/SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
 | [VoiceActivitySegmenter.swift](Workflow/VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
@@ -94,7 +94,8 @@ flowchart TB
  K["Zipformer keyword probe"]:::agent
  W["VAD window progress and onset evidence"]:::agent
  T["RecognitionTurn：partial／final"]:::agent
- S["SoundSourceEstimator／频谱测量"]:::agent
+ F["频谱测量：最新帧"]:::agent
+ S["SoundSourceEstimator"]:::agent
  end
  V -.-> L
  V -.-> N
@@ -105,6 +106,8 @@ flowchart TB
  B --> K
  B --> W
  N --> S
+ P --> F
+ L --> F
  M <--> B
  M <--> T
  M <--> K
@@ -117,7 +120,7 @@ flowchart TB
  X --> PC["PlatformKit · 权限、采集和播放"]:::platform
  X --> UE["UI.home：准备提示／触觉等效果"]:::ui
  Y --> UC["UI.home：字幕／语音状态"]:::ui
- S --> AP["注入 Actions 频谱／检测呈现服务"]:::action
+ F --> AP["注入 Actions 频谱／检测呈现服务"]:::action
  AP --> US["UI.home／diagnostics：低频测量"]:::ui
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -128,6 +131,8 @@ flowchart TB
  classDef action fill:#ffe4e6,stroke:#e11d48,color:#881337
  classDef host fill:#f1f5f9,stroke:#64748b,color:#334155
 ```
+
+麦克风频谱与有序识别在同一采集作用域内并行消费。显示按最新 PCM 测量，每次 FFT 前后检查接纳状态，停止时加入显示任务并清除对应令牌。
 
 低频频谱／检测测量走注入的 Actions 呈现服务；字幕、聆听和语音状态走受保护调用。原始 PCM 始终留在角色消费路径，Actions 原生执行服务只控制采集与屏障。
 
@@ -284,3 +289,7 @@ SpeechPerceptionAgent按至多32ms原始片段和512样本DSP输出处理音频�
 - [Input](Input/) 接收聆听意图和原生麦克风帧，转换输入样本。
 - [Workflow](Workflow/) 拥有语音边界、识别轮次、关键词探测和声源估计。
 - [Output](Output/) 发布最新声源观察并保留发布失败和替换计数。
+
+容器快照的 `business.lifecyclePhase` 公开本角色生命周期，取值见[角色 State 契约](../README.md#reflexive-state-reads-and-disclosure)。
+
+[Input](Input/) 校验采集代与音频并选择输入信号。[Workflow](Workflow/) 负责语音分段、关键词检测、识别及失败恢复。[Output](Output/) 发布 VAD、关键词和转写事实，派发字幕、声音状态与声源观测。

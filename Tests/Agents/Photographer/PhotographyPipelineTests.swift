@@ -68,7 +68,7 @@ extension LiveRuntimeTests {
     @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionKeepsOnlyLatestAndNeverOverlapsOrReplays() async throws {
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -126,7 +126,7 @@ extension LiveRuntimeTests {
     {
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -166,7 +166,7 @@ extension LiveRuntimeTests {
     {
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -218,9 +218,19 @@ extension LiveRuntimeTests {
         let session = UUID().uuidString
         let manager = AgentManager()
         let model = ControlledPose()
-        let vision = try VisionPerceptionAgent(
+        let role = try VisionPerceptionAgent(
+            sessionID: session,
+            context: AgentContextRepository(
+                agent: .visionPerception, scope: session, state: CameraTransactionContextState()))
+        try await role.start()
+        let vision = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
+            track: { pose, input in
+                do { try await role.track(pose, input: input) } catch {
+                    Issue.record("Local tracking rejected the pose: \(error)")
+                }
+            },
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
                 state: VisionPerceptionContextState())
@@ -327,6 +337,8 @@ extension LiveRuntimeTests {
         #expect(await second.inputs.count == (withSubscribers ? 3 : 0))
         #expect(await third.inputs.count == (withSubscribers ? 3 : 0))
         #expect(await model.calls.count == 3)
+        #expect(await role.status().processedInputs == 3)
+        await role.stop()
         await manager.stopAll()
         await output.shutdown()
     }
@@ -353,14 +365,8 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func visionOutputsAreCodeOwnedPermissions() throws {
     let config = try AgentConfigurations.load(named: "VisionPerception")
-    #expect(config.capabilities.actions.isEmpty && config.capabilities.tools.isEmpty)
-    let agent = try VisionPerceptionAgent(
-        pose: CrowdPose(), sessionID: UUID().uuidString,
-        context: try AgentContextRepository(
-            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
-            state: VisionPerceptionContextState())
-    )
-    let registry = agent.descriptor.capabilities
+    #expect(config.agentID == .visionPerception)
+    let registry = try VisionPerceptionAgent.runtimeCapabilities()
     #expect(
         registry.permits(
             ToolCall(id: UUID().uuidString, toolPath: "UI.Gaze.moveEyes", arguments: ["x": "0", "y": "0"])))
@@ -384,7 +390,7 @@ extension LiveRuntimeTests {
         async throws
     {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: CrowdPose(), sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -437,7 +443,7 @@ extension LiveRuntimeTests {
         async throws
     {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: EmptyPose(), sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -501,7 +507,7 @@ extension LiveRuntimeTests {
     {
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -584,7 +590,7 @@ extension LiveRuntimeTests {
     {
         let session = UUID().uuidString
         let port = BlockedPosePublication()
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: EmptyPose(), sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -654,7 +660,7 @@ extension LiveRuntimeTests {
         async throws
     {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: FailingSecondPose(), sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -698,7 +704,7 @@ extension LiveRuntimeTests {
         async throws
     {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: EmptyPose(), sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -738,7 +744,7 @@ extension LiveRuntimeTests {
 extension LiveRuntimeTests {
     @Test(.actionCatalog, .timeLimit(.minutes(1))) func rejectingPhotographerCannotStopPoseDisplay() async throws {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: CrowdPose(), sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -746,7 +752,7 @@ extension LiveRuntimeTests {
         )
         try await agent.bind(
             AgentMessaging { _, _, _ in
-                DeliveryReport(rejected: [.photographer: "notRunning"])
+                DeliveryReport(rejected: [.visionPerception: "notRunning"])
             })
         try await agent.start()
         var output = fixtureOutputs(agent).makeAsyncIterator()
@@ -776,7 +782,7 @@ extension LiveRuntimeTests {
         async throws
     {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: EmptyPose(), sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1079,7 +1085,7 @@ extension LiveRuntimeTests {
         // A small RGB fixture and wider capture-to-result budget tolerate parallel admission load.
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session, sampling: FrameSamplingConfiguration(maximumObservationLatency: 0.5),
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1168,7 +1174,7 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func visionRejectsGenericImageIngressWithoutQueuing() async throws {
     let session = UUID().uuidString
-    let agent = try VisionPerceptionAgent(
+    let agent = try PoseInferenceWorkflow(
         pose: ControlledPose(), sessionID: session,
         context: try AgentContextRepository(
             agent: .visionPerception, scope: UUID().uuidString,
@@ -1213,7 +1219,7 @@ extension LiveRuntimeTests {
     {
         let model = RecoverablePose(failures: 1)
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             sampling: FrameSamplingConfiguration(maximumInterval: 0.000001, initialInterval: 0),
             context: try AgentContextRepository(
@@ -1253,7 +1259,7 @@ extension LiveRuntimeTests {
     {
         let model = RecoverablePose(failures: 4)
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1282,7 +1288,7 @@ extension LiveRuntimeTests {
     {
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1306,7 +1312,7 @@ extension LiveRuntimeTests {
 
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func visionInputFailureBeforeFirstFramePublishesDiagnostic() async throws {
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: RecoverablePose(failures: 0), sessionID: "input-fixture",
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1326,7 +1332,7 @@ extension LiveRuntimeTests {
     @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionHealthReportsInputSilenceAndContinuousExpiredFrames()
         async throws
     {
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: RecoverablePose(failures: 0), sessionID: "health-fixture",
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1349,7 +1355,7 @@ extension LiveRuntimeTests {
 
 extension LiveRuntimeTests {
     @Test(.actionCatalog) func visionHealthRetainsPresentationFailureUntilSuccessfulDelivery() async throws {
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: RecoverablePose(failures: 0), sessionID: "presentation-health",
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1399,7 +1405,7 @@ extension LiveRuntimeTests {
         let persistence = VisionPersistenceGate()
         let model = ControlledPose()
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: model, sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
@@ -1436,7 +1442,7 @@ extension LiveRuntimeTests {
     @Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
     func visionTerminalFailureSurvivesGatewayAndAppearsAsAgentToast() async throws {
         let session = UUID().uuidString
-        let agent = try VisionPerceptionAgent(
+        let agent = try PoseInferenceWorkflow(
             pose: RecoverablePose(failures: 0), sessionID: session,
             context: try AgentContextRepository(
                 agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,

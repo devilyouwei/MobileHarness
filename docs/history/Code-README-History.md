@@ -1982,7 +1982,7 @@ HistoryPresentationAdapter validates root session/source, reads actual records a
 
 ## MobileHarness/Resources/Agents/README.md
 
-[现行 README](../../MobileHarness/Resources/Agents/README.md)
+[现行资源规范](../../MobileHarness/Agents/Resources/AgentAuthoring.md)
 
 ````markdown
 ## Agent.json 字段
@@ -2052,7 +2052,7 @@ Agent 配置声明基础交互与机械臂 Skill，任务和交互链按需要�
 
 ## MobileHarness/Resources/Skills/README.md
 
-[现行 README](../../MobileHarness/Resources/Skills/README.md)
+[现行资源规范](../../MobileHarness/Agents/Resources/SkillAuthoring.md)
 
 ````markdown
 # Skill 配置与撰写规范

@@ -22,7 +22,7 @@ private enum TrackingUnavailable: Error { case offline }
     for sequence: UInt64 in [1, 2] {
         stream.continuation.yield(
             OutputEnvelope(
-                source: .photographer, context: input.context,
+                source: .visionPerception, context: input.context,
                 output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim")),
                 sequence: sequence, taskScope: input.taskScope))
     }
@@ -44,7 +44,7 @@ private enum TrackingUnavailable: Error { case offline }
     let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(1))
     stream.continuation.yield(
         OutputEnvelope(
-            source: .photographer, context: input.context,
+            source: .visionPerception, context: input.context,
             output: .toolCall(ToolCall(id: UUID().uuidString, toolPath: "NexArm.Tracking.aim")),
             taskScope: input.taskScope))
     stream.continuation.finish()

@@ -2052,8 +2052,8 @@ extension LiveRuntimeTests {
         let resources = try ResourceCoordinator(
             definitions: (1...6).map {
                 ResourceDefinition(
-                    id: ResourceID(rawValue: "nexarm.motor.\($0)"), allowedOwners: [.assistant, .photographer],
-                    executionGroup: ResourceID(rawValue: "nexarm.writer"), preempts: [.assistant: [.photographer]]
+                    id: ResourceID(rawValue: "nexarm.motor.\($0)"), allowedOwners: [.assistant, .visionPerception],
+                    executionGroup: ResourceID(rawValue: "nexarm.writer"), preempts: [.assistant: [.visionPerception]]
                 ) { await workflow.stopAgentActions() }
             })
         workflow.withMotorResources = bluetoothResourceGuard(resources)
@@ -2063,9 +2063,9 @@ extension LiveRuntimeTests {
         await workflow.waitUntilIdle()
         workflow.connect(try link.businessID)
         await workflow.waitUntilIdle()
-        let photographer = ExecutionOwner(
-            agent: .photographer, incarnation: UUID().uuidString, sessionID: UUID().uuidString)
-        try await ResourceExecutionContext.$owner.withValue(photographer) {
+        let visionPerception = ExecutionOwner(
+            agent: .visionPerception, incarnation: UUID().uuidString, sessionID: UUID().uuidString)
+        try await ResourceExecutionContext.$owner.withValue(visionPerception) {
             try await workflow.aim(base: -0.8, pitch: 0.4)
         }
         try await until { await !link.liveCommands.isEmpty }
@@ -2106,11 +2106,11 @@ extension LiveRuntimeTests {
         let stopped = await link.liveCommands.count
         try await Task.sleep(for: .milliseconds(100))
         #expect(await link.liveCommands.count == stopped)
-        try await ResourceExecutionContext.$owner.withValue(photographer) {
+        try await ResourceExecutionContext.$owner.withValue(visionPerception) {
             try await workflow.aim(base: 0.5, pitch: -0.3)
         }
         try await until { await link.liveCommands.count > stopped }
-        await resources.close(sessionID: photographer.sessionID)
+        await resources.close(sessionID: visionPerception.sessionID)
         #expect(workflow.state.controlReady && workflow.state.error == nil && workflow.state.transportIssue == nil)
         #expect(await link.connects == 1)
         await scheduler.shutdown()
@@ -2131,28 +2131,31 @@ extension LiveRuntimeTests {
         let resources = try nexArmTestResources()
         workflow.withMotorResources = bluetoothResourceGuard(resources)
         let session = UUID().uuidString
-        let photographer = try PhotographerAgent(
+        let visionPerception = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
-        try await photographer.start()
+        try await visionPerception.start()
         let pose = try PoseObservation(
             width: 100, height: 100, sequence: 1, timestamp: 1e12, rotation: 1,
             people: [Array(repeating: .init(x: 50, y: 50, confidence: 0.9), count: 17)])
         let payload = InputPayload.observation(.pose(pose))
-        workflow.trackingInputAvailable = { await photographer.hasFreshPose() }
+        workflow.trackingInputAvailable = { await visionPerception.hasFreshPose() }
         let observer = Task { await workflow.run() }
         workflow.openPage()
         try await until { !workflow.state.nearby.isEmpty }
         await workflow.waitUntilIdle()
         workflow.connect(try link.businessID)
         await workflow.waitUntilIdle()
-        try await photographer.receive(
-            AgentInput(
-                id: UUID().uuidString,
-                sessionID: session, payload: payload,
-                metadata: InputMetadata(payload: payload, source: "visionPerception", rootID: UUID().uuidString))
+        try await visionPerception.track(
+            pose,
+            input:
+                AgentInput(
+                    id: UUID().uuidString,
+                    sessionID: session, payload: payload,
+                    metadata: InputMetadata(payload: payload, source: "visionPerception", rootID: UUID().uuidString))
         )
         await link.blockLiveEnd()
         try await workflow.aim(base: -0.8, pitch: 0.4)
@@ -2169,7 +2172,7 @@ extension LiveRuntimeTests {
         #expect(await link.liveCommands.count == stopped)
         #expect(workflow.state.error == nil && workflow.state.controlReady && workflow.state.transportIssue == nil)
         #expect(await link.connects == 1)
-        await photographer.stop()
+        await visionPerception.stop()
         workflow.disconnect()
         await workflow.waitUntilIdle()
         observer.cancel()
@@ -2193,14 +2196,15 @@ extension LiveRuntimeTests {
         workflow.connect(try link.businessID)
         await workflow.waitUntilIdle()
         let session = UUID().uuidString
-        let photographer = try PhotographerAgent(
+        let visionPerception = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
         let manager = AgentManager()
-        try await manager.register(photographer, sessionID: session)
-        try await photographer.start()
+        try await manager.register(visionPerception, sessionID: session)
+        try await visionPerception.start()
         let tools = try ToolRegistry(modules: [
             NexArmTrackingModule { base, pitch, _ in try await workflow.aim(base: base, pitch: pitch) }
         ])
@@ -2214,7 +2218,7 @@ extension LiveRuntimeTests {
                 arguments: ["base": String(0.5 + Double(sequence) / 100), "pitch": "0.5"])
             let result = try await output.dispatch(
                 OutputEnvelope(
-                    source: .photographer,
+                    source: .visionPerception,
                     context: (AgentInput(
                         id: UUID().uuidString, sessionID: session, payload: .text("Test tracking intent"))).context,
                     output: .toolCall(call), sequence: sequence))
@@ -2238,7 +2242,7 @@ extension LiveRuntimeTests {
         workflow.disconnect()
         await workflow.waitUntilIdle()
         await output.shutdown()
-        await photographer.stop()
+        await visionPerception.stop()
         observer.cancel()
         await observer.value
     }
@@ -2469,13 +2473,14 @@ extension LiveRuntimeTests {
         let session = UUID().uuidString
         try await manager.register(assistant, sessionID: session)
         try await assistant.start()
-        let photographer = try PhotographerAgent(
+        let visionPerception = try VisionPerceptionAgent(
             sessionID: session, controlsArm: true,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         )
-        try await manager.register(photographer, sessionID: session)
-        try await photographer.start()
+        try await manager.register(visionPerception, sessionID: session)
+        try await visionPerception.start()
         let input = InputGateway(manager: manager)
         let releaseSpeech = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
         var spoken: [String] = []
@@ -2568,7 +2573,7 @@ extension LiveRuntimeTests {
         await link.resumeTelemetry()
         let failedTool = try await output.execute(
             OutputEnvelope(
-                source: .photographer,
+                source: .visionPerception,
                 context: (AgentInput(
                     id: UUID().uuidString, sessionID: session, payload: .text("Unavailable robot"))).context,
                 output: .toolCall(
@@ -2579,7 +2584,7 @@ extension LiveRuntimeTests {
         )
         #expect(failedTool.isError && failedTool.tool?.isError == true)
         #expect(await assistant.status().lifecycle == .running)
-        #expect(await photographer.status().lifecycle == .running)
+        #expect(await visionPerception.status().lifecycle == .running)
         if fault == .radioOff { await link.power(.poweredOn) }
         if fault == .exhausted {
             try await until { workflow.state.recoveryStage == .failed }
@@ -2622,7 +2627,7 @@ extension LiveRuntimeTests {
         await workflow.waitUntilIdle()
         await output.shutdown()
         await assistant.stop()
-        await photographer.stop()
+        await visionPerception.stop()
         observer.cancel()
         await observer.value
     }

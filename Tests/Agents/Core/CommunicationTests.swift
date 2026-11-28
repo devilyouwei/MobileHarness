@@ -53,22 +53,23 @@ extension AgentMessage {
 func communicationConfiguration(_ id: String, subscribes: Bool = false, publishes: Bool = false) throws
     -> AgentConfiguration
 {
-    let communication: [String: Any] = [
-        "requests": id == "direct" ? ["fixture.transcript.v1"] : [], "feedback": [],
-        "subscriptions": subscribes
-            ? [
-                [
-                    "channel": "user.input.speech", "protocol": "user.input.speech.v1", "sources": ["producer"],
-                    "events": ["final"],
-                ]
-            ] : [],
-        "publications": publishes ? [["channel": "user.input.speech", "protocol": "user.input.speech.v1"]] : [],
-    ]
+    var channels: [String: [String: Any]] = [:]
+    if id == "direct" || id == "producer" {
+        channels["fixture.transcript.v1"] = ["type": "send", "name": "configured.direct", "receive": id == "direct"]
+    }
+    if subscribes || publishes {
+        var binding: [String: Any] = ["type": "pubSub", "name": "user.input.speech", "publish": publishes]
+        if subscribes {
+            binding["sources"] = ["producer"]
+            binding["events"] = ["final"]
+        }
+        channels[SpeechRecognition.contract] = binding
+    }
     return try AgentConfiguration(
         contracts: communicationFixtureContracts(),
         data: JSONSerialization.data(withJSONObject: [
-            "version": 9, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
-            "signals": communication,
+            "version": 10, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
+            "channels": channels, "feedback": [String](),
         ]))
 }
 
@@ -160,6 +161,7 @@ extension LiveRuntimeTests {
         let sent = try await port.send(
             .requestedTranscript("direct", final: true), parent: parent, to: direct.descriptor.id)
         #expect(sent.requestID == sent.reference)
+        #expect(await direct.inputs.first?.metadata.topic == "configured.direct")
         await #expect(throws: CommunicationError.unsupportedContract) {
             try await port.send(
                 .requestedTranscript("forbidden", final: true), parent: parent, to: consumer.descriptor.id)
@@ -469,7 +471,7 @@ private func registeredFixtureContract(
     startsNewWork: Bool = false, maximumBytes: Int = 64
 ) -> CommunicationContract {
     CommunicationContract(
-        name: "fixture.custom.v1", kind: .observation, channel: "fixture.custom", maximumBytes: maximumBytes,
+        name: "fixture.custom.v1", kind: .observation, isPublication: true, maximumBytes: maximumBytes,
         startsNewWork: startsNewWork,
         validateMessage: { message in
             guard let value = message.content(as: RegisteredFixtureMessage.self), value.value >= 0 else {
@@ -480,16 +482,15 @@ private func registeredFixtureContract(
 private func registeredFixtureConfiguration(
     _ id: String, contracts: CommunicationContracts, publishes: Bool
 ) throws -> AgentConfiguration {
-    try AgentConfiguration(
+    let binding: [String: Any] =
+        publishes
+        ? ["type": "pubSub", "name": "configured.events", "publish": true]
+        : ["type": "pubSub", "name": "configured.events", "sources": ["producer"]]
+    return try AgentConfiguration(
         contracts: contracts,
         data: JSONSerialization.data(withJSONObject: [
-            "version": 9, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
-            "signals": [
-                "requests": [], "feedback": [],
-                "subscriptions": publishes
-                    ? [] : [["channel": "fixture.custom", "protocol": "fixture.custom.v1", "sources": ["producer"]]],
-                "publications": publishes ? [["channel": "fixture.custom", "protocol": "fixture.custom.v1"]] : [],
-            ],
+            "version": 10, "category": "cognition", "id": id, "actions": [String: [String]](), "tools": [],
+            "channels": ["fixture.custom.v1": binding], "feedback": [String](),
         ]))
 }
 
@@ -540,6 +541,7 @@ extension LiveRuntimeTests {
             Issue.record("Missing generic message")
             return
         }
+        #expect(delivered.metadata.topic == "configured.events")
         #expect(received.content(as: RegisteredFixtureMessage.self) == content)
         #expect(received.perception == nil)
         #expect(delivered.metadata.deadline == nil)

@@ -350,17 +350,22 @@ public actor OutputGateway {
             guard let contract = policy.contracts[observation.contract] else {
                 throw CommunicationError.unsupportedContract
             }
-            if contract.channel != nil {
-                guard
-                    declaration.publications.contains(where: {
-                        $0.protocol == observation.contract && $0.channel == contract.channel
-                    })
-                else { throw CommunicationError.unauthorized }
+            let channel: String
+            if contract.isPublication {
+                guard let binding = declaration.publications.first(where: { $0.protocol == observation.contract })
+                else {
+                    throw CommunicationError.unauthorized
+                }
+                channel = binding.channel
             } else if let target {
                 guard policy.agents[target] != nil else { throw CommunicationError.unknownTarget }
                 guard policy.agents[target]?.requests.contains(observation.contract) == true else {
                     throw CommunicationError.unsupportedContract
                 }
+                guard let name = policy.sendChannel(for: observation.contract, from: source, to: target) else {
+                    throw SignalTransportError.channelUnavailable(observation.contract)
+                }
+                channel = name
             } else {
                 throw CommunicationError.unknownTarget
             }
@@ -420,13 +425,13 @@ public actor OutputGateway {
                     payload: payload, source: source.rawValue, incarnation: incarnation, origin: .agent,
                     capturedAt: metadata.capturedAt, sequence: sequences[source]!, rootID: metadata.rootID,
                     parentID: inputID, hops: metadata.hops + 1,
-                    deadline: generatedCommand ? nil : metadata.deadline, topic: contract.channel),
+                    deadline: generatedCommand ? nil : metadata.deadline, topic: channel),
                 turn: turn,
                 taskScope: task.flatMap {
                     ($0.kind == .request || $0.kind == .input || $0.kind == .cancel) ? $0.scope : nil
                 })
             var report: DeliveryReport
-            if contract.channel != nil {
+            if contract.isPublication {
                 if observation.content(as: AgentTaskResponse.self) != nil,
                     let reference = observation.eventScope,
                     let record = try await communications?.agentMessage(reference)

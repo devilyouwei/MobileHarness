@@ -9,3 +9,5 @@ WriterTools opts the registered workspace read tool into Responses compatibility
 | [WriterWorkflow.swift](WriterWorkflow.swift) | Task workflow and content instructions. |
 | [WriterTools.swift](WriterTools.swift) | Native tool definitions and execution. |
 | [WriterRecovery.swift](WriterRecovery.swift) | Recovery of unfinished work. |
+
+[WriterTaskExecution.swift](WriterTaskExecution.swift) advances admitted tasks and manages cancellation and background execution. [WriterWorkspaceOperations.swift](WriterWorkspaceOperations.swift) handles library selection, editing and finalization. [WriterRequestHistory.swift](WriterRequestHistory.swift) records model requests and restores eligible history. [WriterFailureRecording.swift](WriterFailureRecording.swift) records the latest failed model request.

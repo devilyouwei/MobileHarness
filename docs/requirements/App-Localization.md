@@ -23,3 +23,16 @@ On device, verify system permissions and Live Activity presentation, Apple recog
 ## Execution Log 标题修正（2026-11-14）
 
 RuntimeLogView 的面板标题和首页入口 accessibility label 通过环境 locale 与 AppLanguage 解析；共享字符串目录增加 Execution Log → 执行日志。应用语言切换后标题随视图刷新，日志数据、筛选和导航状态保持原有契约。更新 RuntimeLog README，并在已有语言测试验证中英标题。
+
+## Agent and Skill project groups
+
+Place each localized role or Skill declaration beside its canonical JSON declaration in the Xcode navigator. Verify the packaged English and Simplified Chinese assets and the localized prompt loader after regrouping.
+
+## Public descriptions for Agents and Skills
+
+Move the existing English and Simplified Chinese descriptions of each indexed role and Skill into Description.md and Description.zh-Hans.md in its resource directory. Agent.json and Skill.json own structured configuration. Instructions remain the separately loaded private teaching. AgentConfigurations will read descriptions through the same language resolver as instructions for peer and Skill discovery, including English fallback. Preserve state translations, catalog budgets and visibility. Update Xcode groups, asset validation, role and Skill authoring guides, and bilingual discovery tests.
+
+## Bilingual Agent and Skill resource audit / Agent 与 Skill 双语核对
+
+Align the English and Simplified Chinese Skill workflows and Writer tool descriptions with registered aliases, parameters, state and result semantics. Correct obsolete control names in the owning design guides and keep developer guides outside packaged runtime assets. Verify localized resource parity and packaged contents.
+按现有注册表、参数、状态与回执校准英文和简体中文 Skill 教程及 Writer 工具说明。更新所属设计文档中过时的控制名，开发指南与运行时资源分开打包，验证两种语言的内容与打包结果。

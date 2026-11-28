@@ -1116,3 +1116,11 @@ AssistantChatWorker（4051 行，按职责拆成 Assistant 目录内的同名 ex
 受影响：Agents/Support（Skill 解码、Loader、Configurations、Core Capability）、Assistant（库与固定能力）、AgentContracts、Resources/Skills（BasicSkill、README）、相关 README、boundary checker 与 pbxproj、测试（control 的来源由 BasicSkill 改为 Assistant 固定能力，`useControls` 断言删除）。无新目录或模块。
 
 验收：`./scripts/check.sh`、`./scripts/build-ios.sh`；测试覆盖 Skill 含 `useControls` 被拒绝、Assistant 固定能力含五个 control 且中文本地化、其他 Agent 无 control、`<wait>` 内 control 被拒绝仍成立。真实模型下提示词效果不在工程检查范围内。
+
+## Agent channel declarations
+
+Migrate the six Agent resources from signals to channels. Use the stable signal protocol identifier as the lookup key, with the transport name and the send or pubSub type supplied by configuration. Keep source/event filters and receiver authorization. Agents resolve bindings during initialization and supply them to Gateway. Gateway owns the transport registry, rejects unavailable or wrong-kind channels before delivery, and has no resource loader. Update role adapters, scoped task subscriptions, packaged configuration and transport tests. Action scheduling channels remain part of the separate execution contract.
+
+Execution feedback already reaches the role through the authenticated execution owner adapter. Preserve feedback protocol selection as role metadata outside channels so it does not create fictitious transport addresses or route a reply back through Gateway.
+
+Task-owner retirement and host activity notifications use a directed host ingress even when their payload describes a task result. Declare that ingress separately from the task publication; preserve cancellation delivery and the original signal contract.

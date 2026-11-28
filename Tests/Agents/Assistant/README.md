@@ -6,7 +6,7 @@ PromptTemplateTests bounds the assembled Assistant static instruction/catalog te
 
 ## Prompt ownership coverage
 
-AgentConfigurationTests cover v10 public role metadata projected to the v8 compiled contract, missing/invalid/oversized descriptions, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
+AgentConfigurationTests cover localized role and Skill Markdown, structured role metadata, unknown fields and identity mismatch. PromptTemplateTests cover instance-permission filtering, exclusion of unsupported peers and private instructions, generic peer Task teaching, and Writer format/retry templates. Existing task, cancellation, library and Writer workflow tests exercise the execution boundary independently of public descriptions.
 
 ## 文件归属
 

@@ -60,7 +60,7 @@ flowchart LR
 
 ## 授权与身份
 
-注册契约定义类型、版本、大小、内容验证和显式 Event Channel。`signals.requests` 启用直接请求处理器，`feedback` 启用可信执行反馈，`publications` 和 `subscriptions` 按 channel/protocol/sources/events 匹配。频道不由协议名推导，不使用发送目标配对白名单。启动校验订阅来源配置及匹配频道/协议的 publication，并校验代码拥有的生产/消费能力。publications 声明本角色可发布的协议，不能由订阅反向授权；允许没有订阅者，且双方实例不必在线。运行时不检查订阅者 readiness。全局至多 64 个频道，每个频道/任务 scope 至多 16 个订阅者。
+注册契约定义消息类型、版本、大小及内容校验。角色的 channels 按协议键选择 send 或 pubSub 及其名称，订阅方声明来源与可选事件筛选。feedback 选择本角色接受的执行反馈。
 
 因果值保留 incarnation/root/parent/session/turn，最多八跳。Signal 无默认 TTL；显式感知 freshness 由生产者和接收者校验。容器／运行故障由上层直接观察，不在通信注册表发布。
 
@@ -74,3 +74,5 @@ Task execution 前台／后台是中立值，反序列化缺少 execution 字段
 后台 agent.task.v1 请求 可省略业务类型标记。接收角色验证来源、任务授权及载荷。其他任务消息使用自身的类型标记解释内容。
 
 Every role retains the unified observation entry, including request-only callers. Consumers select static subscriptions for role lifetime or own dynamic handles for narrower lifetimes. Assistant statically listens to Writer and keeps task/session tracking separate; task completion never unsubscribes that channel. Trusted termination facts retain their authenticated host binding. Task tracking is in-memory and owned by the consuming business owner; there is no broker replay or stored-record reconciliation.
+
+CommunicationPolicy 分别解析定向发送名和事件信道名，并校验静态订阅与发布方声明能否匹配。运行时任务订阅同样使用声明中的名称。 [channel declaration contract](../../../Resources/AgentAuthoring.md#channels--信道声明)

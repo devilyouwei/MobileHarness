@@ -77,7 +77,7 @@ public final class NexArmControlService {
     private var settingsPlayback: Task<Void, any Error>?
     public var withMotorResources:
         (@Sendable (Set<Int>, @escaping @Sendable () async throws -> Void) async throws -> Void)?
-    /// Composition binds the current Photographer's monotonic pose freshness, independently of the radio.
+    /// Composition binds the current VisionPerception's monotonic pose freshness, independently of the radio.
     public var trackingInputAvailable: @Sendable () async -> Bool = { true }
     public var trackingAvailable: Bool {
         foreground && suspension == nil && state.controlReady && settingsWorker == nil && pendingArmAction == nil

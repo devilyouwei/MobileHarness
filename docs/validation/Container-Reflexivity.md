@@ -148,3 +148,11 @@ Built the final working-tree code with the full MobileHarness physical-device sc
 The first installation command failed with CoreDeviceError 4000 (device disconnected immediately after connection). Device information was readable again, but a second installation attempt failed with CoreDeviceError 3002, underlying IXRemoteErrorDomain 6 / Connection interrupted. A subsequent app query succeeded and found dev.mobileharness.app version 0.1.0 / build 1; that metadata does not establish that the latest bundle replaced the existing installation. Installation success is unconfirmed. Requested an unlocked/awake device and preferably USB reconnection before retrying. No app launch, microphone/camera use, model execution or physical-arm acceptance was performed. Logs: /tmp/mobileharness-state-device-build.log, /tmp/mobileharness-state-device-install.log and /tmp/mobileharness-state-device-install-retry.log.
 
 Installation follow-up after the user confirmed the device was ready: the same signed bundle installed successfully on the iPhone 17 Pro. devicectl exited 0 and its structured install outcome was success; a subsequent device app query confirmed dev.mobileharness.app (0.1.0 / build 1). This resolves the preceding unconfirmed-install outcome. Final install evidence: /tmp/mobileharness-state-device-install-ready.json and /tmp/mobileharness-state-device-installed.json. No application launch or functional/native/physical-arm acceptance was performed.
+
+## 2026-11-28 容器状态与模型上下文
+
+State、Context、Prompt 和图像相关的 304 项工程测试通过。最终源码另行复测 11 项，涵盖七模块快照编码、业务字段投影、Skill 加载与释放以及模型图片上下文。直接容器读取和 Skill 选择读取沿用各生产者的同一快照。主 App 模拟器构建和 92 项角色／Skill 打包资源校验通过。工程检查修正了 AgentStateSnapshot 编码检查的源路径，剩余 14 项既有 Xcode 中文资源分组错误。未执行真实模型推理。
+
+## 六个 Agent 的公开生命周期
+
+各角色的 business.lifecyclePhase 随角色状态读取，冷容器与关闭后的空容器也有明确值。274 项生命周期、State 和反射回归通过；另行运行 Writer 生命周期测试与 17 个参数场景的业务回归，通过直接读取、模型上下文、注册、启动、暂停、恢复和终止断言。主 App 模拟器构建通过并校验 92 项 Agent／Skill 资源。标准检查仍报告 14 项既有中文资源工程分组问题。

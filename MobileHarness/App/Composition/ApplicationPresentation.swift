@@ -66,8 +66,8 @@
         public var windows: WindowState { features.windows }
         public var island: IslandState { features.island }
         public var navigation: NavigationState { features.navigation }
-        public var cameraState: CameraState { features.photographer.cameraState }
-        public var cameraControls: any CameraControlling { features.photographer.cameraControls }
+        public var cameraState: CameraState { features.visionPerception.cameraState }
+        public var cameraControls: any CameraControlling { features.visionPerception.cameraControls }
         public var bluetoothState: BluetoothSettingsState { features.applicationControl.devices }
         public var bluetoothControls: any BluetoothControlling { features.applicationControl.bluetoothControls }
         public var settings: SettingsState { features.applicationControl.settings }
@@ -102,8 +102,8 @@
         public func navigate(_ destination: AppDestination?) { features.navigate(destination) }
         public func cameraPreview() -> AnyView {
             AnyView(
-                CameraFrameView(state: features.photographer.cameraState, showsPose: false).id(
-                    features.photographer.cameraState.videoGeneration))
+                CameraFrameView(state: features.visionPerception.cameraState, showsPose: false).id(
+                    features.visionPerception.cameraState.videoGeneration))
         }
         public func navigationChanged() {
             onHomeVisibilityChanged?(features.navigation.path.isEmpty)

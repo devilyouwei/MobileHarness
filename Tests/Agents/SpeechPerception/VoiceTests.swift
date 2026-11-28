@@ -726,10 +726,10 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
     var previews = observed.stream.makeAsyncIterator()
     let preview = try #require(await previews.next())
     #expect(preview.metadata.contract == PerceptionMessage.speechProtocol)
-    #expect(preview.metadata.topic == PerceptionMessage.userInputTopic)
+    #expect(preview.metadata.topic == "user.input.speech")
     if let value = finals.first, case .observation(let event) = value.payload {
         #expect(event.perception == .transcript("你好", final: true))
-        #expect(value.metadata.topic == PerceptionMessage.userInputTopic)
+        #expect(value.metadata.topic == "user.input.speech")
         #expect(value.turn?.ordinal == 1)
     } else {
         Issue.record("Missing final observation")
@@ -2333,7 +2333,7 @@ func speechFactsTravelOneWayThroughGatewayEvents() async throws {
     let delivered = await assistant.inputs
     #expect(
         Set(delivered.compactMap(\.metadata.topic)) == [
-            SpeechActivity.channel, SpeechKeywordMatch.channel, SpeechRecognition.channel,
+            "perception.speech.activity", "perception.speech.keyword", "user.input.speech",
         ])
     #expect(delivered.allSatisfy { $0.sessionID == session && $0.metadata.source == "speechPerception" })
     #expect(delivered.compactMap(\.payload.speechRecognition).map(\.kind) == [.final])

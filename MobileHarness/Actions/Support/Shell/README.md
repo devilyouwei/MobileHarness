@@ -26,7 +26,7 @@ flowchart LR
 
 [`Scheduling/`](Scheduling/) holds ChannelScheduler, its Channel lanes, diagnostics and the passive execution ledger.
 
-Bounded task-local FIFO/wait trees with separate resource arbitration. [ChannelScheduler](Scheduling/ChannelScheduler.swift) owns ordering, admission, finish, cancel and passive execution observation. Each task root contains phases and nested wait groups. A wait joins preceding parent work, executes ordinary per-Channel FIFO internally and releases its continuation only when closed and all children complete. Open active phases may execute received calls; dormant groups hold no resource locks. Native Tools are outside the tree.
+Bounded task-local FIFO/wait trees with separate resource arbitration. [ChannelScheduler](Scheduling/ChannelScheduler.swift) owns ordering, admission, finish, cancel and passive execution observation. Each task root contains phases and nested wait groups. A wait joins preceding parent work, executes ordinary per-Channel FIFO internally and releases its continuation only when closed and all children complete. Open active phases may execute received calls; dormant groups hold no resource locks. The caller selects this tree by sending an ActionCall and supplies the Channel on the scheduled request.
 
 The scheduler keys each root by producer and typed scheduling scope. The execution coordinator admits each round separately on the Action and Tool call lanes. It closes admission at each lane’s End and returns a settlement handle. Finishing or cancelling a round selects that root even when an input uses the same ID string. Session and endpoint cancellation continue to select all matching roots.
 
@@ -52,7 +52,7 @@ The scheduler creates the per-execution [ActionControlRuntime](Scheduling/Action
 
 ### Direct calls
 
-[DirectExecutionDispatcher.swift](DirectExecutionDispatcher.swift) admits up to 128 active Tool calls and rejects overflow with directCapacityExceeded. It validates the endpoint scope, prepares the Tool, rechecks admission, acquires the resource permit and executes, discarding preparation on every terminal path. Caller cancellation, suspension and stop join actual work.
+[DirectExecutionDispatcher.swift](DirectExecutionDispatcher.swift) admits up to 128 active Tool calls and rejects overflow with directCapacityExceeded. Each accepted ToolCall starts its own task and can run alongside other calls. A caller that requires ordering awaits each completion before submitting the next call. The dispatcher validates endpoint scope, prepares the Tool, rechecks admission and acquires the shared resource permit before execution. It discards preparation on every terminal path. Caller cancellation, suspension and stop join actual work.
 
 ### Resources
 

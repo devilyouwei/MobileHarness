@@ -6,6 +6,7 @@ public struct SignalEnvelope: Sendable {
     public let sessionID: String
     public let contract: String
     public let channel: String
+    let explicitChannel: String?
     public let version: Int
     public let hops: Int
     public let payloadBytes: Int
@@ -19,6 +20,7 @@ public struct SignalEnvelope: Sendable {
         self.id = id
         self.sessionID = sessionID
         self.contract = contract
+        self.explicitChannel = channel
         self.channel = channel ?? contract
         self.version = version
         self.hops = hops
@@ -38,8 +40,11 @@ public struct GatewaySignal: Sendable {
     public let envelope: SignalEnvelope
     public let payload: any Sendable
 }
-public enum SignalTransportError: Error, Sendable {
+public enum SignalChannelKind: Sendable { case send, pubSub }
+
+public enum SignalTransportError: Error, Equatable, Sendable {
     case invalidEnvelope, expired, closed, capacityExceeded, unknownEndpoint, staleEndpoint
+    case channelUnavailable(String)
     case unsupportedProtocol, duplicateProtocol, duplicateEndpoint, schemaMismatch, invalidReply, cyclicRequest
 }
 
@@ -75,6 +80,30 @@ public actor SignalTransport {
         return GatewayStateSnapshot(path: "gateway.signals", runtime: runtime)
     }
     private var endpoints: [String: Endpoint] = [:]
+    private var sendChannels: [SignalEndpoint: Set<String>] = [:]
+    private var channelBindings: [SignalEndpoint: [String: SignalChannelKind]] = [:]
+
+    private func validateChannel(_ name: String, kind: SignalChannelKind) throws {
+        guard !name.isEmpty, name.utf8.count <= 256,
+            !channelBindings.values.contains(where: { $0[name].map { $0 != kind } == true })
+        else { throw SignalTransportError.channelUnavailable(name) }
+    }
+
+    /// Declaring a channel selects its transport. Only a receiver or producer binding admits delivery.
+    public func declareChannel(_ name: String, kind: SignalChannelKind, endpoint: SignalEndpoint) throws {
+        try validateRequestEndpoint(endpoint)
+        try validateChannel(name, kind: kind)
+        channelBindings[endpoint, default: [:]][name] = kind
+    }
+
+    func declareSendChannel(_ name: String, endpoint: SignalEndpoint) throws {
+        try declareChannel(name, kind: .send, endpoint: endpoint)
+        sendChannels[endpoint, default: []].insert(name)
+    }
+    func validateSendChannel(_ name: String, target: SignalEndpoint) throws {
+        guard sendChannels[target]?.contains(name) == true else { throw SignalTransportError.channelUnavailable(name) }
+    }
+
     var requestHandlers: [SignalEndpoint: [String: SignalRequestHandler]] = [:]
     func validateRequestEndpoint(_ endpoint: SignalEndpoint) throws {
         guard !closed else { throw SignalTransportError.closed }
@@ -100,7 +129,7 @@ public actor SignalTransport {
         self.eventConfiguration = eventConfiguration
     }
     public func register(
-        address: String, incarnation: String, replaceExisting: Bool = true,
+        address: String, incarnation: String, replaceExisting: Bool = true, sendChannels declared: Set<String> = [],
         receive: @escaping @Sendable (GatewaySignal) async throws -> Void
     ) async throws -> SignalEndpoint {
         guard !closed else { throw SignalTransportError.closed }
@@ -109,15 +138,23 @@ public actor SignalTransport {
         }
         guard endpoints[address] != nil || endpoints.count < 128 else { throw SignalTransportError.capacityExceeded }
         guard replaceExisting || endpoints[address] == nil else { throw SignalTransportError.duplicateEndpoint }
-        if let existing = endpoints[address], existing.port.incarnation == incarnation { return existing.port }
+        for name in declared { try validateChannel(name, kind: .send) }
+        if let existing = endpoints[address], existing.port.incarnation == incarnation {
+            for name in declared { try declareSendChannel(name, endpoint: existing.port) }
+            return existing.port
+        }
         let retired = endpoints[address]?.port
         if let retired {
+            channelBindings[retired] = nil
+            sendChannels[retired] = nil
             requestHandlers[retired] = nil
             for delivery in deliveries.values where delivery.source == retired || delivery.target == retired {
                 delivery.task.cancel()
             }
         }
         let port = SignalEndpoint(address: address, incarnation: incarnation, token: UUID())
+        channelBindings[port] = Dictionary(uniqueKeysWithValues: declared.map { ($0, .send) })
+        sendChannels[port] = declared
         endpoints[address] = Endpoint(port: port, receive: receive)
         if let retired { await eventFacility?.unregister(retired) }
         try validateRequestEndpoint(port)
@@ -133,6 +170,8 @@ public actor SignalTransport {
     public func unregister(_ endpoint: SignalEndpoint) async {
         guard endpoints[endpoint.address]?.port == endpoint else { return }
         endpoints[endpoint.address] = nil
+        channelBindings[endpoint] = nil
+        sendChannels[endpoint] = nil
         await eventFacility?.unregister(endpoint)
         requestHandlers[endpoint] = nil
         let pending = deliveries.filter { $0.value.source == endpoint || $0.value.target == endpoint }
@@ -149,6 +188,9 @@ public actor SignalTransport {
         payload: any Sendable, timeout: Duration = .seconds(30)
     ) async throws {
         guard timeout > .zero, timeout <= .seconds(120) else { throw SignalTransportError.invalidEnvelope }
+        try validateEnvelope(envelope)
+        try validateEndpoint(source, target: target)
+        try validateSendChannel(envelope.channel, target: target)
         let latest = ContinuousClock.now.advanced(by: timeout)
         let deadline = envelope.expiresAt.map { min($0, latest) } ?? latest
         let addressed = SignalEnvelope(
@@ -281,6 +323,8 @@ public actor SignalTransport {
         let pending = deliveries
         for delivery in pending.values { delivery.task.cancel() }
         for (id, delivery) in pending where id != SignalDispatchOwnership.current { _ = await delivery.task.result }
+        sendChannels.removeAll()
+        channelBindings.removeAll()
         endpoints.removeAll()
         requestHandlers.removeAll()
     }

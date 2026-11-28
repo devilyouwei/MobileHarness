@@ -57,7 +57,7 @@ import StorageFiles
         private let uiHome: UIHomeContainer
         private let cacheStorage: CacheContainer
         let applicationControlSession: ApplicationControlExecutionSession
-        let photographerSession: PhotographerExecutionSession
+        let visionSession: VisionPerceptionExecutionSession
         let memorySession: MemoryExecutionSession
         let interaction: AssistantExecutionSession
         let interactionSessionID: String
@@ -103,7 +103,7 @@ import StorageFiles
             maintenance: AgentMaintenancePorts,
             containerFailures: ContainerFailureChannel, home: UIHomeContainer, log: (any RuntimeLogWriting)?,
             assistantContainer: AssistantContainer, applicationControlContainer: ApplicationControlContainer,
-            memoryContainer: MemoryContainer, photographerContainer: PhotographerContainer,
+            memoryContainer: MemoryContainer, visionContainer: VisionPerceptionContainer,
             writerContainer: WriterContainer,
             stateContext: AgentStateContext, cache: CacheContainer,
             repositories: AgentRepositories,
@@ -140,19 +140,19 @@ import StorageFiles
                         id: ResourceID(rawValue: "nexarm.motor.\(motor)"),
                         allowedOwners: Set([
                             AgentID.assistant.rawValue, AgentID.applicationControl.rawValue,
-                            AgentID.photographer.rawValue,
+                            AgentID.visionPerception.rawValue,
                         ]),
                         executionGroup: ResourceID(rawValue: "nexarm.writer"),
                         preempts: [
-                            AgentID.assistant.rawValue: [AgentID.photographer.rawValue],
-                            AgentID.applicationControl.rawValue: [AgentID.photographer.rawValue],
+                            AgentID.assistant.rawValue: [AgentID.visionPerception.rawValue],
+                            AgentID.applicationControl.rawValue: [AgentID.visionPerception.rawValue],
                         ])
                 })
             return AgentExecutionPreparation(request: request) { business in
                 let applicationContext = try Self.context(
                     .applicationControl, ApplicationControlContextState(), scope: contextScope)
-                let photographerContext = try Self.context(
-                    .photographer, PhotographerContextState(), scope: contextScope)
+                let cameraContext = try Self.context(
+                    .visionPerception, CameraTransactionContextState(), scope: contextScope)
                 let memoryContext = try Self.context(.memory, MemoryContextState(), scope: contextScope)
                 let applicationControlAgent = try ApplicationControlAgent(
                     sessionID: applicationControlSessionID,
@@ -171,24 +171,24 @@ import StorageFiles
                         if showsToast { home?.notices.offerToast(issue) }
                     },
                     context: applicationContext)
-                let photographerSessionID = applicationControlSessionID
-                let photographerAgent = try PhotographerAgent(
-                    sessionID: photographerSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,
+                let visionSessionID = applicationControlSessionID
+                let visionAgent = try VisionPerceptionAgent(
+                    sessionID: visionSessionID, uiCamera: cameraUI, controlsArm: true, uiAlbum: albumUI,
                     cameraObservationFailure: { error in
                         containerFailures.report(
                             module: "agents", component: "camera", operation: "observe", error: error)
                     },
                     controlAvailable: business.trackingAvailable,
-                    context: photographerContext)
-                business.bindTracking { [weak photographerAgent] in
-                    await photographerAgent?.hasFreshPose() ?? false
+                    context: cameraContext)
+                business.bindTracking { [weak visionAgent] in
+                    await visionAgent?.hasFreshPose() ?? false
                 }
                 let historySessionID = applicationControlSessionID
                 let assistantControl = AssistantControlLink()
                 let policy = try CommunicationPolicy(
                     contracts: AgentContracts.communication,
                     configurations: [
-                        "Assistant", "SpeechPerception", "VisionPerception", "Photographer",
+                        "Assistant", "SpeechPerception", "VisionPerception",
                         "Memory", "ApplicationControl", "Writer",
                     ]
                     .map {
@@ -208,12 +208,8 @@ import StorageFiles
                     catalog: catalog,
                     capabilities: [
                         AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities),
-                        SpeechPerceptionAgent.runtimeCapabilities(
-                            AgentConfigurations.load(named: "SpeechPerception").capabilities),
-                        VisionPerceptionAgent.runtimeCapabilities(
-                            AgentConfigurations.load(named: "VisionPerception").capabilities),
-                        PhotographerAgent.runtimeCapabilities(
-                            AgentConfigurations.load(named: "Photographer").capabilities),
+                        SpeechPerceptionAgent.runtimeCapabilities(),
+                        VisionPerceptionAgent.runtimeCapabilities(),
                         historyAgent.descriptor.capabilities, applicationControlAgent.descriptor.capabilities,
                         WriterAgent.capabilities(),
                     ] + AgentConfigurations.skillRegistries(), locallyExecutedTools: AgentContracts.localToolPaths)
@@ -265,7 +261,7 @@ import StorageFiles
                         assistantControl: assistantControl,
                         conversations: conversations, communications: repositories.agentMessages,
                         applicationControlSessionID: applicationControlSessionID,
-                        activity: activity, log: log, photographerAgent: photographerAgent,
+                        activity: activity, log: log, visionAgent: visionAgent,
                         applicationControlAgent: applicationControlAgent, historyAgent: historyAgent,
                         stateContext: stateContext, cameraControl: cameraControl, chatProvider: chatProvider,
                         inputDecision: decision, inputQueueStatus: business.inputQueueStatus,
@@ -284,7 +280,7 @@ import StorageFiles
                             }),
                         modelName: modelName, assistantContainer: assistantContainer,
                         applicationControlContainer: applicationControlContainer, memoryContainer: memoryContainer,
-                        photographerContainer: photographerContainer, writerContainer: writerContainer,
+                        visionContainer: visionContainer, writerContainer: writerContainer,
                         language: language)
                 }
             }
@@ -296,7 +292,7 @@ import StorageFiles
             conversations: AssistantHistoryStore,
             communications: any AgentMessageRepository,
             applicationControlSessionID: String, activity: AgentRuntimeLogWorkflow, log: (any RuntimeLogWriting)?,
-            photographerAgent: PhotographerAgent,
+            visionAgent: VisionPerceptionAgent,
             applicationControlAgent: ApplicationControlAgent, historyAgent: MemoryAgent,
             stateContext: AgentStateContext, cameraControl: any AgentCameraAccess,
             chatProvider: @escaping @Sendable () async throws -> any ChatCapability,
@@ -305,7 +301,7 @@ import StorageFiles
             listening: ListeningCoordinator,
             modelName: @escaping @Sendable () async throws -> String, assistantContainer: AssistantContainer,
             applicationControlContainer: ApplicationControlContainer, memoryContainer: MemoryContainer,
-            photographerContainer: PhotographerContainer, writerContainer: WriterContainer,
+            visionContainer: VisionPerceptionContainer, writerContainer: WriterContainer,
             language: @escaping @Sendable () -> String
         ) throws {
             self.contextScope = contextScope
@@ -340,14 +336,14 @@ import StorageFiles
                     effect: .unknown, completion: result.report.map { .report($0.agentValue) }, failure: .handlerFailed)
                 return await input.deliverActionResult(feedback) == .accepted
             }
-            let photography = PhotographerExecutionSession(
+            let visionExecution = VisionPerceptionExecutionSession(
                 manager: manager,
-                output: gateway, agent: photographerAgent,
+                output: gateway, agent: visionAgent,
                 report: { message in
-                    Logger(subsystem: "dev.mobileharness", category: "Photographer").error(
+                    Logger(subsystem: "dev.mobileharness", category: "VisionPerception").error(
                         "\(message, privacy: .private)")
                 })
-            photographerSession = photography
+            visionSession = visionExecution
             let intents = ApplicationControlExecutionSession(
                 manager: manager, output: gateway,
                 agent: applicationControlAgent)
@@ -400,7 +396,7 @@ import StorageFiles
             try assistantContainer.install(interaction)
             try applicationControlContainer.install(intents)
             try memoryContainer.install(history)
-            try photographerContainer.install(photography)
+            try visionContainer.install(visionExecution)
         }
         private var observersStarted = false
         private func startObservers() {

@@ -114,8 +114,8 @@ private actor CameraCommandProbe: CameraControlCapability {
     #expect(completion == .completed)
     #expect(await probe.settings == [.init(mode: "video", zoom: 2, durationSeconds: 10)])
     let settings = CameraCaptureSettings(mode: "video", zoom: 2, durationSeconds: 10)
-    let message = PhotographerCameraIntent(.configure, settings: settings, requestID: UUID().uuidString).message
-    #expect(message.photographerCamera?.settings == settings)
+    let message = CameraCaptureIntent(.configure, settings: settings, requestID: UUID().uuidString).message
+    #expect(message.cameraCaptureIntent?.settings == settings)
 }
 
 @Test func unloadingCameraPreviewReturnsOnlyCompletionAndPreservesErrors() async throws {

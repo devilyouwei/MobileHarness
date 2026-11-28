@@ -162,10 +162,10 @@ actor ResourceTestPreferences: ModelResourcePreferencesCapability {
     }
 }
 @MainActor struct CameraTestRuntime {
-    nonisolated let host: PhotographerExecutionSession
+    nonisolated let host: VisionPerceptionExecutionSession
     let ui: UIContainer
     let camera: UICameraContainer
-    nonisolated var agent: PhotographerAgent { host.agent }
+    nonisolated var agent: VisionPerceptionAgent { host.agent }
     func prepareForInteraction() async throws { try await host.prepareForInteraction() }
     func shutdown() async {
         await host.shutdown()
@@ -174,8 +174,8 @@ actor ResourceTestPreferences: ModelResourcePreferencesCapability {
     func attachTracking(sessionID: String) async throws { try await host.attachTracking(sessionID: sessionID) }
     func detachTracking(sessionID: String) async { await host.detachTracking(sessionID: sessionID) }
     @discardableResult func perform(
-        _ operation: PhotographerCameraIntent.Operation,
-        facing: PhotographerCameraIntent.Facing? = nil, previewID: String? = nil
+        _ operation: CameraCaptureIntent.Operation,
+        facing: CameraCaptureIntent.Facing? = nil, previewID: String? = nil
     ) async throws -> String? {
         try await prepareForInteraction()
         guard let kind = CameraInput.Operation(rawValue: operation.rawValue) else {
@@ -249,7 +249,7 @@ func syntheticCameraImage(
         sequence: sequence, timestamp: timestamp, rotation: rotation, capturedAt: capturedAt)
 }
 
-func processCameraFixture(_ input: AgentInput, using agent: VisionPerceptionAgent) async throws {
+func processCameraFixture(_ input: AgentInput, using agent: PoseInferenceWorkflow) async throws {
     guard case .image(let image) = input.payload,
         let native = image.attachment as? CameraFrame
     else { throw ImageInputError.invalidFrame }

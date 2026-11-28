@@ -69,20 +69,51 @@ extension SpeechPerceptionAgent {
         }
     }
     private func consumeMicrophone(_ capture: MicrophoneCaptureInput, sessionID: String, epoch: UUID) async throws {
-        let display = try await microphoneSpectrum?.begin(sessionID: sessionID, captureGeneration: capture.generation)
-        do { try await consumeMicrophone(capture, sessionID: sessionID, epoch: epoch, display: display) } catch {
-            if let display { await microphoneSpectrum?.finish(display) }
+        guard let microphoneSpectrum else {
+            try await consumeOrderedFrames(capture, sessionID: sessionID, epoch: epoch)
+            return
+        }
+        let display = try await microphoneSpectrum.begin(sessionID: sessionID, captureGeneration: capture.generation)
+        // Injected capture sources may only expose the ordered stream.
+        let stream: AsyncStream<MicrophoneFrame>
+        let relay: AsyncStream<MicrophoneFrame>.Continuation?
+        if let native = capture.meterFrames {
+            stream = native
+            relay = nil
+        } else {
+            (stream, relay) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1))
+        }
+        do {
+            try await withThrowingTaskGroup(of: Bool.self) { group in
+                group.addTask {
+                    try await self.consumeMeter(
+                        stream, presenter: microphoneSpectrum, display: display,
+                        sessionID: sessionID, epoch: epoch)
+                    return false
+                }
+                group.addTask {
+                    defer { relay?.finish() }
+                    try await self.consumeOrderedFrames(capture, sessionID: sessionID, epoch: epoch, meter: relay)
+                    return true
+                }
+                while let orderedFinished = try await group.next() {
+                    if orderedFinished {
+                        group.cancelAll()
+                        return
+                    }
+                }
+            }
+        } catch {
+            await microphoneSpectrum.finish(display)
             throw error
         }
-        if let display { await microphoneSpectrum?.finish(display) }
+        await microphoneSpectrum.finish(display)
     }
-    private func consumeMicrophone(
+
+    private func consumeOrderedFrames(
         _ capture: MicrophoneCaptureInput, sessionID: String, epoch: UUID,
-        display: UUID?
+        meter: AsyncStream<MicrophoneFrame>.Continuation? = nil
     ) async throws {
-        var meterSamples: [Float] = []
-        var meterRate = 0
-        var lastMeterUpdate = ContinuousClock.now
         var lastObservation: ContinuousClock.Instant?
         for try await frame in capture.frames {
             try Task.checkCancellation()
@@ -92,6 +123,7 @@ extension SpeechPerceptionAgent {
                 suppressedMicrophonePackets += 1
                 continue
             }
+            meter?.yield(frame)
             ContainerInputMetrics.record("PCM.Admit", since: frame.capturedAt)
             // Process inline in this lifetime task; the native FIFO supplies the only pending PCM queue.
             try await processMicrophone(frame, sessionID: sessionID, captureGeneration: capture.generation)
@@ -104,24 +136,42 @@ extension SpeechPerceptionAgent {
                 await microphoneObservation(observation)
                 lastObservation = .now
             }
-            if let microphoneSpectrum, let display {
-                if meterRate != frame.sampleRate {
-                    meterSamples.removeAll(keepingCapacity: true)
-                    meterRate = frame.sampleRate
-                }
-                meterSamples.append(contentsOf: frame.omnidirectionalSamples.suffix(AudioSpectrum.sampleCount))
-                if meterSamples.count > AudioSpectrum.sampleCount {
-                    meterSamples.removeFirst(meterSamples.count - AudioSpectrum.sampleCount)
-                }
-                if lastMeterUpdate.duration(to: .now) >= .milliseconds(33) {
-                    let spectrum = try await AudioSpectrum.measureOffMain(meterSamples, sampleRate: meterRate)
-                    try Task.checkCancellation()
-                    guard nativeInputEpoch == epoch, try admitsMicrophone(sessionID: sessionID) else { continue }
-                    try await microphoneSpectrum.present(spectrum, using: display)
-                    lastMeterUpdate = .now
-                }
-            }
         }
         try Task.checkCancellation()
+    }
+
+    private func consumeMeter(
+        _ frames: AsyncStream<MicrophoneFrame>, presenter: any SpectrumPresenting, display: UUID,
+        sessionID: String, epoch: UUID
+    ) async throws {
+        var samples: [Float] = []
+        var sampleRate = 0
+        var lastSequence: UInt64?
+        var nextUpdate = ContinuousClock.now
+        for await frame in frames {
+            try Task.checkCancellation()
+            guard nativeInputEpoch == epoch else { return }
+            guard try admitsMicrophone(sessionID: sessionID, capturedAt: frame.capturedAt) else {
+                samples.removeAll(keepingCapacity: true)
+                continue
+            }
+            if sampleRate != frame.sampleRate || lastSequence.map({ $0 &+ 1 != frame.sequence }) == true {
+                samples.removeAll(keepingCapacity: true)
+            }
+            sampleRate = frame.sampleRate
+            lastSequence = frame.sequence
+            samples.append(contentsOf: frame.omnidirectionalSamples.suffix(AudioSpectrum.sampleCount))
+            if samples.count > AudioSpectrum.sampleCount {
+                samples.removeFirst(samples.count - AudioSpectrum.sampleCount)
+            }
+            let now = ContinuousClock.now
+            guard now >= nextUpdate else { continue }
+            nextUpdate = now + .milliseconds(33)
+            let bands = try await AudioSpectrum.measureOffMain(samples, sampleRate: sampleRate)
+            try Task.checkCancellation()
+            guard nativeInputEpoch == epoch, try admitsMicrophone(sessionID: sessionID, capturedAt: frame.capturedAt)
+            else { continue }
+            try await presenter.present(bands, using: display)
+        }
     }
 }

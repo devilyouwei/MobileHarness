@@ -19,6 +19,12 @@
             for item in context?.state.visibleVariables(session: nil).ordered ?? [] {
                 variables[item.name] = .text(item.entry.value)
             }
+            variables["lifecyclePhase"] = .lifecyclePhase(status?.lifecycle, closed: closed)
+            let meanings = Dictionary(
+                uniqueKeysWithValues: schema.declarations.values.compactMap { declaration -> (String, String)? in
+                    guard variables[declaration.name] != nil else { return nil }
+                    return ("business." + declaration.name, declaration.meaning)
+                })
             return AgentStateSnapshot(
                 path: "agents.assistant",
                 business: variables,
@@ -34,7 +40,7 @@
                     "trackedTasks": trackedCount.map { .count($0) } ?? .unknown,
                     "messageRecordFailure": recordFailure.map { .text($0) } ?? .unknown,
                     "closed": .flag(closed), "installed": .flag(session != nil),
-                ], meanings: schema.declarations.mapValues(\.meaning))
+                ], meanings: meanings)
         }
 
         @ObservationIgnored private var session: AssistantExecutionSession?

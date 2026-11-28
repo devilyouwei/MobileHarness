@@ -1,4 +1,3 @@
-import Actions
 import AgentCore
 import Agents
 import Foundation
@@ -8,6 +7,7 @@ import PlatformKit
 import StorageCore
 import Testing
 
+@testable import Actions
 @testable import UI
 
 @Test func changingCaptionOwnerDoesNotRevokeParentPlayback() {
@@ -17,9 +17,9 @@ import Testing
         source: "assistant", sessionID: session, inputID: UUID().uuidString, sequence: 1,
         correlationID: turn.id, ordinal: turn.ordinal)
     let child = ActionExecutionContext(
-        source: "photographer", sessionID: session, inputID: UUID().uuidString, sequence: 2,
+        source: "visionPerception", sessionID: session, inputID: UUID().uuidString, sequence: 2,
         correlationID: turn.id, ordinal: turn.ordinal, taskID: UUID().uuidString,
-        taskExecutor: "photographer")
+        taskExecutor: "visionPerception")
     var presentation = ConversationPresentation()
     let parentAccepted = presentation.accept(parent, update: .beginReply)
     #expect(parentAccepted)
@@ -186,4 +186,30 @@ func uiExpressionCancellationJoinsWaitAndPreservesRendererFailure() async throws
     #expect(accept(context(7, decision: "second"), update: .replyWaiting))
     presentation.suspendReplies()
     #expect(!accept(context(8, decision: "second"), update: .replyWaiting))
+}
+
+@Test func replyWaitingToolCanOvertakeScheduledReplyWithoutRevivingAnEndedAnimation() {
+    func context(_ sequence: UInt64, decision: String? = nil) -> ActionExecutionContext {
+        .init(
+            source: "assistant", sessionID: "session", inputID: "input", sequence: sequence,
+            correlationID: "turn", ordinal: 1, decisionID: decision)
+    }
+    var presentation = ConversationPresentation()
+    func waiting(_ input: ActionExecutionContext, requestID: String, enabled: Bool) -> Bool {
+        presentation.acceptWaiting(input, requestID: requestID, enabled: enabled)
+    }
+    func begin(_ input: ActionExecutionContext) -> Bool {
+        presentation.accept(input, update: .beginReply)
+    }
+    let first = context(1, decision: "first")
+    #expect(!waiting(context(2), requestID: "first", enabled: true))
+    #expect(begin(first))
+    #expect(presentation.waitingRequestAfterBegin(first) == "first")
+    #expect(waiting(context(3), requestID: "first", enabled: false))
+    let next = context(4, decision: "next")
+    #expect(!waiting(context(6), requestID: "next", enabled: false))
+    #expect(!waiting(context(5), requestID: "next", enabled: true))
+    #expect(begin(next))
+    #expect(presentation.waitingRequestAfterBegin(next) == nil)
+    #expect(!waiting(context(3), requestID: "first", enabled: true))
 }

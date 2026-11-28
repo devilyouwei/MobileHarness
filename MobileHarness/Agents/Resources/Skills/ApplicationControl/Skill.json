@@ -1,8 +1,7 @@
 {
-  "version": 3,
+  "version": 4,
   "id": "application-control",
-  "revision": 24,
-  "description": "Manage all windows (including Writer), app pages/settings, Bluetooth and background vision.",
+  "revision": 26,
   "dependencies": [],
   "useActions": [
     {
@@ -82,43 +81,10 @@
       "callType": "action",
       "alias": "Window.close",
       "channel": "Window"
-    },
-    {
-      "path": "Camera.Perception.openVision",
-      "callType": "action",
-      "alias": "Vision.open",
-      "channel": "Vision"
-    },
-    {
-      "path": "Camera.Perception.closeVision",
-      "callType": "action",
-      "alias": "Vision.close",
-      "channel": "Vision"
-    },
-    {
-      "path": "Camera.Perception.flipVision",
-      "callType": "action",
-      "alias": "Vision.flip",
-      "channel": "Vision"
-    },
-    {
-      "path": "Camera.Perception.retryVision",
-      "callType": "action",
-      "alias": "Vision.retry",
-      "channel": "Vision"
-    },
-    {
-      "path": "UI.Island.setPresentation",
-      "callType": "action",
-      "alias": "Island.setPresentation",
-      "channel": "Island"
     }
   ],
   "useStates": [
-    "ui.windows",
-    "ui.camera",
-    "platform.vision.camera",
-    "ui.island"
+    "ui.windows"
   ],
   "useInstructions": [
     "Instructions.md"

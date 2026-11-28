@@ -30,32 +30,19 @@ extension SpeechActions {
     @Action(
         domain: "Speech", module: "Playback", title: "Set speech playback volume",
         doc:
-            "Set the target volume of the caller’s current speech playback. The playback position and state are preserved.",
+            "Set the target volume for current and subsequent speech playback, including while idle.",
         parameters: [
-            .init("volume", type: .number, description: "Normalized playback volume from 0 to 1."),
-            .init(
-                "executionID", required: false,
-                description: "Target speak execution. Defaults to the current owned playback."),
-        ], kind: .finite, completion: "The playback owner accepted the target volume.", timeout: .seconds(3))
+            .init("volume", type: .number, description: "Normalized playback volume from 0 to 1.")
+        ], kind: .finite, completion: "The target speech volume is set.", timeout: .seconds(3))
     public static func setVolume(
         invocation: any FunctionInput,
-        using apply: @escaping @Sendable (Double, UUID?, any FunctionInput) async throws -> Void
+        using apply: @escaping @Sendable (Double) async -> Void
     ) async throws {
         try Task.checkCancellation()
         let arguments = ActionArguments(invocation.call.parameters)
-        try arguments.validateAllowedKeys(["volume", "executionID"])
+        try arguments.validateAllowedKeys(["volume"])
         let volume = try arguments.requiredFiniteDouble("volume", range: 0...1)
-        let executionID: UUID?
-        if invocation.call.parameters["executionID"] == nil {
-            executionID = nil
-        } else {
-            let value = try arguments.requiredString("executionID", maximumUTF8Bytes: 36)
-            guard let parsed = UUID(uuidString: value) else {
-                throw ActionArguments.ValidationError.invalidValue("executionID")
-            }
-            executionID = parsed
-        }
-        try await apply(volume, executionID, invocation)
+        await apply(volume)
     }
 }
 
@@ -88,10 +75,7 @@ struct SpeechPlaybackExecution: ActionExecutable {
         try await audioControl.waitUntilPlaying(true)
     }
 
-    func setVolume(_ value: Double) throws {
-        guard value.isFinite, (0...1).contains(value) else {
-            throw ActionHostError.invalidPayload
-        }
+    func setVolume(_ value: Double) {
         gain = Float(value)
         if !paused { audioControl.set(.playing(volume: gain)) }
     }

@@ -121,7 +121,7 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     let windowRule = "Window lifetime is independent of Task and Skill lifetime."
     #expect(try AgentConfigurations.skillInstructions("basic-interaction").contains(windowRule))
     #expect(system.components(separatedBy: windowRule).count == 2)
-    for skill in ["photography", "application-control", "web-browsing"] {
+    for skill in ["camera-and-vision", "application-control", "web-browsing"] {
         #expect(!(try AgentConfigurations.skillInstructions(skill)).contains(windowRule))
     }
     let output = try AgentPrompts.capabilityContext()
@@ -129,13 +129,13 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     #expect(system.contains(try output.catalog(registry)))
     #expect(system.contains("<wait>Hello.</wait><express emotion=\"happy\"/>"))
     #expect(!system.contains("Action takePhoto:"))
-    #expect(system.contains("AVAILABLE SKILLS") && system.contains("photography"))
+    #expect(system.contains("AVAILABLE SKILLS") && system.contains("camera-and-vision"))
     #expect(system.contains(try AgentConfigurations.skillInstructions("basic-interaction")))
     #expect(!system.contains("{{functionToken}}"))
     #expect(system.contains("the same Channel also stays ordered across those tasks"))
     #expect(system.contains("A resource conflict fails unless host policy permits takeover after cleanup"))
     #expect(!system.contains("registered serialization"))
-    for role in ["Photographer", "Memory", "ApplicationControl"] {
+    for role in ["VisionPerception", "Memory", "ApplicationControl"] {
         #expect(throws: (any Error).self) { try AgentPrompts.load(named: role) }
     }
 }
@@ -182,10 +182,10 @@ func promptRenderingRejectsMalformedExpressions(body: String) throws {
     #expect(role.contains("is converted to speech and displayed as captions"))
     #expect(!basic.contains("is converted to speech and displayed as captions"))
     #expect(basic.contains("**send**") && basic.contains("Do not replay effects"))
-    #expect(prompt.contains("Skill ID=photography; description="))
+    #expect(prompt.contains("Skill ID=camera-and-vision; description="))
     #expect(prompt.contains("Skill IDs are arguments, not tags."))
     #expect(prompt.contains("<state.set name=\"task\" value="))
-    #expect(!prompt.contains("Action photography:"))
+    #expect(!prompt.contains("Action camera-and-vision:"))
     #expect(prompt.contains("Control state.set (self):") && !prompt.contains("Action state.set:"))
     #expect(prompt.contains("Control send (peer):"))
 }
@@ -334,8 +334,8 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
 @Test(.actionCatalog) func bundledTaskExamplesEmitSilentEntryAndSingleOrderedSpeech() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let base = try AgentConfigurations.baseSkills(named: "Assistant")
-    let photoCatalog = try AgentSkillLoader.registry(base + ["photography"], fixed: config.assistantFixed)
-    for id in ["controls", "photography"] {
+    let photoCatalog = try AgentSkillLoader.registry(base + ["camera-and-vision"], fixed: config.assistantFixed)
+    for id in ["controls", "camera-and-vision"] {
         let examples = id == "controls" ? responseExamples(in: try controlGuide()) : try skillResponseExamples(id)
         #expect(!examples.isEmpty)
         for example in examples {
@@ -468,7 +468,7 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     for loaded in [false, true] {
         if loaded {
             _ = try state.control(
-                "skill.load", arguments: ["skills": "[\"photography\"]"],
+                "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"],
                 inputID: UUID().uuidString, fixed: config.assistantFixed)
         }
         let catalog = try state.registry(fixed: config.assistantFixed)
@@ -489,7 +489,7 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
         #expect(prompt.contains("including wait text"))
         #expect(prompt.contains("Say useful new information once"))
         if loaded {
-            #expect(prompt.contains(try AgentConfigurations.skillInstructions("photography")))
+            #expect(prompt.contains(try AgentConfigurations.skillInstructions("camera-and-vision")))
             #expect(prompt.contains("steps in ONE response"))
             #expect(!prompt.contains("emit these in separate requests"))
             #expect(prompt.contains("preparation was already spoken"))
@@ -508,8 +508,8 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
 @Test(.actionCatalog) func photographyTaskCompletionPreservesWindowUnlessClosureRequested() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
-        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.assistantFixed)
-    let examples = try skillResponseExamples("photography")
+        AgentConfigurations.baseSkills(named: "Assistant") + ["camera-and-vision"], fixed: config.assistantFixed)
+    let examples = try skillResponseExamples("camera-and-vision")
     var closures = 0
     for (index, example) in examples.enumerated() where example == "The camera is closed." {
         #expect(index > 0 && examples[index - 1] == "<closeCamera/>")
@@ -530,7 +530,7 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     #expect(closures == 1)
     #expect(examples.contains { $0.contains("The photo is saved") })
     #expect(!examples.contains { $0.contains("<task.") })
-    let instructions = try AgentConfigurations.skillInstructions("photography")
+    let instructions = try AgentConfigurations.skillInstructions("camera-and-vision")
     #expect(instructions.contains("finish that Task while retaining the Camera window"))
     #expect(!instructions.contains("Cancel or replacement waits for close"))
     #expect(!instructions.contains("Web.browse"))
@@ -540,9 +540,9 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
 @Test(.actionCatalog) func bundledCompletionAndIntentExamplesSeparateTaskClosureFromStandaloneSuccess() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
-        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.assistantFixed)
+        AgentConfigurations.baseSkills(named: "Assistant") + ["camera-and-vision"], fixed: config.assistantFixed)
     let basic = responseExamples(in: try controlGuide())
-    let photo = try skillResponseExamples("photography")
+    let photo = try skillResponseExamples("camera-and-vision")
     for (examples, expected) in [(basic, "Goal completed."), (photo, "The photo is saved in the app album.")] {
         let standalone = try #require(examples.first { $0 == expected })
         var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
@@ -560,10 +560,10 @@ private func controlGuide() throws -> String { try AssistantControls.guidance.te
     #expect(closure.controls.first?.parameters["note"] != nil)
 }
 
-@Test(.actionCatalog, arguments: ["photography", "history-query"])
+@Test(.actionCatalog, arguments: ["camera-and-vision", "history-query"])
 func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) throws {
     let text = try AgentConfigurations.skillInstructions(skill)
-    if skill == "photography" {
+    if skill == "camera-and-vision" {
         #expect(text.contains("matching goal was actually set"))
         #expect(text.contains("The Agent controls own goal selection and closure"))
         #expect(text.contains("Read `task` in AGENT STATE"))
@@ -591,7 +591,8 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
     #expect(base.contains("Include what changes the answer or next step"))
     #expect(!base.contains("assistant.input_batch.v1"))
     #expect(base.contains("web-browsing") && !base.contains("Artifact_library"))
-    _ = try skills.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: "budget", fixed: fixed)
+    _ = try skills.control(
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: "budget", fixed: fixed)
     let photography = try AssistantContextState.systemPrompt(skills.registry(fixed: fixed), skills: skills)
     #expect(photography.utf8.count < 40_000)
     #expect(photography.contains("Action closeCamera:"))
@@ -636,8 +637,8 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
 @Test(.actionCatalog) func closedPhotoTerminalExampleParsesWithoutStartingOrRepeatingEffects() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
-        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.assistantFixed)
-    let examples = try skillResponseExamples("photography")
+        AgentConfigurations.baseSkills(named: "Assistant") + ["camera-and-vision"], fixed: config.assistantFixed)
+    let examples = try skillResponseExamples("camera-and-vision")
     let terminal = try #require(examples.first { $0 == "The camera is closed." })
     var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     try trace.append(terminal)
@@ -649,13 +650,13 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
 
 @Test(.actionCatalog) func retiredPhotoActionIsAbsentFromCatalogAndTeaching() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    let catalog = try AgentSkillLoader.registry(["photography"], fixed: config.assistantFixed)
+    let catalog = try AgentSkillLoader.registry(["camera-and-vision"], fixed: config.assistantFixed)
     for alias in ["ignorePhoto", "discardPhoto"] {
         #expect(!catalog.actions.contains { $0.alias == alias })
         #expect(throws: GenerationError.unknownCapability) {
             try catalog.resolveAction(alias, parameters: ["previewID": "preview_1"])
         }
-        #expect(!(try skillResponseExamples("photography")).contains { $0.contains(alias) })
+        #expect(!(try skillResponseExamples("camera-and-vision")).contains { $0.contains(alias) })
     }
     let output = try AgentPrompts.capabilityContext()
     let prompt = try output.catalog(catalog)
@@ -663,7 +664,7 @@ func businessSkillTeachingCannotFinishAnAbsentOrUnrelatedTask(skill: String) thr
 }
 
 @Test(.actionCatalog) func photographyExamplesCoverVideoLifecycleWithoutModeSetup() throws {
-    let examples = try skillResponseExamples("photography")
+    let examples = try skillResponseExamples("camera-and-vision")
     let starts = examples.filter { $0.contains("<startRecording") }
     #expect(starts.count >= 3)
     #expect(starts.contains { $0.contains("durationSeconds=\"10\"") })
@@ -725,7 +726,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
 @Test(.actionCatalog) func assistantSkillsExposeOnlyScheduledXMLIntentAndVisiblePeerResponsibilities() throws {
     let fixed = try AssistantAgent.runtimeCapabilities(AgentConfigurations.load(named: "Assistant").capabilities)
     for skill in [
-        "basic-interaction", "robot-interaction", "photography", "history-query",
+        "basic-interaction", "robot-interaction", "camera-and-vision", "history-query",
         "application-control", "web-browsing",
     ] {
         let registry = try AgentSkillLoader.registry([skill], fixed: fixed)
@@ -783,7 +784,7 @@ func webSkillExamplesParseAgainstTheirEffectiveCatalogAndStayWithinBudget(skill:
     #expect(prompt.contains("Agent ID=writer; description="))
     #expect(prompt.contains(try AgentConfigurations.publicDescription(named: "Writer")))
     for role in [
-        "photographer", "memory", "speechPerception", "visionPerception", "applicationControl",
+        "visionPerception", "memory", "speechPerception", "applicationControl",
     ] {
         #expect(!prompt.contains("Agent ID=" + role + ";"))
     }
@@ -893,8 +894,9 @@ func writerContentResourcesPreserveFormatAndRetryRules(path: String, rule: Strin
 
 @Test(.actionCatalog) func photographyCountdownExampleEmitsOpenAndCaptureInOneCameraSequence() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
-    let catalog = try AgentSkillLoader.registry(["photography"], fixed: config.assistantFixed)
-    let example = try #require(try skillResponseExamples("photography").first { $0.contains("delaySeconds=\"3\"") })
+    let catalog = try AgentSkillLoader.registry(["camera-and-vision"], fixed: config.assistantFixed)
+    let example = try #require(
+        try skillResponseExamples("camera-and-vision").first { $0.contains("delaySeconds=\"3\"") })
     var trace = GenerationTrace(capabilities: catalog, textMapping: AssistantAgent.mapText)
     for character in example { try trace.append(String(character)) }
     trace.finish()
@@ -907,8 +909,8 @@ func writerContentResourcesPreserveFormatAndRetryRules(path: String, rule: Strin
 @Test(.actionCatalog) func photographySpokenPreparationSitsBetweenOpenAndPhotoInOneResponse() throws {
     let config = try AgentConfigurations.load(named: "Assistant")
     let catalog = try AgentSkillLoader.registry(
-        AgentConfigurations.baseSkills(named: "Assistant") + ["photography"], fixed: config.assistantFixed)
-    let examples = try skillResponseExamples("photography").filter {
+        AgentConfigurations.baseSkills(named: "Assistant") + ["camera-and-vision"], fixed: config.assistantFixed)
+    let examples = try skillResponseExamples("camera-and-vision").filter {
         $0.hasPrefix("<wait><openCamera/></wait><wait>") && $0.contains("<takePhoto")
     }
     #expect(examples.count >= 2)

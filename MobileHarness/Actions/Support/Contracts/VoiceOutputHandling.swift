@@ -11,14 +11,10 @@ public protocol VoiceOutputHandling: VoicePresentationHandling {
     func playCue(_ request: UIActions.CueRequest, invocation: any FunctionInput) async throws
     func vibrate(_ request: UIActions.HapticRequest, invocation: any FunctionInput) async throws
     func play(audioID: String, invocation: any FunctionInput) async throws
-    func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) throws
+    func setVolume(_ volume: Double)
 }
 
 extension VoiceOutputHandling {
-    public func setVolume(_ volume: Double, executionID: UUID?, invocation: any FunctionInput) throws {
-        throw ActionHostError.unsupportedContract
-    }
-
     public func setListening(enabled: Bool, invocation: any FunctionInput) async throws {
         throw SpeechActionError.listeningUnavailable
     }

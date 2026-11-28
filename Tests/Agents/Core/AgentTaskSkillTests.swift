@@ -25,7 +25,7 @@ import UI
     let old = try state.registry(fixed: fixedCapabilities)
     let input = UUID().uuidString
     _ = try state.control(
-        "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixedCapabilities)
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixedCapabilities)
     #expect(!old.actions.contains { $0.alias == "takePhoto" })
     #expect(try state.registry(fixed: fixedCapabilities).actions.contains { $0.alias == "takePhoto" })
     let encoder = JSONEncoder()
@@ -43,11 +43,11 @@ import UI
     }
     #expect(throws: HarnessError.forbiddenFunction) {
         try state.control(
-            "state.set", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixedCapabilities)
+            "state.set", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixedCapabilities)
     }
     #expect(throws: CommunicationError.invalidPayload) {
         try state.control(
-            "skill.load", arguments: ["skills": "[\"photography\"]", "description": "x"], inputID: input,
+            "skill.load", arguments: ["skills": "[\"camera-and-vision\"]", "description": "x"], inputID: input,
             fixed: fixedCapabilities)
     }
     #expect(try encoder.encode(state) == encoded)
@@ -59,7 +59,7 @@ import UI
     #expect(state.activeTaskID == task && state.mode == "task")
     try state.decisionCompleted()
     #expect(state.activeTaskID == nil && state.mode == "default" && state.tasks.last?.status == "completed")
-    #expect(state.loaded.contains("photography") && !state.events.contains { $0.operation == "release" })
+    #expect(state.loaded.contains("camera-and-vision") && !state.events.contains { $0.operation == "release" })
     #expect(throws: CommunicationError.scopeClosed) { try state.bind(UUID().uuidString, task: task) }
 }
 
@@ -95,7 +95,7 @@ import UI
 @Test(.actionCatalog) func allBundledSkillsHaveValidBoundedEffectiveCatalogs() throws {
     let fixedCapabilities = try AssistantAgent.runtimeCapabilities(
         AgentConfigurations.load(named: "Assistant").capabilities)
-    for skill in ["photography", "history-query", "application-control", "web-browsing"] {
+    for skill in ["camera-and-vision", "history-query", "application-control", "web-browsing"] {
         var state = AgentTaskSkillState()
         try state.initialize(
             fixed: fixedCapabilities, baseSkills: try AgentConfigurations.baseSkills(named: "Assistant"))
@@ -117,7 +117,7 @@ import UI
     let before = try state.registry(fixed: fixed)
     #expect(throws: GenerationError.unknownCapability) { try before.resolveAction("takePhoto", parameters: [:]) }
     _ = try state.control(
-        "skill.load", arguments: ["skills": "[\"photography\",\"history-query\"]"],
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\",\"history-query\"]"],
         inputID: UUID().uuidString, fixed: fixed)
     let loaded = try state.registry(fixed: fixed)
     #expect(try loaded.resolveAction("takePhoto", parameters: [:]).actionPath.description == "Camera.Capture.takePhoto")
@@ -167,13 +167,13 @@ private actor SkillModel: ChatCapability {
                         let alias = followUpAlias
                         let parameters = alias == "closeCamera" ? "" : " previewID=\"\(mediaID)\""
                         output = "<\(alias)\(parameters)/>"
-                    case 5: output = "<skill.load skills='[\"photography\"]'/>"
+                    case 5: output = "<skill.load skills='[\"camera-and-vision\"]'/>"
                     default: output = "处理完成。"
                     }
                 }
             } else {
                 switch requests.count {
-                case 1: output = "<skill.load skills='[\"photography\"]'/>"
+                case 1: output = "<skill.load skills='[\"camera-and-vision\"]'/>"
                 case 2: output = "<takePhoto/>"
                 default: output = "拍好了。"
                 }
@@ -187,8 +187,8 @@ private actor SkillModel: ChatCapability {
             }
         } else {
             switch requests.count - (rejectFirst ? 1 : 0) {
-            case 0: output = "<photography/>"
-            case 1: output = "<skill.load skills='[\"photography\"]'/>"
+            case 0: output = "<camera-and-vision/>"
+            case 1: output = "<skill.load skills='[\"camera-and-vision\"]'/>"
             case 2: output = "<state.set name=\"task\" value=\"拍照 fixture\"/><takePhoto/>"
             case 3: output = "需要保存吗？"
             case 4: output = "<savePhoto previewID=\"\(mediaID)\"/>"
@@ -448,7 +448,7 @@ func fullDuplexInterruptedReplyPreservesPhotographyTaskAndPersistsSummary() asyn
 
     let session = UUID().uuidString
     _ = try await agent.control(
-        .loadSkills, arguments: ["skills": #"["photography"]"#],
+        .loadSkills, arguments: ["skills": #"["camera-and-vision"]"#],
         source: AgentID.assistant.rawValue, sessionID: session, inputID: "photo-start", decisionID: nil)
     _ = try await agent.control(
         .stateSet, arguments: ["name": "task", "value": "连续拍照"],
@@ -703,7 +703,7 @@ private func photographyAcceptance(
             ])
         #expect(
             !history.raw.contains("state.set") && !history.raw.contains("state.clear") && !history.raw.contains("保存"))
-        #expect(snapshot.state.skillState?.recentSkills["photography"]?.remainingDecisions == 5)
+        #expect(snapshot.state.skillState?.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
         if followUpAlias == nil {
             _ = try await manager.receiveLocally(
                 .init(id: UUID().uuidString, sessionID: session, payload: .text("继续看这张图片")), to: .assistant)
@@ -723,7 +723,7 @@ private func photographyAcceptance(
                         AgentInput(id: UUID().uuidString, sessionID: session, payload: .text("无关聊天 \(index)")),
                         to: .assistant)
                     try await skillEventually { await effects.completed == 1 + index }
-                    let remaining = try await context.snapshot().state.skillState?.recentSkills["photography"]?
+                    let remaining = try await context.snapshot().state.skillState?.recentSkills["camera-and-vision"]?
                         .remainingDecisions
                     #expect(remaining == (index == 5 ? nil : 5 - index))
                 }
@@ -757,7 +757,7 @@ private func photographyAcceptance(
                 ])
             let state = try await context.snapshot().state
             #expect(state.skillState?.tasks.isEmpty == true)
-            #expect(state.skillState?.recentSkills["photography"]?.remainingDecisions == 5)
+            #expect(state.skillState?.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
             #expect(state.history.current.turns.last?.state == .completed)
         }
         if !live {
@@ -885,7 +885,7 @@ private func photographyAcceptance(
         #expect(try await context.snapshot().state.skillState?.loaded.contains("history-query") == true)
         #expect(await effects.failures == [])
         #expect(requests.contains { $0.response.contains("<state.set") })
-        #expect(requests.contains { $0.decisionMetadata?.skills["photography"] != nil })
+        #expect(requests.contains { $0.decisionMetadata?.skills["camera-and-vision"] != nil })
         if run == 0 {
             for (offset, command) in ["机械臂点一次头，不用说话。", "先说你好，再挥手一次。", "关闭摄像头。"].enumerated() {
                 if offset == 2 {
@@ -947,10 +947,10 @@ private func photographyAcceptance(
         let beforeID = beforeCapture["displayedPreviewID"]
         #expect(beforeID == nil || beforeID is NSNull)
         #expect(afterCapture["displayedPreviewID"] as? String == photo)
-        let photographyRevision = try AgentConfigurations.skill("photography").revision
+        let photographyRevision = try AgentConfigurations.skill("camera-and-vision").revision
         #expect(
             requests[start + 2].decisionMetadata?.taskID == active
-                && requests[start + 2].decisionMetadata?.skills["photography"] == photographyRevision)
+                && requests[start + 2].decisionMetadata?.skills["camera-and-vision"] == photographyRevision)
         #expect(archive.current.turns.last?.modelRequests?.count == 2)
         #expect(archive.current.turns.first?.generationRounds?.count == (rejectFirst ? 4 : 3))
         let calls = await stub.requests
@@ -1041,7 +1041,7 @@ private func photographyAcceptance(
             id: "completed-asr", sessionID: session, payload: payload,
             metadata: .init(
                 payload: payload, source: "speechPerception", origin: .agent, rootID: "completed-asr",
-                topic: PerceptionMessage.userInputTopic), turn: turn))
+                topic: "user.input.speech"), turn: turn))
     #expect(try await context.snapshot().state.skillState?.taskID(for: "completed-asr") == current)
     await agent.stop()
 }
@@ -1061,7 +1061,7 @@ private func photographyAcceptance(
     await #expect(throws: WriteFailure.self) {
         try await repository.transaction {
             _ = try $0.state.skillState?.control(
-                "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: UUID().uuidString,
+                "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: UUID().uuidString,
                 fixed: fixedCapabilities)
         }
     }
@@ -1081,7 +1081,7 @@ private func photographyAcceptance(
     try await agent.start()
     let session = UUID().uuidString
     _ = try await agent.control(
-        .loadSkills, arguments: ["skills": "[\"photography\"]"], source: "assistant",
+        .loadSkills, arguments: ["skills": "[\"camera-and-vision\"]"], source: "assistant",
         sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     _ = try await agent.control(
         .stateSet, arguments: ["name": "task", "value": "fixed fixture"], source: "assistant",
@@ -1089,7 +1089,7 @@ private func photographyAcceptance(
     #expect(try await context.snapshot().state.skillState?.mode == "task")
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.control(
-            .stateClear, arguments: ["name": "task", "note": "spoofed"], source: "photographer", sessionID: session,
+            .stateClear, arguments: ["name": "task", "note": "spoofed"], source: "visionPerception", sessionID: session,
             inputID: UUID().uuidString,
             decisionID: nil)
     }
@@ -1252,7 +1252,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
     try await assistant.start()
     await child.start()
     _ = try await assistant.control(
-        .loadSkills, arguments: ["skills": "[\"photography\"]"], source: "assistant",
+        .loadSkills, arguments: ["skills": "[\"camera-and-vision\"]"], source: "assistant",
         sessionID: session, inputID: UUID().uuidString, decisionID: nil)
     _ = try await assistant.control(
         .stateSet, arguments: ["name": "task", "value": "继续拍摄"], source: "assistant",
@@ -1311,7 +1311,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
 
 @Test(.actionCatalog) func baseSkillsAreTheOnlyRoleModelFunctionSource() throws {
     for name in [
-        "Assistant", "Photographer", "Memory", "ApplicationControl", "SpeechPerception",
+        "Assistant", "VisionPerception", "Memory", "ApplicationControl", "SpeechPerception",
         "VisionPerception",
     ] {
         let configuration = try AgentConfigurations.load(named: name)
@@ -1457,7 +1457,7 @@ func legacyBackgroundStartIsRejectedWithoutChangingForegroundOrInvokingChat()
         try skills.registry(fixed: config.capabilities).resolveAction("takePhoto", parameters: [:])
     }
     _ = try skills.control(
-        "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: input.id, fixed: config.capabilities)
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input.id, fixed: config.capabilities)
     let registry = try skills.registry(fixed: config.capabilities)
     let photo = "preview_1"
     for (alias, parameters) in [
@@ -1488,7 +1488,7 @@ func assistantCapturesWithoutTaskWhenNoFollowUpIsRequested(supportsImages: Bool)
             "Speech.Listening.startListening", "Speech.Listening.stopListening",
         ])
     let application = try AgentConfigurations.skill("application-control")
-    #expect(application.useActions.count == 18 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
+    #expect(application.useActions.count == 13 && !application.useActions.contains { $0.path.hasPrefix("NexArm.") })
     let robot = try AgentConfigurations.skill("robot-interaction")
     #expect(robot.useActions.count == 11 && robot.useActions.allSatisfy { $0.path.hasPrefix("NexArm.") })
     for registry in try AgentConfigurations.skillRegistries() {
@@ -1726,20 +1726,20 @@ private func retainedLoad(_ skill: String, state: inout AgentTaskSkillState, fix
 
 @Test(.actionCatalog) func skillIdleCounterSettlesOncePerCompleteUserDecision() throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     let frozen = try state.registry(fixed: fixed)
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     let system = UUID().uuidString
     try state.beginDecision(system, countsIdle: false)
     try state.decisionCompleted(inputID: system)
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     for count in 1...5 {
         let input = UUID().uuidString
         for _ in 0..<10 { try state.beginDecision(input) }  // Internal ReACT never adds a second owner.
-        #expect(state.recentSkills["photography"]?.remainingDecisions == 6 - count)
+        #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 6 - count)
         try state.decisionCompleted(inputID: input)
         try state.decisionCompleted(inputID: input)
-        #expect(state.recentSkills["photography"]?.remainingDecisions == (count == 5 ? nil : 5 - count))
+        #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == (count == 5 ? nil : 5 - count))
     }
     #expect(throws: GenerationError.unknownCapability) {
         try state.registry(fixed: fixed).resolveAction("closeCamera", parameters: [:])
@@ -1751,7 +1751,7 @@ private func retainedLoad(_ skill: String, state: inout AgentTaskSkillState, fix
 func admittedSkillCallsRenewRetentionIncludingExecutionFailure(kind: String) throws {
     var (state, fixed) = try retentionFixture()
     let callType = "action"
-    let skill = kind == "query" ? "history-query" : "photography"
+    let skill = kind == "query" ? "history-query" : "camera-and-vision"
     let path = kind == "query" ? "History.Conversation.list" : "Camera.Capture.close"
     try retainedLoad(skill, state: &state, fixed: fixed)
     for _ in 0..<3 {
@@ -1777,14 +1777,14 @@ func admittedSkillCallsRenewRetentionIncludingExecutionFailure(kind: String) thr
     var (state, fixed) = try retentionFixture()
     state.policy.maximumNonBaseSkills = 2
     try retainedLoad("history-query", state: &state, fixed: fixed)
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     let use = UUID().uuidString
     try state.beginDecision(use)
     try state.recordUse(
         path: "History.Conversation.list", callType: "action", inputID: use, snapshotSkills: state.loaded)
     try state.decisionCompleted(inputID: use)
     try retainedLoad("application-control", state: &state, fixed: fixed)
-    #expect(!state.loaded.contains("photography") && state.loaded.contains("history-query"))
+    #expect(!state.loaded.contains("camera-and-vision") && state.loaded.contains("history-query"))
     let encoder = JSONEncoder()
     encoder.outputFormatting = .sortedKeys
     let id = UUID().uuidString
@@ -1795,21 +1795,21 @@ func admittedSkillCallsRenewRetentionIncludingExecutionFailure(kind: String) thr
         path: "System.Provider.readSettings", callType: "action", inputID: id, snapshotSkills: state.loaded)
     let before = try encoder.encode(state)
     #expect(throws: CommunicationError.capacityExceeded) {
-        try state.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: id, fixed: fixed)
+        try state.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: id, fixed: fixed)
     }
     #expect(try encoder.encode(state) == before)
     var (small, _) = try retentionFixture()
     small.policy.maximumNonBaseBytes = 1
     let empty = try encoder.encode(small)
     #expect(throws: CommunicationError.capacityExceeded) {
-        try small.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: id, fixed: fixed)
+        try small.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: id, fixed: fixed)
     }
     #expect(try encoder.encode(small) == empty)
 }
 
 @Test(.actionCatalog) func inFlightDecisionProtectsUsedSkillFromIdleExpiry() throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     try retainedLoad("history-query", state: &state, fixed: fixed)
     let inFlight = UUID().uuidString
     try state.beginDecision(inFlight)
@@ -1820,22 +1820,22 @@ func admittedSkillCallsRenewRetentionIncludingExecutionFailure(kind: String) thr
         try state.beginDecision(other)
         try state.decisionCompleted(inputID: other)
     }
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     #expect(!state.loaded.contains("history-query"))
     try state.decisionCompleted(inputID: inFlight)
-    #expect(try state.ownership("photography") == "recent")
-    #expect(state.loaded.contains("photography"))
+    #expect(try state.ownership("camera-and-vision") == "recent")
+    #expect(state.loaded.contains("camera-and-vision"))
 }
 
 @Test(.actionCatalog) func skillDefinitionsDoNotBecomeConversationOrRestartActivation() throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     try state.resetConversation()
-    #expect(!state.loaded.contains("photography") && state.decisions.isEmpty)
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    #expect(!state.loaded.contains("camera-and-vision") && state.decisions.isEmpty)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     state.recover()
     try state.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-    #expect(!state.loaded.contains("photography") && state.recentSkills.isEmpty)
+    #expect(!state.loaded.contains("camera-and-vision") && state.recentSkills.isEmpty)
 }
 
 private actor QueryRetentionModel: ChatCapability {
@@ -1912,29 +1912,29 @@ func queryActionAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     try await context.update {
         var skills = AgentTaskSkillState()
         try skills.initialize(fixed: fixed, baseSkills: AgentConfigurations.baseSkills(named: "Assistant"))
-        try retainedLoad("photography", state: &skills, fixed: fixed)
+        try retainedLoad("camera-and-vision", state: &skills, fixed: fixed)
         $0.state.skillState = skills
     }
     _ = try await store.startNew()
-    #expect(try await context.snapshot().state.skillState?.loaded.contains("photography") == false)
+    #expect(try await context.snapshot().state.skillState?.loaded.contains("camera-and-vision") == false)
 }
 
 @Test(.actionCatalog) func recentSkillCancellationPreservesOtherSessions() throws {
     var (state, fixed) = try retentionFixture()
     let input = UUID().uuidString
     try state.beginDecision(input, sessionID: "owner")
-    _ = try state.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+    _ = try state.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixed)
     try state.decisionCompleted(inputID: input)
     try state.closeSession("unrelated", inputs: [])
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     try state.closeSession("owner", inputs: [])
-    #expect(!state.loaded.contains("photography"))
+    #expect(!state.loaded.contains("camera-and-vision"))
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func providerSelectionFailureSettlesIdleSkillDecisionOnce() async throws
 {
     var (skills, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &skills, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &skills, fixed: fixed)
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
@@ -1947,7 +1947,7 @@ func queryActionAdmissionRenewsButParameterRejectionDoesNot(executionFails: Bool
     try await agent.receive(.init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("hello")))
     try await skillEventually {
         let state = try await context.snapshot().state.skillState
-        return state?.decisions.isEmpty == true && state?.recentSkills["photography"]?.remainingDecisions == 4
+        return state?.decisions.isEmpty == true && state?.recentSkills["camera-and-vision"]?.remainingDecisions == 4
     }
     await agent.stop()
 }
@@ -1967,19 +1967,19 @@ private func idleSkillDecision(_ state: inout AgentTaskSkillState, fixed: Capabi
 @Test(.actionCatalog, arguments: [false, true])
 func skillReloadAtLastChanceOrAfterExpiryStartsFreshFiveDecisionWindow(afterExpiry: Bool) throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     for _ in 0..<(afterExpiry ? 5 : 4) { try idleSkillDecision(&state, fixed: fixed) }
-    let oldLoads = state.events.filter { $0.operation == "load" && $0.skill == "photography" }.count
-    try retainedLoad("photography", state: &state, fixed: fixed)
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    let oldLoads = state.events.filter { $0.operation == "load" && $0.skill == "camera-and-vision" }.count
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     #expect(
-        state.events.filter { $0.operation == "load" && $0.skill == "photography" }.count == oldLoads
+        state.events.filter { $0.operation == "load" && $0.skill == "camera-and-vision" }.count == oldLoads
             + (afterExpiry ? 1 : 0))
     #expect(try state.registry(fixed: fixed).actions.filter { $0.alias == "closeCamera" }.count == 1)
     for _ in 0..<4 { try idleSkillDecision(&state, fixed: fixed) }
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 1)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 1)
     try idleSkillDecision(&state, fixed: fixed)
-    #expect(!state.loaded.contains("photography"))
+    #expect(!state.loaded.contains("camera-and-vision"))
 }
 
 @Test(.actionCatalog) func lastChanceActionRenewsOnlyItsProvidingSkill() throws {
@@ -1987,7 +1987,7 @@ func skillReloadAtLastChanceOrAfterExpiryStartsFreshFiveDecisionWindow(afterExpi
     let load = UUID().uuidString
     try state.beginDecision(load)
     _ = try state.control(
-        "skill.load", arguments: ["skills": "[\"photography\",\"history-query\"]"], inputID: load, fixed: fixed)
+        "skill.load", arguments: ["skills": "[\"camera-and-vision\",\"history-query\"]"], inputID: load, fixed: fixed)
     try state.decisionCompleted(inputID: load)
     for _ in 0..<4 { try idleSkillDecision(&state, fixed: fixed) }
     let input = UUID().uuidString
@@ -1997,7 +1997,7 @@ func skillReloadAtLastChanceOrAfterExpiryStartsFreshFiveDecisionWindow(afterExpi
             path: "Camera.Capture.close", callType: "action", inputID: input, snapshotSkills: state.loaded)
     }
     try state.decisionCompleted(inputID: input)
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     #expect(!state.loaded.contains("history-query"))
     #expect(state.events.filter { $0.skill == "history-query" && $0.reason == "idle" }.count == 1)
 }
@@ -2005,7 +2005,7 @@ func skillReloadAtLastChanceOrAfterExpiryStartsFreshFiveDecisionWindow(afterExpi
 @Test(.actionCatalog, arguments: ["wrongType", "absentSnapshot", "unknownPath", "baseFunction"])
 func unrelatedOrUnexposedCallsCannotRenewOrAdoptSkill(reason: String) throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     for _ in 0..<4 { try idleSkillDecision(&state, fixed: fixed) }
     let input = UUID().uuidString
     try state.beginDecision(input)
@@ -2015,13 +2015,13 @@ func unrelatedOrUnexposedCallsCannotRenewOrAdoptSkill(reason: String) throws {
         callType: reason == "wrongType" ? "tool" : "action", inputID: input,
         snapshotSkills: reason == "absentSnapshot" ? [] : state.loaded)
     try state.decisionCompleted(inputID: input)
-    #expect(!state.loaded.contains("photography"))
+    #expect(!state.loaded.contains("camera-and-vision"))
     #expect(state.decisions.isEmpty)
 }
 
 @Test(.actionCatalog) func pendingDecisionCapacityRejectsAtomicallyAndDiscardReleasesProtection() throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     let inputs = (0..<32).map { _ in UUID().uuidString }
     for input in inputs { try state.beginDecision(input, sessionID: "owner") }
     try state.recordUse(
@@ -2033,16 +2033,17 @@ func unrelatedOrUnexposedCallsCannotRenewOrAdoptSkill(reason: String) throws {
     #expect(try lifecycleSnapshot(state) == before)
     state.discardDecision(inputs[0])
     for input in inputs.dropFirst() { state.discardDecision(input) }
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     for _ in 0..<5 { try idleSkillDecision(&state, fixed: fixed) }
-    #expect(!state.loaded.contains("photography") && state.decisions.isEmpty)
+    #expect(!state.loaded.contains("camera-and-vision") && state.decisions.isEmpty)
 }
 
 @Test(
-    .actionCatalog, arguments: ["[\"basic-interaction\"]", "[\"missing\"]", "[\"photography\",\"basic-interaction\"]"])
+    .actionCatalog,
+    arguments: ["[\"basic-interaction\"]", "[\"missing\"]", "[\"camera-and-vision\",\"basic-interaction\"]"])
 func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws {
     var (state, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &state, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
     let before = try lifecycleSnapshot(state)
     #expect(throws: CommunicationError.unauthorized) {
         try state.control("skill.unload", arguments: ["skills": skills], inputID: UUID().uuidString, fixed: fixed)
@@ -2054,31 +2055,35 @@ func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws
     var (state, fixed) = try retentionFixture()
     let input = UUID().uuidString
     try state.beginDecision(input)
-    _ = try state.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+    _ = try state.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixed)
     let snapshot = state.loaded
-    _ = try state.control("skill.unload", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+    _ = try state.control(
+        "skill.unload", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixed)
     try state.recordUse(path: "Camera.Capture.close", callType: "action", inputID: input, snapshotSkills: snapshot)
-    #expect(!state.loaded.contains("photography") && state.recentSkills.isEmpty)
+    #expect(!state.loaded.contains("camera-and-vision") && state.recentSkills.isEmpty)
     try state.decisionCompleted(inputID: input)
-    #expect(!state.loaded.contains("photography"))
+    #expect(!state.loaded.contains("camera-and-vision"))
     #expect(
-        state.events.filter { $0.skill == "photography" && $0.operation == "release" }.map(\.reason) == ["explicit"])
+        state.events.filter { $0.skill == "camera-and-vision" && $0.operation == "release" }.map(\.reason) == [
+            "explicit"
+        ])
 }
 
 @Test(.actionCatalog, arguments: [0, -1]) func skillByteBudgetAcceptsExactLimitAndRejectsOneByteLess(delta: Int) throws
 {
     var (state, fixed) = try retentionFixture()
     let base = state.loaded
-    let expanded = try AgentSkillLoader.expand(base + ["photography"])
+    let expanded = try AgentSkillLoader.expand(base + ["camera-and-vision"])
     state.policy.maximumNonBaseBytes = try AgentSkillLoader.nonBaseBytes(expanded, base: base) + delta
     let before = try lifecycleSnapshot(state)
     if delta == 0 {
-        try retainedLoad("photography", state: &state, fixed: fixed)
-        #expect(state.loaded.contains("photography"))
+        try retainedLoad("camera-and-vision", state: &state, fixed: fixed)
+        #expect(state.loaded.contains("camera-and-vision"))
     } else {
         #expect(throws: CommunicationError.capacityExceeded) {
             try state.control(
-                "skill.load", arguments: ["skills": "[\"photography\"]"], inputID: UUID().uuidString, fixed: fixed)
+                "skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: UUID().uuidString, fixed: fixed
+            )
         }
         #expect(try lifecycleSnapshot(state) == before)
     }
@@ -2088,7 +2093,7 @@ func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws
     var (state, fixed) = try retentionFixture()
     let input = UUID().uuidString
     try state.beginDecision(input)
-    let arguments = ["skills": "[\"photography\",\"history-query\",\"application-control\"]"]
+    let arguments = ["skills": "[\"camera-and-vision\",\"history-query\",\"application-control\"]"]
     _ = try state.control("skill.load", arguments: arguments, inputID: input, fixed: fixed)
     let loaded = state.loaded
     let events = state.events.count
@@ -2108,7 +2113,8 @@ func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws
     let before = try lifecycleSnapshot(state)
     #expect(throws: CommunicationError.capacityExceeded) {
         try state.control(
-            "skill.load", arguments: ["skills": "[\"photography\",\"history-query\"]"], inputID: UUID().uuidString,
+            "skill.load", arguments: ["skills": "[\"camera-and-vision\",\"history-query\"]"],
+            inputID: UUID().uuidString,
             fixed: fixed)
     }
     #expect(try lifecycleSnapshot(state) == before)
@@ -2119,33 +2125,33 @@ func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws
     var (state, fixed) = try retentionFixture()
     let first = UUID().uuidString
     try state.beginDecision(first, sessionID: "first")
-    _ = try state.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: first, fixed: fixed)
+    _ = try state.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: first, fixed: fixed)
     try state.decisionCompleted(inputID: first)
     let second = UUID().uuidString
     try state.beginDecision(second, sessionID: "second")
     try state.recordUse(path: "Camera.Capture.close", callType: "action", inputID: second, snapshotSkills: state.loaded)
     try state.decisionCompleted(inputID: second)
-    #expect(state.recentSkills["photography"]?.sessionID == "second")
+    #expect(state.recentSkills["camera-and-vision"]?.sessionID == "second")
     try state.closeSession("first", inputs: [first])
-    #expect(state.recentSkills["photography"]?.remainingDecisions == 5)
+    #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == 5)
     try state.closeSession("second", inputs: [second])
-    #expect(!state.loaded.contains("photography"))
+    #expect(!state.loaded.contains("camera-and-vision"))
 }
 
 @Test(.actionCatalog) func cancellingUnrelatedSessionKeepsTaskAndClearsOnlyItsPendingDecision() throws {
     var (state, fixed) = try retentionFixture()
     let owner = UUID().uuidString
     try state.beginDecision(owner, sessionID: "task-owner")
-    _ = try state.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: owner, fixed: fixed)
+    _ = try state.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: owner, fixed: fixed)
     try state.beginTask(goal: "等待用户", taskID: fixtureTaskID(), sessionID: "task-owner", inputID: owner)
     try state.decisionCompleted(inputID: owner)
     let other = UUID().uuidString
     try state.beginDecision(other, sessionID: "other")
     try state.closeSession("other", inputs: [other])
     #expect(state.activeTaskID != nil && state.tasks.last?.status == "waitingUser")
-    #expect(state.loaded.contains("photography") && state.decisions.isEmpty)
+    #expect(state.loaded.contains("camera-and-vision") && state.decisions.isEmpty)
     try state.closeSession("task-owner", inputs: [])
-    #expect(state.activeTaskID != nil && !state.loaded.contains("photography"))
+    #expect(state.activeTaskID != nil && !state.loaded.contains("camera-and-vision"))
 }
 
 @Test(.actionCatalog, arguments: [false, true]) func restartInterruptsTaskAndDiscardsAllNonBaseActivation(waiting: Bool)
@@ -2156,7 +2162,7 @@ func invalidSkillReleaseCannotPartiallyRemoveRecentSkills(skills: String) throws
     try retainedLoad("history-query", state: &state, fixed: fixed)
     let input = UUID().uuidString
     try state.beginDecision(input)
-    _ = try state.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+    _ = try state.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixed)
     try state.beginTask(goal: "重启前任务", taskID: fixtureTaskID(), sessionID: nil, inputID: input)
     if waiting { try state.decisionCompleted(inputID: input) }
     state.recover()
@@ -2182,7 +2188,7 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
         }
     }
     var (skills, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &skills, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &skills, fixed: fixed)
     if operation == "idle" {
         for _ in 0..<4 { try idleSkillDecision(&skills, fixed: fixed) }
     }
@@ -2203,7 +2209,7 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     let mutate: @Sendable (inout AgentContext<AssistantContextState>) throws -> Void = { [fixed] context in
         if operation == "release" {
             _ = try context.state.skillState?.control(
-                "skill.unload", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+                "skill.unload", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixed)
         } else {
             try context.state.skillState?.decisionCompleted(inputID: input)
         }
@@ -2215,10 +2221,11 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     if operation == "terminal" {
         #expect(committed.tasks.last?.status == "completed")
         #expect(
-            committed.loaded.contains("photography") && committed.recentSkills["photography"]?.remainingDecisions == 4)
+            committed.loaded.contains("camera-and-vision")
+                && committed.recentSkills["camera-and-vision"]?.remainingDecisions == 4)
     } else {
-        #expect(!committed.loaded.contains("photography"))
-        #expect(committed.events.filter { $0.skill == "photography" && $0.operation == "release" }.count == 1)
+        #expect(!committed.loaded.contains("camera-and-vision"))
+        #expect(committed.events.filter { $0.skill == "camera-and-vision" && $0.operation == "release" }.count == 1)
     }
 }
 
@@ -2228,7 +2235,7 @@ func failedLifecycleCommitCanRetryWithoutDoubleReleaseOrCountdown(operation: Str
     var (skills, fixed) = try retentionFixture()
     let input = UUID().uuidString
     try skills.beginDecision(input)
-    _ = try skills.control("skill.load", arguments: ["skills": "[\"photography\"]"], inputID: input, fixed: fixed)
+    _ = try skills.control("skill.load", arguments: ["skills": "[\"camera-and-vision\"]"], inputID: input, fixed: fixed)
     try skills.beginTask(goal: "保持任务", taskID: fixtureTaskID(), sessionID: nil, inputID: input)
     if waiting { try skills.decisionCompleted(inputID: input) }
     var initial = AssistantContextState()
@@ -2285,7 +2292,7 @@ private func completeLifecycleDecision(
 @Test(.actionCatalog, .timeLimit(.minutes(1)))
 func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvidence() async throws {
     var (skills, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &skills, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &skills, fixed: fixed)
     var initial = AssistantContextState()
     initial.skillState = skills
     let context = try AgentContextRepository(
@@ -2300,7 +2307,7 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     for index in 0..<7 {
         #expect(try await completeLifecycleDecision(agent: agent, outputs: &outputs, session: session) == 0)
         let state = try #require(try await context.snapshot().state.skillState)
-        #expect(state.recentSkills["photography"]?.remainingDecisions == (index < 4 ? 4 - index : nil))
+        #expect(state.recentSkills["camera-and-vision"]?.remainingDecisions == (index < 4 ? 4 - index : nil))
     }
     let requests = await model.requests
     try #require(requests.count == 7)
@@ -2309,8 +2316,8 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     }
     let history = try await context.snapshot().state.history.current
     #expect(history.turns.count == 7)
-    #expect(history.turns.first?.modelRequests?.first?.decisionMetadata?.skills["photography"] != nil)
-    #expect(history.turns.last?.modelRequests?.first?.decisionMetadata?.skills["photography"] == nil)
+    #expect(history.turns.first?.modelRequests?.first?.decisionMetadata?.skills["camera-and-vision"] != nil)
+    #expect(history.turns.last?.modelRequests?.first?.decisionMetadata?.skills["camera-and-vision"] == nil)
     for turn in history.turns {
         let metadata = try #require(turn.modelRequests?.first?.decisionMetadata)
         #expect(metadata.states == (try AgentSkillLoader.useStates(Array(metadata.skills.keys))))
@@ -2323,7 +2330,7 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     async throws
 {
     var (skills, fixed) = try retentionFixture()
-    try retainedLoad("photography", state: &skills, fixed: fixed)
+    try retainedLoad("camera-and-vision", state: &skills, fixed: fixed)
     try retainedLoad("history-query", state: &skills, fixed: fixed)
     var initial = AssistantContextState()
     initial.skillState = skills
@@ -2343,12 +2350,12 @@ func assistantIdleExpiryChangesNextRequestCatalogButKeepsEarlierConversationEvid
     let session = UUID().uuidString
     #expect(try await completeLifecycleDecision(agent: agent, outputs: &outputs, session: session) == 8)
     let first = try #require(try await context.snapshot().state.skillState)
-    #expect(first.recentSkills["photography"]?.remainingDecisions == 3)
+    #expect(first.recentSkills["camera-and-vision"]?.remainingDecisions == 3)
     #expect(first.recentSkills["history-query"]?.remainingDecisions == 5 && first.decisions.isEmpty)
     #expect(await model.requests.count == 9)
     #expect(try await completeLifecycleDecision(agent: agent, outputs: &outputs, session: session) == 0)
     let second = try #require(try await context.snapshot().state.skillState)
-    #expect(second.recentSkills["photography"]?.remainingDecisions == 2)
+    #expect(second.recentSkills["camera-and-vision"]?.remainingDecisions == 2)
     #expect(second.recentSkills["history-query"]?.remainingDecisions == 4)
     let history = try await context.snapshot().state.history.current
     #expect(history.turns.count == 2 && history.turns.first?.modelRequests?.count == 9)
@@ -2992,7 +2999,7 @@ private func fixtureEventPublication(
 @Test(.actionCatalog) func skillChannelsSeparateIndependentWorkAndKeepExclusiveWorkTogether() async throws {
     let registry = try AgentSkillLoader.registry(
         [
-            "application-control", "history-query", "photography", "robot-interaction", "web-browsing",
+            "application-control", "history-query", "camera-and-vision", "robot-interaction", "web-browsing",
             "basic-interaction",
         ], fixed: CapabilityRegistry())
     func channel(_ alias: String) throws -> String {
@@ -3013,7 +3020,6 @@ private func fixtureEventPublication(
     #expect(
         try Set([channel("History.list"), channel("Provider.readSettings"), channel("ModelResources.snapshot")]).count
             == 3)
-    #expect(try channel("Island.setPresentation") != channel("Window.move"))
     #expect(!registry.channels.contains("Query") && !registry.channels.contains("System"))
     #expect(registry.channels.count <= 16)
 }
@@ -3025,10 +3031,10 @@ private func fixtureEventPublication(
         fixed.controls.map(\.alias).sorted() == [
             "send", "skill.load", "skill.unload", "state.clear", "state.get", "state.set",
         ])
-    for name in ["Photographer", "Memory", "Writer", "ApplicationControl"] {
+    for name in ["VisionPerception", "Memory", "Writer", "ApplicationControl"] {
         #expect(try AgentConfigurations.load(named: name).capabilities.controls.isEmpty)
     }
-    let registry = try AgentSkillLoader.registry(["photography"], fixed: fixed)
+    let registry = try AgentSkillLoader.registry(["camera-and-vision"], fixed: fixed)
     #expect(registry.controls.count == 6)
     #expect(try AgentSkillLoader.registry(["basic-interaction"], fixed: CapabilityRegistry()).controls.isEmpty)
     let legacy = Data(

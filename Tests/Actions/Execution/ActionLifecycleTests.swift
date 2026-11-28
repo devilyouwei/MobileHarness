@@ -162,12 +162,12 @@ private func lifecycleResources(stop: @escaping @Sendable () async throws -> Voi
 {
     let resources = try ResourceCoordinator(definitions: [
         ResourceDefinition(
-            id: armResource, allowedOwners: [.assistant, .photographer], preempts: [.assistant: [.photographer]]
+            id: armResource, allowedOwners: [.assistant, .visionPerception], preempts: [.assistant: [.visionPerception]]
         ) { throw HarnessError.notRunning }
     ])
     let started = LifecycleGate()
     let old = Task {
-        try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {
+        try await resources.run(resources: [armResource], owner: lifecycleOwner(.visionPerception), lease: nil) {
             await started.release()
             try await Task.sleep(for: .seconds(60))
         }
@@ -194,12 +194,12 @@ func cancelledResourceOwnerCleanupWaitsForAcknowledgmentAndAllowsAssistant(scope
     let stopping = LifecycleGate()
     let finishStop = LifecycleGate()
     let completed = LifecycleCounter()
-    let owner = lifecycleOwner(.photographer)
+    let owner = lifecycleOwner(.visionPerception)
     let resources = try ResourceCoordinator(
         definitions: [armResource, secondResource].map {
             ResourceDefinition(
-                id: $0, allowedOwners: [.assistant, .photographer], executionGroup: armResource,
-                preempts: [.assistant: [.photographer]]
+                id: $0, allowedOwners: [.assistant, .visionPerception], executionGroup: armResource,
+                preempts: [.assistant: [.visionPerception]]
             ) {
                 await stopping.release()
                 await finishStop.wait()
@@ -277,7 +277,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let finishStop = LifecycleGate()
     let actions = LifecycleCounter()
     let resources = try ResourceCoordinator(definitions: [
-        ResourceDefinition(id: armResource, allowedOwners: [.assistant, .photographer]) {
+        ResourceDefinition(id: armResource, allowedOwners: [.assistant, .visionPerception]) {
             await stopping.release()
             await finishStop.wait()
         }
@@ -285,8 +285,8 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let manager = AgentManager()
     let visionSession = UUID().uuidString
     let replySession = UUID().uuidString
-    try await manager.register(ReceiptAgent(id: .photographer), sessionID: visionSession)
-    try await manager.start(.photographer)
+    try await manager.register(ReceiptAgent(id: .visionPerception), sessionID: visionSession)
+    try await manager.start(.visionPerception)
     let assistant = try ReceiptAgent(
         capabilities: CapabilityRegistry(actions: [
             ActionRegistration(alias: "perform", path: lifecyclePath, defaultChannel: "Ordered")
@@ -303,9 +303,9 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let output = await OutputGateway(
         manager: manager, requests: InputGateway(manager: manager), tools: ToolRegistry(),
         actions: scheduler, sink: { _ in })
-    _ = try await output.resourceControl(for: .photographer, sessionID: visionSession)
+    _ = try await output.resourceControl(for: .visionPerception, sessionID: visionSession)
     let owner = ExecutionOwner(
-        agent: .photographer, incarnation: try await manager.identity(.photographer), sessionID: visionSession)
+        agent: .visionPerception, incarnation: try await manager.identity(.visionPerception), sessionID: visionSession)
     let tracking = Task {
         try await resources.run(resources: [armResource], owner: owner, lease: nil) {
             await started.release()
@@ -316,7 +316,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     // CameraCoordinator cancels its vision connection before its catch removes the Photographer.
     let closeCamera = Task {
         withUnsafeCurrentTask { $0?.cancel() }
-        try await manager.remove(.photographer)
+        try await manager.remove(.visionPerception)
     }
     await stopping.wait()
     #expect(await resources.snapshot()[armResource] == .locked(owner))
@@ -342,10 +342,10 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let started = LifecycleGate()
     let finishStop = LifecycleGate()
     let stopStarted = LifecycleGate()
-    let owner = lifecycleOwner(.photographer)
+    let owner = lifecycleOwner(.visionPerception)
     let resources = try ResourceCoordinator(
         definitions: [
-            ResourceDefinition(id: armResource, allowedOwners: [.assistant, .photographer]) {
+            ResourceDefinition(id: armResource, allowedOwners: [.assistant, .visionPerception]) {
                 await stopStarted.release()
                 await finishStop.wait()
             }
@@ -387,8 +387,8 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let resources = try ResourceCoordinator(
         definitions: [armResource, secondResource].map {
             ResourceDefinition(
-                id: $0, allowedOwners: [.assistant, .photographer], executionGroup: group,
-                preempts: [.assistant: [.photographer]]
+                id: $0, allowedOwners: [.assistant, .visionPerception], executionGroup: group,
+                preempts: [.assistant: [.visionPerception]]
             ) {}
         })
     let started = LifecycleGate()
@@ -398,7 +398,7 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let releaseAssistant = LifecycleGate()
     let count = LifecycleCounter()
     let old = Task {
-        try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {
+        try await resources.run(resources: [armResource], owner: lifecycleOwner(.visionPerception), lease: nil) {
             await permitBox.capture(ResourceExecutionContext.permit)
             await started.release()
             do { try await Task.sleep(for: .seconds(60)) } catch {
@@ -423,20 +423,20 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let oldPermit = try #require(await permitBox.get())
     await #expect(throws: ResourceError.staleUse) { try await oldPermit.validate([armResource]) }
     await #expect(throws: ResourceError.busy) {
-        try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {}
+        try await resources.run(resources: [armResource], owner: lifecycleOwner(.visionPerception), lease: nil) {}
     }
     await releaseCleanup.release()
     await admitted.wait()
     await #expect(throws: CancellationError.self) { try await old.value }
     await #expect(throws: ResourceError.busy) {
-        try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {}
+        try await resources.run(resources: [armResource], owner: lifecycleOwner(.visionPerception), lease: nil) {}
     }
     await #expect(throws: ResourceError.busy) {
         try await resources.run(resources: [armResource], owner: lifecycleOwner(), lease: nil) {}
     }
     await releaseAssistant.release()
     try await assistant.value
-    try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {}
+    try await resources.run(resources: [armResource], owner: lifecycleOwner(.visionPerception), lease: nil) {}
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func resourcePreemptionKeepsWholeWriterLockedUntilJoin()
@@ -449,12 +449,12 @@ func cancelledLeaseCleanupPreservesAcknowledgedUnlock(operation: String) async t
     let resources = try ResourceCoordinator(
         definitions: [armResource, secondResource].map {
             ResourceDefinition(
-                id: $0, allowedOwners: [.assistant, .photographer], executionGroup: armResource,
-                preempts: [.assistant: [.photographer]]
+                id: $0, allowedOwners: [.assistant, .visionPerception], executionGroup: armResource,
+                preempts: [.assistant: [.visionPerception]]
             ) {}
         })
     let old = Task {
-        try await resources.run(resources: [armResource], owner: lifecycleOwner(.photographer), lease: nil) {
+        try await resources.run(resources: [armResource], owner: lifecycleOwner(.visionPerception), lease: nil) {
             await started.release()
             do { try await Task.sleep(for: .seconds(60)) } catch {
                 await cleanupStarted.release()

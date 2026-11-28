@@ -63,7 +63,8 @@
             guard state.accepts(token), state.isVoiceActive, acceptsSession(invocation.context.sessionID) else {
                 throw CancellationError()
             }
-            guard acceptPresentation(invocation.context, update: .replyWaiting) else { return }
+            guard conversationPresentation.acceptWaiting(invocation.context, requestID: requestID, enabled: enabled)
+            else { return }
             state.presentReplyWaiting(enabled, requestID: requestID)
         }
 
@@ -75,6 +76,9 @@
             guard acceptPresentation(invocation.context, update: .beginReply) else { return }
             effects.replyDidBegin()
             state.clearReply()
+            if let waiting = conversationPresentation.waitingRequestAfterBegin(invocation.context) {
+                state.presentReplyWaiting(true, requestID: waiting)
+            }
             resetExpression()
         }
 

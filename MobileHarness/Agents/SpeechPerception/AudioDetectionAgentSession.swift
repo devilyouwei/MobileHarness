@@ -130,7 +130,7 @@ public typealias AudioDetectionConnections = DetectionConnections<any AudioCaptu
             outputTask = Task {
                 do {
                     try await IndependentOutputWorkflow.consumeSignals(
-                        speech.outputs, contracts: AgentContracts.communication
+                        speech.outputs, publicationChannels: speech.descriptor.publicationChannels
                     ) { envelope in
                         try Task.checkCancellation()
                         try await consumer.execute(envelope)

@@ -86,9 +86,9 @@ flowchart TB
 | Component | Responsibility |
 | --- | --- |
 | [ApplicationControlContainer.swift](ApplicationControlContainer.swift) | Owns the installed session and environment worker, forwards foreground changes, and projects passive State. |
-| [ApplicationControlExecutionSession.swift](Output/ApplicationControlExecutionSession.swift) | Registers the role, binds the Gateway consumer, drains independent output, and joins shutdown. |
-| [ApplicationControlUI.swift](Input/ApplicationControlUI.swift) | Owns typed UI subscriptions and request-scoped execution, including cancellation and reply creation. |
-| [ApplicationControlAgent.swift](ApplicationControlAgent.swift), [ApplicationControlProcessing.swift](Workflow/ApplicationControlProcessing.swift) | Admit inputs, maintain Context, correlate pending calls, and advance requests from actual outcomes. |
+| [ApplicationControlExecutionSession.swift](ApplicationControlExecutionSession.swift) | Registers the role, binds the Gateway consumer, drains independent output, and joins shutdown. |
+| [ApplicationControlUI.swift](Input/ApplicationControlUI.swift) | Owns typed UI subscriptions and routes admitted requests to their workflows. |
+| [ApplicationControlAgent.swift](ApplicationControlAgent.swift), [ApplicationControlContextState.swift](ApplicationControlContextState.swift) | Admit inputs, maintain Context, correlate pending calls, and advance requests from actual outcomes. |
 | [ApplicationControlFunctions.swift](Output/ApplicationControlFunctions.swift), [ApplicationControlPolicy.swift](Workflow/ApplicationControlPolicy.swift) | Own fixed invocation permissions and pure classification of device facts and failures. |
 | [ApplicationEnvironmentInputs.swift](Input/ApplicationEnvironmentInputs.swift), [ResourceObservationSession.swift](Input/ResourceObservationSession.swift) | Coalesce environment facts and manage the foreground-scoped revision subscription. |
 | [ApplicationControlInputs.swift](Input/ApplicationControlInputs.swift), [ModelResourceInputs.swift](Input/ModelResourceInputs.swift), [ProviderInputs.swift](Input/ProviderInputs.swift) | Define typed local intents, observations, and the business payloads accepted through fixed-task envelopes. |
@@ -129,3 +129,7 @@ Resource save and restore use the same request-scoped Tool calls for the capabil
 - [Output](Output/) 声明角色调用的函数并消费输出流，使用直接 Tool 回执推进设置和呈现事务。
 
 业务 Tool 经绑定的角色端口发送，调用方按原请求消费执行结果。这些调用独立于模型轮次。
+
+容器快照的 `business.lifecyclePhase` 公开本角色生命周期，取值见[角色 State 契约](../README.md#reflexive-state-reads-and-disclosure)。
+
+[Input](Input/) owns UI subscriptions, signal selection and admission. [Workflow](Workflow/) handles settings and resource operations, diagnostics, and the sequence of commands for each request. [Output](Output/) owns fixed tool declarations, dispatch, receipt correlation and output delivery.

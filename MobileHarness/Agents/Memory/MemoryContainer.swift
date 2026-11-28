@@ -14,8 +14,9 @@
             return AgentStateSnapshot(
                 path: "agents.memory",
                 business: [
+                    "lifecyclePhase": .lifecyclePhase(status?.lifecycle, closed: closed),
                     "taskPhases": context?.state.taskViews.map { .texts($0.values.map { $0.stage.rawValue }.sorted()) }
-                        ?? .unknown
+                        ?? .unknown,
                 ],
                 runtime: [
                     "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,

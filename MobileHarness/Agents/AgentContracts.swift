@@ -7,7 +7,6 @@ import StorageCore
 extension AgentID {
     public static let speechPerception = AgentID(rawValue: "speechPerception")
     public static let visionPerception = AgentID(rawValue: "visionPerception")
-    public static let photographer = AgentID(rawValue: "photographer")
     public static let writer = AgentID(rawValue: "writer")
     public static let memory = AgentID(rawValue: "memory")
     public static let applicationControl = AgentID(rawValue: "applicationControl")
@@ -28,7 +27,7 @@ public enum AgentContracts {
             try CommunicationContracts(
                 additional: [
                     CommunicationContract(
-                        name: AssistantInterrupt.contract, kind: .observation, channel: "agent.interruption",
+                        name: AssistantInterrupt.contract, kind: .observation, isPublication: true,
                         maximumBytes: 1024,
                         validateMessage: { message in
                             guard message.content(as: AssistantInterrupt.self) != nil else {
@@ -52,7 +51,7 @@ public enum AgentContracts {
                             try value.validate()
                         }),
                     CommunicationContract(
-                        name: AgentTaskResponse.contract, kind: .observation, channel: "agent.task",
+                        name: AgentTaskResponse.contract, kind: .observation, isPublication: true,
                         maximumBytes: 131072, startsNewWork: true,
                         validateMessage: { message in
                             if let response = message.content(as: AgentTaskResponse.self) {
@@ -77,7 +76,7 @@ public enum AgentContracts {
                             guard message.eventScope == signal.scope.id else { throw CommunicationError.invalidPayload }
                         }),
                     CommunicationContract(
-                        name: SpeechRecognition.contract, kind: .observation, channel: SpeechRecognition.channel,
+                        name: SpeechRecognition.contract, kind: .observation, isPublication: true,
                         events: ["partial", "final"], maximumBytes: 16_384,
                         validateMessage: { message in
                             guard let value = message.content(as: SpeechRecognition.self),
@@ -86,7 +85,7 @@ public enum AgentContracts {
                             try value.validate()
                         }),
                     CommunicationContract(
-                        name: SpeechActivity.contract, kind: .observation, channel: SpeechActivity.channel,
+                        name: SpeechActivity.contract, kind: .observation, isPublication: true,
                         events: Set(SpeechActivity.Kind.allCases.map(\.rawValue)), maximumBytes: 1024,
                         validateMessage: { message in
                             guard let value = message.content(as: SpeechActivity.self),
@@ -95,7 +94,7 @@ public enum AgentContracts {
                             try value.validate()
                         }),
                     CommunicationContract(
-                        name: SpeechKeywordMatch.contract, kind: .observation, channel: SpeechKeywordMatch.channel,
+                        name: SpeechKeywordMatch.contract, kind: .observation, isPublication: true,
                         events: [SpeechKeywordMatch.event], maximumBytes: 1024,
                         validateMessage: { message in
                             guard let match = message.content(as: SpeechKeywordMatch.self),
@@ -103,17 +102,17 @@ public enum AgentContracts {
                             else { throw CommunicationError.invalidPayload }
                             try match.validate()
                         }),
-                    contract("perception.audio.source.v1", channel: "perception.audio.source"),
-                    contract("perception.vision.pose.v1", channel: "perception.vision.pose", maximumBytes: 262_144),
+                    contract("perception.audio.source.v1"),
+                    contract("perception.vision.pose.v1", maximumBytes: 262_144),
                 ])
         }
     }
     private static func contract(
-        _ name: String, channel: String, events: Set<String> = [], maximumBytes: Int = 16_384,
+        _ name: String, events: Set<String> = [], maximumBytes: Int = 16_384,
         startsNewWork: Bool = false
     ) -> CommunicationContract {
         CommunicationContract(
-            name: name, kind: .observation, channel: channel, events: events, maximumBytes: maximumBytes,
+            name: name, kind: .observation, isPublication: true, events: events, maximumBytes: maximumBytes,
             startsNewWork: startsNewWork,
             validateMessage: { message in
                 guard let value = message.perception, value.contract == name else {
@@ -139,9 +138,9 @@ extension AgentContracts {
                     protocolID: "agent.task.v1", role: MemoryAgent.self, operations: operations,
                     handler: { try await $0.receiveRequest($1) })
             ],
-            .photographer: [
+            .visionPerception: [
                 .init(
-                    protocolID: "agent.task.v1", role: PhotographerAgent.self, operations: operations,
+                    protocolID: "agent.task.v1", role: VisionPerceptionAgent.self, operations: operations,
                     handler: { try await $0.receiveRequest($1) })
             ],
             .applicationControl: [
@@ -156,29 +155,29 @@ extension AgentContracts {
         implementations: [AgentRequestImplementation]? = nil
     ) throws {
         let registrations = implementations ?? requestImplementations[configuration.agentID] ?? []
-        for (index, protocolID) in configuration.communication.requests.enumerated() {
+        for protocolID in configuration.communication.requests {
             let matches = registrations.filter { $0.protocolID == protocolID }
             guard matches.count == 1 else {
                 throw AgentProtocolStartupError(
-                    agentID: configuration.agentID, field: "signals.requests[\(index)]",
+                    agentID: configuration.agentID, field: "channels." + protocolID,
                     protocolID: protocolID, reason: matches.isEmpty ? .missingHandler : .schemaMismatch)
             }
             guard Set(AgentRequestOperation.allCases).isSubset(of: matches[0].operations) else {
                 throw AgentProtocolStartupError(
-                    agentID: configuration.agentID, field: "signals.requests[\(index)]",
+                    agentID: configuration.agentID, field: "channels." + protocolID,
                     protocolID: protocolID, reason: .missingRequiredOperation)
             }
         }
         try validateEventImplementations(configuration)
         let knownRoles: Set<AgentID> = [
-            .assistant, .writer, .memory, .photographer, .applicationControl, .speechPerception, .visionPerception,
+            .assistant, .writer, .memory, .applicationControl, .speechPerception, .visionPerception,
         ]
         for protocolID in configuration.communication.feedback {
             guard knownRoles.contains(configuration.agentID),
                 protocolID != ExecutionFeedback.contract || configuration.agentID == .assistant
             else {
                 throw AgentProtocolStartupError(
-                    agentID: configuration.agentID, field: "signals.feedback", protocolID: protocolID,
+                    agentID: configuration.agentID, field: "feedback", protocolID: protocolID,
                     reason: .missingHandler)
             }
         }
@@ -196,28 +195,23 @@ extension AgentContracts {
         [
             .assistant: [
                 .init(
-                    channel: "user.input.speech", protocolID: "user.input.speech.v1", variants: ["final"],
+                    protocolID: "user.input.speech.v1", variants: ["final"],
                     role: AssistantAgent.self, handler: { try await $0.receive($1) }),
                 .init(
-                    channel: SpeechActivity.channel, protocolID: SpeechActivity.contract,
+                    protocolID: SpeechActivity.contract,
                     variants: Set(SpeechActivity.Kind.allCases.map(\.rawValue)), role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
                 .init(
-                    channel: SpeechKeywordMatch.channel, protocolID: SpeechKeywordMatch.contract,
+                    protocolID: SpeechKeywordMatch.contract,
                     variants: [SpeechKeywordMatch.event], role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
                 .init(
-                    channel: "agent.interruption", protocolID: "agent.interruption.v1", role: AssistantAgent.self,
+                    protocolID: "agent.interruption.v1", role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
                 .init(
-                    channel: "agent.task", protocolID: "agent.task.events.v1", role: AssistantAgent.self,
+                    protocolID: "agent.task.events.v1", role: AssistantAgent.self,
                     handler: { try await $0.receive($1) }),
-            ],
-            .photographer: [
-                .init(
-                    channel: "perception.vision.pose", protocolID: "perception.vision.pose.v1",
-                    role: PhotographerAgent.self, handler: { try await $0.receive($1) })
-            ],
+            ]
         ]
     }
     private static var publicationImplementations: [AgentID: Set<String>] {
@@ -226,35 +220,35 @@ extension AgentContracts {
                 SpeechRecognition.contract, SpeechActivity.contract, SpeechKeywordMatch.contract,
                 "perception.audio.source.v1",
             ],
-            .visionPerception: ["perception.vision.pose.v1"],
+            .visionPerception: ["perception.vision.pose.v1", "agent.task.events.v1"],
             .applicationControl: ["agent.interruption.v1", "agent.task.events.v1"],
             .assistant: ["agent.task.events.v1"],
             .writer: ["agent.task.events.v1"],
-            .memory: ["agent.task.events.v1"], .photographer: ["agent.task.events.v1"],
+            .memory: ["agent.task.events.v1"],
         ]
     }
     static func validateEventImplementations(_ configuration: AgentConfiguration) throws {
-        for (index, subscription) in configuration.communication.subscriptions.enumerated() {
+        for subscription in configuration.communication.subscriptions {
             let implementations = eventImplementations[configuration.agentID, default: []].filter {
-                $0.channel == subscription.channel && $0.protocolID == subscription.protocol
+                $0.protocolID == subscription.protocol
             }
             guard implementations.count == 1 else {
                 throw AgentProtocolStartupError(
-                    agentID: configuration.agentID, field: "signals.subscriptions[\(index)]",
+                    agentID: configuration.agentID, field: "channels." + subscription.protocol,
                     protocolID: subscription.protocol, reason: .missingHandler)
             }
             let contracts = try communication
             let required = Set(subscription.events ?? contracts[subscription.protocol]?.events.sorted() ?? [])
             guard required.isSubset(of: implementations[0].variants) else {
                 throw AgentProtocolStartupError(
-                    agentID: configuration.agentID, field: "signals.subscriptions[\(index)].events",
+                    agentID: configuration.agentID, field: "channels." + subscription.protocol + ".events",
                     protocolID: subscription.protocol, reason: .missingRequiredOperation)
             }
         }
-        for (index, publication) in configuration.communication.publications.enumerated() {
+        for publication in configuration.communication.publications {
             guard publicationImplementations[configuration.agentID, default: []].contains(publication.protocol) else {
                 throw AgentProtocolStartupError(
-                    agentID: configuration.agentID, field: "signals.publications[\(index)]",
+                    agentID: configuration.agentID, field: "channels." + publication.protocol,
                     protocolID: publication.protocol, reason: .missingHandler)
             }
         }

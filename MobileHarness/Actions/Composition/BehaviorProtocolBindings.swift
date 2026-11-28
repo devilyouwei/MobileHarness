@@ -1,84 +1,29 @@
 import CallRuntime
-import ExecutionRuntime
 import FunctionContracts
 
-/// Host-owned registration profiles, grouped by module rather than model aliases or function lists.
+/// Both call routes are available for each installed function. Tool feedback policy is independent of routing.
 public struct BehaviorProtocolBindings {
     public static func bind(_ function: ActionFunction) throws -> ActionBinding {
-        if function.path.domain == "Artifacts" {
-            return ActionBinding(
-                function: function, protocols: [.tool], executionPolicy: .direct,
-                directResultPolicy: .returning)
-        }
-        if function.path.domain == "Web" {
-            return ActionBinding(
-                function: function, protocols: [.action, .tool],
-                executionPolicy: .direct, directResultPolicy: .returning)
-        }
-        if function.path.domain == "UI", function.path.module == "Island" {
-            return ActionBinding(
-                function: function,
-                protocols: function.path.function == "setPresentation" ? [.action, .tool] : [.tool],
-                executionPolicy: .direct, directResultPolicy: .returning)
-        }
-        if [
-            "Camera.Album.perform", "History.Conversation.readFull", "Speech.Detection.run", "Speech.Listening.prepare",
-            "Speech.Listening.update", "Speech.Playback.setVolume",
-        ].contains(
-            function.path.description)
-        {
-            return ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)
-        }
-        if (function.path.domain == "History" && function.path.module == "Conversation"
-            && ["list", "read"].contains(function.path.function))
-            || (function.path.domain == "System" && function.path.module == "Provider"
-                && function.path.function == "readSettings")
-            || (function.path.domain == "System" && function.path.module == "ModelResources"
-                && function.path.function == "snapshotResources")
-            || (function.path.domain == "System" && function.path.module == "Device"
-                && function.path.function == "readStatus")
-        {
-            return ActionBinding(
-                function: function, protocols: [.action, .tool], executionPolicy: .direct,
-                directResultPolicy: .returning)
-        }
-        if (function.path.domain == "Camera" && ["Capture", "Perception", "Video"].contains(function.path.module))
-            || (function.path.domain == "UI" && ["Navigation", "Window"].contains(function.path.module))
-            || (function.path.domain == "System" && function.path.module == "Device"
-                && function.path.function == "control")
-            || (function.path.domain == "System" && function.path.module == "ModelResources"
-                && ["download", "cancel"].contains(function.path.function))
-        {
-            return ActionBinding(
-                function: function, protocols: [.action, .tool], executionPolicy: .direct,
-                directResultPolicy: .returning)
-        }
-        if function.path.domain == "UI", function.path.module == "Expression", function.path.function == "setLoading" {
-            return ActionBinding(
-                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
-        }
-        if function.path.domain == "UI", function.path.module == "Expression",
-            function.path.function == "setReplyWaiting"
-        {
-            return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
-        }
-        let group = function.path.domain + "." + function.path.module
-        if group == "UI.Caption", ["print", "beginReplyTurn"].contains(function.path.function) {
-            return ActionBinding(function: function, protocols: [.action, .tool], executionPolicy: .direct)
-        }
-        switch group {
-        case "UI.Expression", "UI.Feedback", "Speech.Playback", "Speech.Listening",
-            "NexArm.Motion", "NexArm.Gesture":
-            return ActionBinding(function: function)
-        case "Speech.Detection", "History.Conversation", "System.ModelResources", "System.Provider",
-            "UI.ResourcePresentation", "UI.BluetoothStatus", "System.Device":
-            return ActionBinding(
-                function: function, protocols: [.tool], executionPolicy: .direct, directResultPolicy: .returning)
-        case "UI.Gaze", "UI.Caption", "UI.VoiceState", "UI.Pose", "UI.HistoryPresentation",
-            "NexArm.Tracking":
-            return ActionBinding(function: function, protocols: [.tool], executionPolicy: .direct)
+        let binding = ActionBinding(
+            function: function, protocols: [.action, .tool], executionPolicy: .direct,
+            directResultPolicy: toolResultPolicy(for: function.path))
+        try binding.validate()
+        return binding
+    }
+
+    private static func toolResultPolicy(for path: ActionIdentifier) -> ActionBinding.DirectResultPolicy {
+        switch (path.domain, path.module, path.function) {
+        case ("History", "Conversation", "readFull"), ("Speech", "Detection", "run"):
+            return .completionOnly
+        case ("Artifacts", _, _), ("Web", _, _), ("UI", "Island", _),
+            ("History", "Conversation", _), ("Speech", "Detection", _),
+            ("System", "ModelResources", _), ("System", "Provider", _), ("System", "Device", _),
+            ("UI", "ResourcePresentation", _), ("UI", "BluetoothStatus", _),
+            ("UI", "Expression", "setLoading"), ("UI", "Navigation", _), ("UI", "Window", _),
+            ("Camera", "Capture", _), ("Camera", "Perception", _), ("Camera", "Video", _):
+            return .returning
         default:
-            return ActionBinding(function: function)
+            return .completionOnly
         }
     }
 }

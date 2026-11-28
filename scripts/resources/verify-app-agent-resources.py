@@ -52,7 +52,7 @@ keyword_assets = {
 if not keyword_assets.issubset(expected):
     raise SystemExit(f'Missing speech keyword assets: {keyword_assets - expected.keys()}')
 for path, original in expected.items():
-    if '.zh-Hans.' in path.name or path.name == 'README.md' or path in keyword_assets:
+    if '.zh-Hans.' in path.name or path in keyword_assets:
         continue
     if path.suffix not in ('.json', '.md') or path.name in ('Agent.json', 'Skill.json', 'Catalog.json'):
         continue
@@ -72,15 +72,16 @@ for path, original in expected.items():
         if set(re.findall(placeholders, template)) != set(re.findall(placeholders, translated_templates[key])):
             raise SystemExit(f'Template placeholder mismatch: {path}:{key}')
 catalog = json.loads((bundle / 'Catalog.json').read_text())
-def translated(path, key):
-    sibling = (bundle / path).with_name(pathlib.Path(path).stem + '.zh-Hans.json')
-    return json.loads(sibling.read_text())['templates'].get(key) if sibling.is_file() else None
-for path in catalog['agents'].values():
-    if not translated(path, 'description'):
-        raise SystemExit(f'Missing Chinese role description: {path}')
-for path in catalog['skills'].values():
-    if not translated(path, 'description'):
-        raise SystemExit(f'Missing Chinese Skill description: {path}')
+for group in ('agents', 'skills'):
+    for path in catalog[group].values():
+        config = bundle / path
+        if 'description' in json.loads(config.read_text()):
+            raise SystemExit(f'Public prose belongs in Description.md: {path}')
+        for name in ('Description.md', 'Description.zh-Hans.md'):
+            description = config.with_name(name)
+            text = description.read_text(encoding='utf-8').strip()
+            if not text or (group == 'agents' and len(text.encode('utf-8')) > 2048):
+                raise SystemExit(f'Invalid public description: {description}')
 for name in ('Input/InputProtocol.json', 'Input/InputDecision.json', 'Controls/Controls.json', 'Controls/Controls.md', 'Prompts.json', 'Instructions.md'):
     if not (bundle / 'Agents/Assistant' / name).is_file():
         raise SystemExit(f'Missing Assistant prompt resource: {name}')

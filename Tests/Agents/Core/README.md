@@ -6,7 +6,7 @@ GenerationRoundTests 的 fullDuplexReACTRepliesReachCaptions 使用替身模型�
 
 AgentContainerTests 使用生产 AgentContainerLifecycle 和可控 gate，覆盖冷根失效、真实 ApplicationLifecycle 初始 inactive → active 组合、启动在途取消、并发启停、部分启动回滚、必须暂停、迟到恢复围栏、终态拒绝及原始／清理失败。AgentSpecialistTests 验证 Assistant 前后台切换不控制平级角色。
 
-iOS 条件用例验证 ApplicationContainer 同根缓存、七个子能力身份和跨根隔离，需要 iOS 测试宿主；macOS check.sh 不执行这些用例。具体执行状态归[容器验证](../../../docs/validation/Agent-Containers.md)，README 只定义覆盖范围。
+iOS 条件用例验证 ApplicationContainer 同根缓存、六个子能力身份和跨根隔离，需要 iOS 测试宿主；macOS check.sh 不执行这些用例。具体执行状态归[容器验证](../../../docs/validation/Agent-Containers.md)，README 只定义覆盖范围。
 
 | 用例边界 | 观察行为 |
 | --- | --- |

@@ -314,7 +314,7 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
     }
 
     @available(iOS 27, *)
-    @Test @MainActor func agentContainerRegistrySharesSevenStableChildrenAndIsolatesRoots() {
+    @Test @MainActor func agentContainerRegistrySharesSixStableChildrenAndIsolatesRoots() {
         let firstRegistry = ApplicationContainer(root: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
         let secondRegistry = ApplicationContainer(
             root: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
@@ -325,12 +325,11 @@ private enum ContainerTestFailure: Error { case startup, cleanup }
             [
                 ObjectIdentifier(root.assistant), ObjectIdentifier(root.applicationControl),
                 ObjectIdentifier(root.memory), ObjectIdentifier(root.writer),
-                ObjectIdentifier(root.photographer), ObjectIdentifier(root.speechPerception),
-                ObjectIdentifier(root.visionPerception),
+                ObjectIdentifier(root.visionPerception), ObjectIdentifier(root.speechPerception),
             ]
         }
         #expect(first === same && first !== second)
-        #expect(children(first) == children(same) && Set(children(first)).count == 7)
+        #expect(children(first) == children(same) && Set(children(first)).count == 6)
         #expect(Set(children(first)).isDisjoint(with: children(second)))
         #expect(!first.isAvailable && !first.speechPerception.isReady && !second.isAvailable)
     }

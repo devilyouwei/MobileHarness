@@ -260,7 +260,7 @@ private func roundHarness(
     let agent: any Agent
     if photo || photoCommand != nil || deviceStatus {
         let declared = try AgentConfigurations.registry(
-            AgentConfigurations.skill(deviceStatus ? "application-control" : "photography").useActions)
+            AgentConfigurations.skill(deviceStatus ? "application-control" : "camera-and-vision").useActions)
         let capabilities = try CapabilityRegistry(
             actions: declared.actions, channels: declared.channels, supportsWait: true)
         agent = try FixtureNativeAgent(
@@ -1629,13 +1629,13 @@ func recordingActionWaitsForTerminalWhilePhotographerStopToolRemainsIndependent(
         handler: { _ in .completed })
     let ui = UIContainer()
     try ui.start()
-    let photographer = PhotographerExecutionSession(
+    let visionPerception = VisionPerceptionExecutionSession(
         manager: harness.manager, output: harness.gateway,
-        agent: try PhotographerAgent(
+        agent: try VisionPerceptionAgent(
             sessionID: "recording-ui", uiCamera: ui.camera,
             context: AgentContextRepository(
-                agent: .photographer, scope: UUID().uuidString, state: PhotographerContextState())))
-    try await photographer.prepareForInteraction()
+                agent: .visionPerception, scope: UUID().uuidString, state: CameraTransactionContextState())))
+    try await visionPerception.prepareForInteraction()
     let pump = try await harness.start(
         .init(id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("开始录像")))
     let waitStream = camera.waiting.stream
@@ -1667,7 +1667,7 @@ func recordingActionWaitsForTerminalWhilePhotographerStopToolRemainsIndependent(
     #expect(await camera.stops == 1)
     let turn = try #require(try await harness.store.snapshot().current.turns.first)
     #expect(turn.generationRounds?.count == 2)
-    await photographer.shutdown()
+    await visionPerception.shutdown()
     await harness.close()
     await ui.stop()
 }
@@ -2025,7 +2025,7 @@ func fullDuplexInterruptSettlesOldActionAndRetainsQueuedInput(cleanupConfirmed: 
             id: id, sessionID: session, payload: payload,
             metadata: .init(
                 payload: payload, source: AgentID.speechPerception.rawValue, incarnation: "fixture", origin: .agent,
-                rootID: id, topic: SpeechActivity.channel))
+                rootID: id, topic: "perception.speech.activity"))
     }
     try await agent.receive(activity(SpeechActivity(.captureStarted, generation: capture)))
     await agent.bindInputInterruption { scope, id in
@@ -2136,7 +2136,10 @@ func assistantGatewayActionControlAdvancesWhileActionCallsRemainFIFO() async thr
     outputs.continuation.finish()
     let task = Task {
         defer { observed.continuation.finish() }
-        try await AssistantGenerationTransport.consume(outputs.stream, contracts: AgentContracts.communication) {
+        try await AssistantGenerationTransport.consume(
+            outputs.stream,
+            publicationChannels: AgentConfigurations.load(named: "Assistant").communication.publicationChannels
+        ) {
             output in
             observed.continuation.yield(output.sequence)
             if output.sequence == 1 { try await gate.execute() }
@@ -2168,7 +2171,10 @@ func assistantToolLaneSealsWhileActionAdmissionIsSuspended() async throws {
     output.continuation.finish()
     let delivery = Task {
         defer { toolSealed.continuation.finish() }
-        try await AssistantGenerationTransport.consume(output.stream, contracts: AgentContracts.communication) {
+        try await AssistantGenerationTransport.consume(
+            output.stream,
+            publicationChannels: AgentConfigurations.load(named: "Assistant").communication.publicationChannels
+        ) {
             envelope in
             switch envelope.output {
             case .actionCall: try await gate.execute()
@@ -2206,7 +2212,10 @@ func toolResultsReturnBeforeRoundSealAndIndependentToolDoesNotBlockIt() async th
     outputs.continuation.finish()
     let delivery = Task {
         defer { observed.continuation.finish() }
-        try await AssistantGenerationTransport.consume(outputs.stream, contracts: AgentContracts.communication) {
+        try await AssistantGenerationTransport.consume(
+            outputs.stream,
+            publicationChannels: AgentConfigurations.load(named: "Assistant").communication.publicationChannels
+        ) {
             envelope in
             switch envelope.output {
             case .toolCall(let call):

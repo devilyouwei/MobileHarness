@@ -651,3 +651,9 @@ iPhone17 Pro原位安装成功，安装序列5460；系统启动请求成功，�
 按用户后续安装要求，使用既有本地签名构建 MobileHarness / Debug iPhoneOS，命令行构建号2026110501；未修改仓库签名配置。构建退出0（/tmp/island-unified-device-build.log），严格深层签名、30项Agent/Skill资源及Live Activity扩展身份／版本校验通过。首次设备连接被重置，用户连接后恢复。
 
 已原位安装到 iPhone17 Pro，bundle dev.mobileharness.app，安装流水5892（/tmp/island-unified-device-install.log及.json）。独立设备应用清单确认0.1.0 / 2026110501（/tmp/island-unified-device-after.json），启动成功、进程20223（/tmp/island-unified-device-launch.log及.json）。未卸载、清空或直接改写真机SQLite。安装和系统启动不等于本轮语音、状态收起或Live Activity视觉体验验收通过。
+
+## 2026-11-28 灵动岛内部 Tool 与相机视觉 Skill
+
+依据 [Skill 清理与合并计划](../requirements/Face-Window-Island-Plan.md)。逐项核对 8 个随包 Skill、Agent 的 Skill 引用、视觉 Action 迁移及 State 选择。54 项灵动岛及目录 Swift 定向测试通过，覆盖 Tool 协议、执行回执、发布和角色内部权限。15 项相机与视觉 Swift 定向测试通过，覆盖能力目录、Channel、State、提示词预算和拍摄流程。Swift 严格格式、8 项 Python 工程工具测试、plist 和 `git diff --check` 通过。
+
+`./scripts/check.sh` 在已有的 State Value codec 和 Xcode 中文资源归属检查处退出，两轮报错相同。`./scripts/build-ios.sh` 五个模拟器目标通过，主 App 中 94 项 Agent／Skill 资源、灵动岛扩展和中英文本地化校验通过。未执行真实模型、原生 UI 交互或物理设备验收。

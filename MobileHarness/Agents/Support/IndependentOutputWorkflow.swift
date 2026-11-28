@@ -9,14 +9,14 @@ import UI
 public enum IndependentOutputWorkflow {
     /// Independent protocol consumers; only a round/input boundary joins both branches.
     public static func consumeGeneration(
-        _ outputs: AsyncStream<OutputEnvelope>, contracts: CommunicationContracts? = nil,
+        _ outputs: AsyncStream<OutputEnvelope>, publicationChannels: [String: String] = [:],
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
     ) async throws {
         // Actions may emit communication after the model has already emitted roundFinished.
         // Keep that transport alive while the round consumer joins its scheduled work.
         let rounds = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(256))
         let communications = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
-        let channels = contracts?.registered.compactMap(\.channel) ?? []
+        let channels = Array(publicationChannels.values)
         let signalDispatcher = SignalChannelDispatcher<OutputEnvelope>(channels: Set(channels))
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { try await consumeRounds(rounds.stream, dispatch: dispatch) }
@@ -32,7 +32,7 @@ public enum IndependentOutputWorkflow {
                     try Task.checkCancellation()
                     let destination: AsyncStream<OutputEnvelope>.Continuation
                     if case .communication(let action) = envelope.output {
-                        if let channel = contracts?[action.message.contract]?.channel {
+                        if let channel = publicationChannels[action.message.contract] {
                             try signalDispatcher.enqueue(envelope, channel: channel)
                             continue
                         }
@@ -200,7 +200,7 @@ public enum IndependentOutputWorkflow {
     /// Latest-state policy comes from the producer; discrete commands retain FIFO admission.
     public static func consumeSignals(
         _ outputs: AsyncStream<OutputEnvelope>,
-        contracts: CommunicationContracts? = nil,
+        publicationChannels: [String: String] = [:],
         replacementKey: @escaping @Sendable (OutputEnvelope) -> String? = { _ in nil },
         onMediaExpired: @escaping @Sendable (OutputEnvelope) async -> Void = { _ in },
         dispatch: @escaping @Sendable (OutputEnvelope) async throws -> Void
@@ -210,7 +210,7 @@ public enum IndependentOutputWorkflow {
         let latestCommunications = AgentOutputMailbox(capacity: 16)
         let dynamicSignals = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(16))
         let callChannel = ActionCallSignal.channel
-        let channels = (contracts?.registered.compactMap(\.channel) ?? []) + [callChannel]
+        let channels = Array(publicationChannels.values) + [callChannel]
         let signalDispatcher = SignalChannelDispatcher<OutputEnvelope>(
             channels: Set(channels), capacities: [callChannel: 256])
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -252,7 +252,7 @@ public enum IndependentOutputWorkflow {
                     let channel: String?
                     switch envelope.output {
                     case .communication(let action):
-                        channel = contracts?[action.message.contract]?.channel
+                        channel = publicationChannels[action.message.contract]
                     case .toolCall, .actionControl:
                         channel = nil
                     default:

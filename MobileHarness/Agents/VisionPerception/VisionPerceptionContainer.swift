@@ -1,67 +1,69 @@
-import Foundation
-import FunctionContracts
-
 #if os(iOS)
-    import ModelKit
-    import PlatformKit
-#endif
+    import Foundation
+    import Observation
+    import UI
+    import FunctionContracts
 
-/// Stable owner for one replaceable capture-generation role and its joined output work.
-@MainActor
-public final class VisionPerceptionContainer {
-    private var work: Task<Void, any Error>?
-    private var closed = false
-
-    init() {}
-
-    public func stateSnapshot() async throws -> AgentStateSnapshot {
-        try Task.checkCancellation()
-        return AgentStateSnapshot(
-            path: "agents.visionperception",
-            runtime: ["working": .flag(work != nil), "closed": .flag(closed), "installed": .flag(work != nil)])
-    }
-
-    #if os(iOS)
-        @available(iOS 27, *)
-        func run(
-            runtime: AgentRuntime, pose: any PoseCapability, camera: any CameraFrameObserving,
-            sessionID: String, mirrored: Bool, status: @escaping @MainActor @Sendable (String?, String) -> Void
-        ) async throws {
-            try await run {
-                try await VisionAgentSession(runtime: runtime, pose: pose, camera: camera)
-                    .run(sessionID: sessionID, mirrored: mirrored, status: status)
-            }
-        }
-    #endif
-
-    func run(_ session: @escaping @MainActor @Sendable () async throws -> Void) async throws {
-        guard !closed else { throw AgentContainerError.stopped }
-        guard work == nil else { throw AgentContainerError.busy }
-        try Task.checkCancellation()
-        // Capture outlives the request that enabled it. Its Tools start an independent request chain.
-        let task = Task.detached(priority: Task.currentPriority) {
+    @available(iOS 27, *)
+    @MainActor @Observable
+    public final class VisionPerceptionContainer {
+        let capture = VisionCaptureSessionHost()
+        public func stateSnapshot() async throws -> AgentStateSnapshot {
             try Task.checkCancellation()
-            try await session()
+            let presentationFailure = await session?.agent.presentationFailure
+            let status = await session?.agent.status()
+            let context = await session?.agent.residentContext()
+            return AgentStateSnapshot(
+                path: "agents.visionperception",
+                business: [
+                    "lifecyclePhase": .lifecyclePhase(status?.lifecycle, closed: closed),
+                    "taskPhases": context?.state.taskViews.map { .texts($0.values.map { $0.stage.rawValue }.sorted()) }
+                        ?? .unknown,
+                ],
+                runtime: [
+                    "working": .flag(capture.working),
+                    "presentationFailure": presentationFailure.map { .text($0) } ?? .unknown,
+                    "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
+                    "queuedInputs": status.map { .count($0.queuedInputs) } ?? .unknown,
+                    "processedInputs": status.map { .count($0.processedInputs) } ?? .unknown,
+                    "taskViews": context?.state.taskViews.map { .count($0.count) } ?? .unknown, "closed": .flag(closed),
+                    "installed": .flag(session != nil),
+                ])
         }
-        work = task
-        defer { work = nil }
-        try await withTaskCancellationHandler {
-            try await task.value
-        } onCancel: {
-            task.cancel()
+
+        @ObservationIgnored private var session: VisionPerceptionExecutionSession?
+        @ObservationIgnored private var closed = false
+        private let cameraUI: UICameraContainer
+        private let facades: AgentUIFacades
+        init(camera: UICameraContainer, facades: AgentUIFacades) {
+            cameraUI = camera
+            self.facades = facades
         }
-    }
+        public var cameraState: CameraState { cameraUI.state }
 
-    func invalidate() { work?.cancel() }
-
-    func suspend() async throws {
-        let pending = work
-        pending?.cancel()
-        do { try await pending?.value } catch is CancellationError {} catch { throw error }
+        func setInputAvailable(_ value: Bool) { cameraUI.requests.setAvailable(value) }
+        func install(_ session: VisionPerceptionExecutionSession) throws {
+            guard !closed else { throw AgentContainerError.stopped }
+            guard self.session == nil else { throw AgentContainerError.busy }
+            self.session = session
+        }
+        func start() async throws {
+            guard !closed else { throw AgentContainerError.stopped }
+            guard let session else { throw AgentContainerError.unavailable }
+            try await session.prepareForInteraction()
+        }
+        func setForeground(_ value: Bool) async throws {
+            guard !closed else { throw AgentContainerError.stopped }
+            guard let session else { return }
+            let state = await session.agent.status().lifecycle
+            if value, state == .paused { try await session.agent.resume() }
+            if !value, state == .running { try await session.agent.pause() }
+        }
+        func stop() async throws {
+            closed = true
+            await session?.shutdown()
+            if let failure = await session?.cleanupFailure { throw failure }
+        }
+        public var cameraControls: any CameraControlling { facades.camera }
     }
-
-    func stop() async throws {
-        closed = true
-        try await suspend()
-    }
-}
+#endif

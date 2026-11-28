@@ -4,7 +4,6 @@ import Foundation
 /// A keyword match in captured speech, correlated to the same utterance as VAD and ASR.
 public struct SpeechKeywordMatch: Codable, Sendable, Equatable {
     public static let contract = "perception.speech.keyword.v1"
-    public static let channel = "perception.speech.keyword"
     public static let event = "keywordMatched"
 
     public struct Detection: Codable, Sendable, Equatable {

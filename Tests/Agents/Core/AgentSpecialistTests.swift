@@ -42,7 +42,7 @@ private func specialistEventually(_ predicate: @Sendable () async throws -> Bool
         try restored.validateContextState()
     }
     try verify(MemoryContextState())
-    try verify(PhotographerContextState())
+    try verify(CameraTransactionContextState())
     try verify(ApplicationControlContextState())
 }
 
@@ -74,12 +74,13 @@ private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
         agent: AgentID.assistant, scope: UUID().uuidString, state: AssistantContextState()
     )
     let parent = try AssistantAgent(stateContext: try publicStateFixture(), context: repository)
-    let camera = PhotographerExecutionSession(
+    let camera = VisionPerceptionExecutionSession(
         manager: manager, output: gateway,
-        agent: try PhotographerAgent(
+        agent: try VisionPerceptionAgent(
             sessionID: session, uiCamera: ui.camera,
             context: try AgentContextRepository(
-                agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+                agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                state: CameraTransactionContextState())
         ), report: { await effects.fail($0) })
     try await camera.prepareForInteraction()
     let root = AssistantExecutionSession(
@@ -89,7 +90,7 @@ private struct SpecialistTools: ToolModule { let definitions: [ActionBinding] }
     let operation = Task { try await ui.camera.requests.submit(.init(.open)) }
     do {
         try await operation.value
-        #expect(await effects.owners == ["photographer"])
+        #expect(await effects.owners == ["visionPerception"])
         let state = try await repository.snapshot().state
         #expect(state.history.current.turns.isEmpty)
         #expect(state.taskViews?.isEmpty != false)
@@ -143,7 +144,7 @@ private actor SpecialistPendingModel: ChatCapability {
     try await failing.start()
     let session = UUID().uuidString
     let scope = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .photographer, sessionID: session)
+        id: UUID().uuidString, requester: .assistant, executor: .visionPerception, sessionID: session)
     try await context.update {
         try $0.tasks.register(scope)
         $0.state.taskViews = [scope.id: AgentTaskView(scope: scope, content: try AgentTaskContent(text: "In progress"))]
@@ -191,9 +192,9 @@ extension LiveRuntimeTests {
         let resource = ResourceID(rawValue: "nexarm.motor.1")
         let resources = try ResourceCoordinator(definitions: [
             ResourceDefinition(
-                id: resource, allowedOwners: [.assistant, .applicationControl, .photographer],
+                id: resource, allowedOwners: [.assistant, .applicationControl, .visionPerception],
                 executionGroup: ResourceID(rawValue: "nexarm.writer"),
-                preempts: [.assistant: [.photographer], .applicationControl: [.photographer]]
+                preempts: [.assistant: [.visionPerception], .applicationControl: [.visionPerception]]
             ) {}
         ])
         let effects = SpecialistEffects()
@@ -304,10 +305,11 @@ extension LiveRuntimeTests {
         context: try AgentContextRepository(
             agent: AgentID(rawValue: "assistant"), scope: UUID().uuidString, state: AssistantContextState())
     )
-    let child = try PhotographerAgent(
+    let child = try VisionPerceptionAgent(
         sessionID: UUID().uuidString,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: CameraTransactionContextState())
     )
     try await manager.register(child)
     try await child.start()
@@ -325,10 +327,11 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func photographerCameraFactsArePassiveRevisionedAndScoped() async throws {
     let session = UUID().uuidString
-    let agent = try PhotographerAgent(
+    let agent = try VisionPerceptionAgent(
         sessionID: session,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: CameraTransactionContextState())
     )
     try await agent.start()
     let first = CameraStateObservation(
@@ -368,7 +371,8 @@ extension LiveRuntimeTests {
     #expect(snapshot.state.cameraState == second)
     #expect(snapshot.work.isEmpty && snapshot.records.isEmpty)
     #expect(await agent.status().processedInputs == 2)
-    var recovered = try JSONDecoder().decode(PhotographerContextState.self, from: JSONEncoder().encode(snapshot.state))
+    var recovered = try JSONDecoder().decode(
+        CameraTransactionContextState.self, from: JSONEncoder().encode(snapshot.state))
     recovered.recoverInterruptedWork()
     #expect(recovered.cameraState == nil)
     #expect(throws: CommunicationError.invalidPayload) {
@@ -388,33 +392,33 @@ extension LiveRuntimeTests {
 
 @Test(.actionCatalog) func photographerPhaseProjectsExistingTaskAndArtifactState() throws {
     let task = AgentTaskScope(
-        id: UUID().uuidString, requester: .assistant, executor: .photographer,
+        id: UUID().uuidString, requester: .assistant, executor: .visionPerception,
         sessionID: UUID().uuidString)
     let input = AgentInput(
         id: UUID().uuidString, sessionID: task.sessionID, payload: .text("photo"), taskScope: task)
     var context = AgentContext(
-        agentID: .photographer, scopeID: UUID().uuidString, state: PhotographerContextState())
+        agentID: .visionPerception, scopeID: UUID().uuidString, state: CameraTransactionContextState())
     try context.tasks.register(task)
     try context.beginWork(input.id, sessionID: input.sessionID)
-    #expect(PhotographerContextState.phase(context, input: input) == .preparing)
+    #expect(CameraTransactionContextState.phase(context, input: input) == .preparing)
     try context.transitionWork(input.id, to: .running)
     try context.transitionWork(input.id, to: .awaitingFeedback)
-    #expect(PhotographerContextState.phase(context, input: input) == .awaitingFeedback)
+    #expect(CameraTransactionContextState.phase(context, input: input) == .awaitingFeedback)
     try context.transitionWork(input.id, to: .continuation)
     let photo = UUID().uuidString
     try context.append(.init(taskID: task.id, kind: "user.text", data: JSONEncoder().encode(SignalEvidence(input))))
     context.state.photoOwners = [photo: input.id]
-    #expect(PhotographerContextState.phase(context, input: input) == .reviewingPhoto)
+    #expect(CameraTransactionContextState.phase(context, input: input) == .reviewingPhoto)
     context.state.taskViews = [
         task.id: AgentTaskView(
             scope: task,
             content: try AgentTaskContent(
                 text: "Save?", stage: .waitingUser, interactionID: UUID().uuidString, artifactID: photo))
     ]
-    #expect(PhotographerContextState.phase(context, input: input) == .waitingUser)
+    #expect(CameraTransactionContextState.phase(context, input: input) == .waitingUser)
     let failed = try AgentTaskContent(text: "failure").signal(.result, scope: task, status: .failed)
-    try context.tasks.report(failed, agent: .photographer)
-    #expect(PhotographerContextState.phase(context, input: input) == .failed)
+    try context.tasks.report(failed, agent: .visionPerception)
+    #expect(CameraTransactionContextState.phase(context, input: input) == .failed)
     #expect(context.state.cameraState == nil)
     #expect(context.state.taskViews?[task.id]?.scope.id == task.id)
 }

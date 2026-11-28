@@ -104,7 +104,10 @@ private actor MediaTransportRecording {
         try envelope(message, sequence: UInt64(index))
     }
     let pump = Task {
-        try await IndependentOutputWorkflow.consumeSignals(source.stream, contracts: AgentContracts.communication) {
+        try await IndependentOutputWorkflow.consumeSignals(
+            source.stream,
+            publicationChannels: AgentConfigurations.load(named: "SpeechPerception").communication.publicationChannels
+        ) {
             value in
             await recorded.frame(value.sequence)
             switch value.sequence {
@@ -247,7 +250,7 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     let recorded = VisualStateRecording()
     let task = Task {
         try await IndependentOutputWorkflow.consumeSignals(
-            source.stream, replacementKey: { VisionPerceptionAgent.outputReplacementKey($0.output) },
+            source.stream, replacementKey: { PoseInferenceWorkflow.outputReplacementKey($0.output) },
             dispatch: { value in
                 switch value.output {
                 case .toolCall:
@@ -299,7 +302,7 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     source.continuation.yield(try visualStateOutput(1, broadcast: false))
     await #expect(throws: CommunicationError.unauthorized) {
         try await IndependentOutputWorkflow.consumeSignals(
-            source.stream, replacementKey: { VisionPerceptionAgent.outputReplacementKey($0.output) },
+            source.stream, replacementKey: { PoseInferenceWorkflow.outputReplacementKey($0.output) },
             dispatch: { _ in throw CommunicationError.unauthorized })
     }
     source.continuation.finish()
@@ -381,7 +384,7 @@ private func visualStateOutput(_ sequence: UInt64, broadcast: Bool) throws -> Ou
     }
     let task = Task {
         try await IndependentOutputWorkflow.consumeSignals(
-            source.stream, replacementKey: { VisionPerceptionAgent.outputReplacementKey($0.output) },
+            source.stream, replacementKey: { PoseInferenceWorkflow.outputReplacementKey($0.output) },
             dispatch: { value in
                 if case .toolCall = value.output {
                     await recorded.tool(value.sequence)

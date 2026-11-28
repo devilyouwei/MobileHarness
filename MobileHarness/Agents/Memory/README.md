@@ -18,13 +18,17 @@ MemoryAgent 构造注入 `UIHistoryContainer`、会话身份、私有 `AgentCont
 
 | 文件 | 职责 |
 | --- | --- |
-| [ConversationTitleGenerator.swift](ConversationTitleGenerator.swift) | 有界标题采样与注入 Chat 的标题生成策略 |
+| [ConversationTitleGenerator.swift](Workflow/ConversationTitleGenerator.swift) | 有界标题采样与注入 Chat 的标题生成策略 |
 | [MemoryAgent.swift](MemoryAgent.swift) | 历史请求与确定性固定 Task 的准入、调用及真实结果 |
 | [MemoryExecutionSession.swift](MemoryExecutionSession.swift) | Memory 注册、输出泵、失败与停止加入 |
-| [MemoryHistoryIntent.swift](MemoryHistoryIntent.swift) | 历史意图与本角色固定任务载荷解码，拒绝远程取消私有请求 |
-| [MemoryHistoryWorkflow.swift](MemoryHistoryWorkflow.swift) | 历史查询／修改操作的顺序、请求槽与结果关联 |
-| [MemoryProcessing.swift](MemoryProcessing.swift) | Memory 私有 Context、预处理和决策输入 |
-| [MemoryUI.swift](MemoryUI.swift) | history 订阅、请求私有完整读取端口和取消加入 |
+| [MemoryHistoryIntent.swift](Input/MemoryHistoryIntent.swift) | 历史意图与本角色固定任务载荷解码，拒绝远程取消私有请求 |
+| [MemoryHistoryWorkflow.swift](Workflow/MemoryHistoryWorkflow.swift) | 历史查询／修改操作的顺序、请求槽与结果关联 |
+| [MemoryInputProcessing.swift](Input/MemoryInputProcessing.swift) | 信号预处理和决策输入选择 |
+| [MemoryUI.swift](Input/MemoryUI.swift) | 历史 UI 请求订阅、类型化请求分流与订阅清理 |
+
+角色入口维护 MemoryContextState，记录在途调用和任务视图。容器通过 stateSnapshot() 对外投影角色生命周期、计数和任务阶段。输入适配、信号分类与输入选择归 [Input](Input/)，历史事务和标题推理归 [Workflow](Workflow/)。
+
+Memory 直接声明历史事务使用的内部 Tool。标题请求只接收标题提示与会话内容。所有业务调用使用 `tool.call.v1`，沿原请求消费 `execution.call.result.v1`。历史事务按原始请求和调用 ID 顺序推进，标题生成独立使用一次 Chat 请求。固定任务沿 `agent.task.v1` 接纳，执行结果沿 `agent.task.events.v1` 发布。
 
 ## 外部关系（一层）
 
@@ -96,9 +100,9 @@ flowchart TB
 
 五类完整历史读取走私有 `History.Conversation.readFull`，调用携带单次类型化结果端口，校验真实 source/session/input，不使用全局结果暂存表。最多四个实际读取任务；普通 UI 请求仍受每源 64 个未终态项限制。页面取消及角色停止取消并加入已授权读取；端口不可重复执行或终态后复用。
 
-`MemoryUI.swift` 在 MemoryAgent 隔离域内同步读取角色状态；历史执行前和异步结果返回后均检查角色仍在运行，Gateway 执行与结果端口读取保持异步。
+[HistoryReadDispatch.swift](Output/HistoryReadDispatch.swift) 在 MemoryAgent 隔离域内同步读取角色状态；历史执行前和异步结果返回后均检查角色仍在运行，Gateway 执行与结果端口读取保持异步。
 
-新会话先通过 Assistant 的 task.end 提交活跃前台任务的摘要和终态，再归档。归档提交后独立生成标题，标题失败不撤回归档。固定操作和模型 history-query 暴露范围分别声明，Assistant 可直接调用相同 History Actions。回执等待真实读取、变更或呈现结果。
+新会话先通过 Assistant 的 clearForegroundTask 提交活跃前台任务的摘要和终态，再归档。归档提交后独立生成标题，标题失败不撤回归档。固定操作和模型 history-query 暴露范围分别声明，Assistant 可直接调用相同 History Actions。回执等待真实读取、变更或呈现结果。
 
 ## 标题算法
 
@@ -131,3 +135,7 @@ History clear registration and invocation share one InternalTool declaration wit
 ConversationTitleGenerator owns the Memory title-template accessor alongside title inference. Shared AgentPrompts provides locale-aware loading/rendering without embedding the Memory resource path. Template content, language selection and failure propagation retain their existing contracts.
 
 标题日志在 ModelKit 请求实际发出时建立，随后保存同一次请求的模型身份和终态元数据。
+
+容器快照的 `business.lifecyclePhase` 公开本角色生命周期，取值见[角色 State 契约](../README.md#reflexive-state-reads-and-disclosure)。
+
+[Input](Input/) 接收历史请求、解码意图并选择信号。[Workflow](Workflow/) 推进读取后的事务、修改、取消以及标题推理。[Output](Output/) 持有历史读取使用的类型化结果端口，派发固定 Tool，并把真实回执交回原事务。

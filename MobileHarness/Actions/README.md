@@ -1,12 +1,14 @@
 # Actions — Business execution and module lifetime
 
+[开发规范](AGENTS.md)
+
 ## Responsibilities and boundaries
 
 Built-in camera, device, voice and settings notices carry English source copy through their existing presentation ports. UI resolves the notices for the selected application language. Bluetooth transport evidence, audio recovery errors, and MOSS validation reports use English. Execution identifiers, structured results, and authorization checks retain their existing meanings.
 
 ActionsContainer is the single App-scoped execution root. It owns compiled function registration, immutable catalog metadata, effect-free input preparation, budgets/resources, actual execution, output validation and joined business/native cleanup. It also owns the [execution Shell](Support/Shell/README.md): Channel scheduling, direct Tool calls, resource arbitration and the result ledger. App constructs and manages it; App connects the Actions execution endpoint and Agents adapters through Gateway. The endpoint dispatches Action, Tool, and Control calls to the Shell. Agents owns authorization and supplies cognitive host callbacks through App-bound neutral interfaces.
 
-Domains, modules and individual actions remain extensible declarations and function composition. They have no container, lifecycle node or App registration. Stateful execution services are retained by the module root and composed through narrow interfaces. Registration establishes implementation availability, not Skill permission or device readiness. Actions manages Actions and their scheduling only: it owns no model prompts, Skill instructions or Action usage examples (the scheduling `wait` is registered and taught by Basic Interaction). It does own each function's contract prose: the default-language text lives in `@Action`, and translations are [Actions/Resources](Resources/README.md) files that `ActionLocalization` validates against the declarations; App passes them to Agents with the declarations, and missing entries keep the `@Action` text. Actions imports neither AgentCore, Agents, Gateway nor App.
+Domains, modules and individual actions remain extensible declarations and function composition. Stateful execution services are retained by the module root and composed through narrow interfaces. Actions registers the implementation, and Agents authorizes access and owns model prompts and Skill teaching, including Basic Interaction's scheduling `wait`. Default-language function contracts live in `@Action`, and `ActionLocalization` validates [Actions/Resources](Resources/README.md) translations against the declarations. App passes both to Agents. Missing translations retain the `@Action` text. Actions imports neither AgentCore, Agents, Gateway nor App.
 
 ## Direct relationships
 
@@ -34,7 +36,7 @@ The module root keeps the execution root (ActionsContainer, ActionsFailure), the
 | --- | --- |
 | ActionsContainer / ActionsFailure | Unique root, admission state, preparation credentials, execution workers, execution Shell and structured lifecycle errors. |
 | Composition: ActionsBusinessAssembly / ActionsBusinessBindings / ActionsUIFacades | Actions-owned service construction and narrow public binding ports; helper objects retained by the root, not peer containers. |
-| CapabilityModules (root) / Composition: BehaviorProtocolBindings / BehaviorAssembly | Explicit compiled declarations, protocol policies and canonical function assembly. Unknown domains can use default bindings; builtin policies remain explicit. |
+| CapabilityModules (root) / Composition: BehaviorProtocolBindings / BehaviorAssembly | Explicit compiled declarations, canonical function assembly, dual call projections and Tool feedback policy. |
 | [ActionLocalization](Support/Localization/ActionLocalization.swift) | Loads and validates per-language translations of declared function prose from the `Localization` directory of [Resources](Resources/README.md), packaged in the Actions resource bundle. |
 | Composition: ActionEndpoints | Instance-level composition of presentation, speech, camera and Task ports; no capability lookup/downcast. |
 | [Camera](Camera/README.md) | Capture, camera control and private photo/album operations. |
@@ -66,19 +68,13 @@ flowchart TB
 
 ## Registration and validation
 
-Macros emit canonical declarations and factories. CapabilityModules explicitly binds compiled business functions; there is no hot discovery/update. BehaviorAssembly validates definitions and canonical address uniqueness and produces Action/Tool views over the same implementation. Missing required bindings, duplicate definitions, invalid metadata and capacity excess prevent configuration. Optional Task capability is absent from the catalog when unbound. Catalog readers receive descriptors only, without handlers or mutation access. Registration is implementation availability; Agents owns exposure and authorization, Gateway owns Signal transport, and this module owns scheduling, resources and business validity. The [overall lifecycle matrix](../README.md#action-lifecycle-responsibilities) describes their complete interaction.
+Macros emit canonical declarations and factories. CapabilityModules explicitly binds compiled business functions; there is no hot discovery/update. BehaviorAssembly validates definitions and canonical address uniqueness and projects every installed function into both Action and Tool registries. Both routes use the same implementation and catalog capacity of 256 functions. Missing required bindings, duplicate definitions, invalid metadata and capacity excess prevent configuration. Optional Task capability is absent from the catalog when unbound. Catalog readers receive descriptors only, without handlers or mutation access. Registration is implementation availability; Agents owns exposure and authorization, Gateway owns Signal transport, and this module owns scheduling, resources and business validity. The [overall lifecycle matrix](../README.md#action-lifecycle-responsibilities) describes their complete interaction.
 
-`prepare` validates the registered protocol, argument shape and pure domain decoding, resolves dynamic resources and budget, and retains the invocation behind a single-use PreparedAction. The credential is bound to the root's catalog revision. The [execution Shell](Support/Shell/README.md) owns Channel/wait/resource arbitration and supplies the resource execution context. `execute` consumes the credential, verifies a live permit for declared resources and rechecks current business conditions through the actual handler. The same FunctionExecutor validates inputs, deadlines, completion/report/value output and cancellation for both call protocols.
+`prepare` resolves the call view, validates argument shape and pure domain decoding, resolves dynamic resources and budget, and retains the invocation behind a single-use PreparedAction. The credential is bound to the root's catalog revision. The [execution Shell](Support/Shell/README.md) owns Channel/wait/resource arbitration and supplies the resource execution context. `execute` consumes the credential, verifies a live permit for declared resources and rechecks current business conditions through the actual handler. The same FunctionExecutor validates inputs, deadlines, completion/report/value output and cancellation for both call protocols.
+
+The call type selects the execution route. ActionCall enters ChannelScheduler using the submitted Channel and wait scope. Each admitted ToolCall starts directly and may overlap other calls, subject to shared resource admission. A caller can await each Tool result before submitting the next.
 
 Agents alone checks roles, Skills, Tasks and decision snapshots. Actions checks service availability, current session/generation, media/native ownership, business preconditions and permits; it does not authorize role names. Already-admitted work never re-queries Skill permissions.
-
-### Action 编写规范
-
-业务 Action 通过 `@Action` 或 `ActionBinding` 注册，声明输入、资源、预算与完成条件。处理器返回实际结果或抛出业务异常，在返回前等候自己启动的原生工作完成或清理。执行 Shell 负责执行实例、调度、取消和反馈，业务处理器通过已注入的能力接口操作具体服务。
-
-变量、协议和文件沿用所属模块的领域术语，并写明具体职责。调用消息使用 `ActionCall`。`callID`、`executionID` 和 `roundID` 分别标识调用、实际执行和模型轮次。
-
-生命周期控制的 Swift 接口模板、Send 契约及迁移验收见 [Action 实例生命周期与控制](../../docs/requirements/technical/Action-Execution-Lifecycle.md#action-实例生命周期与控制)。
 
 ## Lifecycle, bounds and failures
 
@@ -122,7 +118,7 @@ Camera coordinates independent photo and background visual demand over one Platf
 
 ActionsBusinessAssembly connects CameraCoordinator's recording audio hold to the active VoiceSessionCoordinator and injects joined image/video export through PlatformKit.Vision. CameraRecordingSession owns recording completion and pending media independently of window mounting; speech owns listening generation/restoration. Camera, UI, PlatformKit and Storage keep separate facts and completion contracts. The fixed Capture/Video/Perception entry points remain domain-owned @Actions; scheduled Action and direct Tool projections are shared by all three Camera modules. See [Camera](Camera/README.md) and [Listening](Speech/Listening/README.md).
 
-IslandModule提供双端内容发布/更新/结束和compact/expanded请求；UI拥有身份账本、布局、动画和系统提交。ActionsBusinessAssembly构造唯一执行服务，各Agent用自身身份调用。播放频谱跟随实际播放器经专用UI端口更新，不逐帧提交Action；角色停止清理自己的活动和发布任务。
+IslandModule 通过直达 Tool 提供双端内容发布、更新、结束和 compact/expanded 请求；UI拥有身份账本、布局、动画和系统提交。ActionsBusinessAssembly构造唯一执行服务，各Agent用自身身份调用。播放频谱跟随实际播放器经专用UI端口更新，不逐帧提交Action；角色停止清理自己的活动和发布任务。
 
 setSceneActive只调用原生场景服务的失活/加入端口，不暂停Actions根或取消其他已接纳Action；Camera与Bluetooth所属服务保持既有前台门。完整setForeground(false)/invalidate/stop仍执行全部取消。语音会话的半双工准入与持续采集见Speech/Listening。
 
@@ -134,7 +130,7 @@ Camera与Web在创建UI窗口时显式提供各自图标。Actions只选择显�
 
 生产 BehaviorAssembly 将公开 Action 投影为 scheduled 执行，Tool 投影保留 direct；同一函数可有两种协议适配，业务实现及资源检查仍共享。Assistant 所有 Skill 函数采用 XML Action；Writer 使用独立 Tool 目录。显式测试/宿主注入的注册策略不被生产投影重写。
 
-UI.Island工具执行生产者自己决定的语义内容。Writer与Assistant管理自身任务，Assistant另管理推理等待；SpeechPerception管理聆听/识别，Assistant的语音子能力管理合成/真实播放，Photographer和ApplicationControl管理摄影与连接展示。Actions不从UI状态或任务日志推断角色展示。
+UI.Island工具执行生产者自己决定的语义内容。Writer与Assistant管理自身任务，Assistant另管理推理等待；SpeechPerception管理聆听/识别，Assistant的语音子能力管理合成/真实播放，VisionPerception和ApplicationControl管理摄影与连接展示。Actions不从UI状态或任务日志推断角色展示。
 
 Writer workspace commands, including preview/describe, enter through Gateway direct tools. The admitted edit returns a stream identity and structured file facts for Writer's content request. Source append/complete/abort use the host-bound ArtifactStreaming continuation with delegate/stream validation and caller backpressure. Revoke closes ordinary continuation admission. Release joins actual work before retiring the editor, and Actions root shutdown provides final cleanup. Tool completion, file completion and Writer task completion are separate boundaries. Source intake checkpoints the draft independently of safe previews. Explicit render joins pending previews and executes complete scripts. Finish requires current render evidence and publishes once. See [Artifacts](Artifacts/README.md#执行与续写生命周期).
 
@@ -158,7 +154,7 @@ Camera uses memory-only preview_N references within one window lifetime, indepen
 
 History.Conversation.clearLogs为用户日志管理提供内部业务函数：按request_N或共享全库物理删除可选日志。Memory拥有调用与结果处理，Storage保留对话、消息和业务请求记录，UI仅刷新Prompts可用性。
 
-Task Actions expose foreground task.start/end. task.send requires agent_id and text to relay a message to a peer Agent; the receiving Agent owns task admission, workspace selection and completion. History reads role-owned messages and shared log details. Prompt images decode only logged request bytes; no history-to-camera-cache or history-to-album fallback port is assembled.
+Assistant owns the foreground goal controls state.set and state.clear. Its peer control send requires agent_id and text to relay a message to a peer Agent; the receiving Agent owns task admission, workspace selection and completion. History reads role-owned messages and shared log details. Prompt images decode only logged request bytes; no history-to-camera-cache or history-to-album fallback port is assembled.
 
 历史 UI facade 只注入真实读取、分页、摘要、删除及日志清理端口；不注入对旧回复重新解析的 execution preview formatter。
 

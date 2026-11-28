@@ -13,7 +13,7 @@ import UI
 @testable import Agents
 
 private actor CameraProbe {
-    var operations: [PhotographerCameraIntent.Operation] = []
+    var operations: [CameraCaptureIntent.Operation] = []
     var sources: [String] = []
     var facings: [String] = []
     var failFlip = true
@@ -23,7 +23,7 @@ private actor CameraProbe {
     var exports = 0
     var failSave = false
     func denyNextSave() { failSave = true }
-    func photo(_ operation: PhotographerCameraIntent.Operation, id: String?, source: String) throws
+    func photo(_ operation: CameraCaptureIntent.Operation, id: String?, source: String) throws
         -> CameraPhotoCommandReceipt
     {
         guard photoVisible, id == nil || id == previewID else { throw CameraControlError.photoUnavailable }
@@ -45,7 +45,7 @@ private actor CameraProbe {
         release?.resume()
         release = nil
     }
-    func perform(_ operation: PhotographerCameraIntent.Operation, source: String, facing: String?) async throws {
+    func perform(_ operation: CameraCaptureIntent.Operation, source: String, facing: String?) async throws {
         operations.append(operation)
         sources.append(source)
         if let facing { facings.append(facing) }
@@ -101,10 +101,10 @@ private actor CameraBridge: CameraControlCapability {
     func savePhoto(_ id: String?, invocation: any FunctionInput) async throws -> CameraPhotoCommandReceipt {
         try await photo(.savePhoto, id: id, invocation: invocation)
     }
-    private func photo(_ operation: PhotographerCameraIntent.Operation, id: String?, invocation: any FunctionInput)
+    private func photo(_ operation: CameraCaptureIntent.Operation, id: String?, invocation: any FunctionInput)
         async throws -> CameraPhotoCommandReceipt
     {
-        guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
+        guard invocation.context.source == "visionPerception" else { throw CommunicationError.unauthorized }
         return try await probe.photo(operation, id: id, source: invocation.context.source)
     }
     func setEnabled(_ enabled: Bool, invocation: any FunctionInput) async throws {
@@ -121,10 +121,10 @@ private actor CameraBridge: CameraControlCapability {
         try await perform(.flip, facing: facing, invocation: invocation)
     }
     private func perform(
-        _ operation: PhotographerCameraIntent.Operation, facing: CameraActions.Facing? = nil,
+        _ operation: CameraCaptureIntent.Operation, facing: CameraActions.Facing? = nil,
         invocation: any FunctionInput
     ) async throws {
-        guard invocation.context.source == "photographer" else { throw CommunicationError.unauthorized }
+        guard invocation.context.source == "visionPerception" else { throw CommunicationError.unauthorized }
         try await probe.perform(operation, source: invocation.context.source, facing: facing?.rawValue)
     }
 }
@@ -175,13 +175,13 @@ private struct CameraFixture {
         gateway = await OutputGateway(
             manager: manager, requests: input, tools: tools,
             actions: ChannelScheduler(registry: actions), policy: policy, sink: { _ in })
-        let host = PhotographerExecutionSession(
+        let host = VisionPerceptionExecutionSession(
             manager: manager, output: gateway,
-            agent: try PhotographerAgent(
+            agent: try VisionPerceptionAgent(
                 sessionID: root, uiCamera: cameraUI,
                 context: try AgentContextRepository(
-                    agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString,
-                    state: PhotographerContextState())
+                    agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+                    state: CameraTransactionContextState())
             ))
         runtime = CameraTestRuntime(host: host, ui: ui, camera: cameraUI)
     }
@@ -194,7 +194,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     try await f.runtime.perform(.open)
     let opened = try #require(await f.runtime.agent.cameraResult())
     #expect(opened.completion == .completed && !opened.isError)
-    await #expect(throws: PhotographerIntentFailure.self) { try await f.runtime.perform(.flip, facing: .back) }
+    await #expect(throws: CameraIntentFailure.self) { try await f.runtime.perform(.flip, facing: .back) }
     let feedback = try #require(await f.runtime.agent.cameraResult())
     #expect(feedback.isError)
     #expect(feedback.failureCode == "camera.unavailable")
@@ -213,7 +213,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     try await f.runtime.perform(.close)
     #expect(await f.probe.operations == [.open, .flip, .flip, .retry, .close])
     #expect(await f.probe.facings == ["back", "front"])
-    #expect(await f.probe.sources.allSatisfy { $0 == "photographer" })
+    #expect(await f.probe.sources.allSatisfy { $0 == "visionPerception" })
     await f.runtime.shutdown()
 }
 @Test(.actionCatalog, .timeLimit(.minutes(1))) func photographerCameraCancellationJoinsBeforeQueuedRetry()
@@ -246,9 +246,11 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     #expect(await f.runtime.agent.status().lifecycle == .running)
     let pose = try PoseObservation(width: 100, height: 100, sequence: 1, timestamp: 1, rotation: 1, people: [])
     let payload = InputPayload.observation(.pose(pose))
-    await #expect(throws: CommunicationError.unauthorized) {
-        try await f.runtime.agent.receive(
-            AgentInput(id: UUID().uuidString, sessionID: vision, payload: payload))
+    await #expect(throws: CommunicationError.scopeClosed) {
+        try await f.runtime.agent.track(
+            pose,
+            input:
+                AgentInput(id: UUID().uuidString, sessionID: vision, payload: payload))
     }
     try await f.runtime.perform(.close)
     try await f.runtime.perform(.open)
@@ -275,18 +277,19 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
 
 @Test(.actionCatalog) func photographerCameraRejectsForeignScopeAndFeedbackWithoutLosingPendingWork() async throws {
     let root = UUID().uuidString
-    let agent = try PhotographerAgent(
+    let agent = try VisionPerceptionAgent(
         sessionID: root,
         context: try AgentContextRepository(
-            agent: AgentID(rawValue: "photographer"), scope: UUID().uuidString, state: PhotographerContextState())
+            agent: AgentID(rawValue: "visionPerception"), scope: UUID().uuidString,
+            state: CameraTransactionContextState())
     )
     try await agent.start()
     await #expect(throws: CommunicationError.unauthorized) {
         try await agent.receive(
-            PhotographerCameraIntent(.open, requestID: UUID().uuidString).input(
+            CameraCaptureIntent(.open, requestID: UUID().uuidString).input(
                 sessionID: UUID().uuidString))
     }
-    let request = PhotographerCameraIntent(.open, requestID: UUID().uuidString)
+    let request = CameraCaptureIntent(.open, requestID: UUID().uuidString)
     try await agent.receive(request.input(sessionID: root))
     var reader = agent.outputs.makeAsyncIterator()
     let envelope = try #require(await reader.next())
@@ -305,7 +308,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     }
     await #expect(throws: CommunicationError.capacityExceeded) {
         try await agent.receive(
-            PhotographerCameraIntent(.close, requestID: UUID().uuidString).input(sessionID: root))
+            CameraCaptureIntent(.close, requestID: UUID().uuidString).input(sessionID: root))
     }
     #expect(envelope.roundID == nil)
     #expect(!agent.descriptor.inputs.contains(.toolResult))
@@ -320,16 +323,16 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
 }
 
 @Test(.actionCatalog) func photographerCameraFacingIsRequiredOnlyForFlip() throws {
-    for facing in [PhotographerCameraIntent.Facing.front, .back] {
-        _ = try PhotographerCameraIntent(.flip, facing: facing, requestID: UUID().uuidString).message
+    for facing in [CameraCaptureIntent.Facing.front, .back] {
+        _ = try CameraCaptureIntent(.flip, facing: facing, requestID: UUID().uuidString).message
             .validatedSize()
         #expect(throws: CommunicationError.invalidPayload) {
-            try PhotographerCameraIntent(.open, facing: facing, requestID: UUID().uuidString).message
+            try CameraCaptureIntent(.open, facing: facing, requestID: UUID().uuidString).message
                 .validatedSize()
         }
     }
     #expect(throws: CommunicationError.invalidPayload) {
-        try PhotographerCameraIntent(.flip, requestID: UUID().uuidString).message.validatedSize()
+        try CameraCaptureIntent(.flip, requestID: UUID().uuidString).message.validatedSize()
     }
 }
 
@@ -337,7 +340,7 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     let fixture = try await CameraFixture()
     let id = await fixture.probe.previewID
     await fixture.probe.denyNextSave()
-    await #expect(throws: PhotographerIntentFailure.self) {
+    await #expect(throws: CameraIntentFailure.self) {
         try await fixture.runtime.perform(.savePhoto, previewID: id)
     }
     let raw = try #require(try await fixture.runtime.perform(.savePhoto, previewID: id))
@@ -346,13 +349,13 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     let repeated = try #require(try await fixture.runtime.perform(.savePhoto, previewID: id))
     #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(repeated.utf8)).alreadySaved)
     #expect(await fixture.probe.exports == 1)
-    await #expect(throws: PhotographerIntentFailure.self) {
+    await #expect(throws: CameraIntentFailure.self) {
         try await fixture.runtime.perform(.savePhoto, previewID: UUID().uuidString)
     }
     #expect(await fixture.probe.photoVisible)
-    await #expect(throws: PhotographerIntentFailure.self) { try await fixture.runtime.perform(.savePhoto) }
+    await #expect(throws: CameraIntentFailure.self) { try await fixture.runtime.perform(.savePhoto) }
     try await fixture.runtime.perform(.open)
-    #expect(await fixture.probe.sources.allSatisfy { $0 == "photographer" })
+    #expect(await fixture.probe.sources.allSatisfy { $0 == "visionPerception" })
     await fixture.runtime.shutdown()
 }
 
@@ -371,13 +374,13 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
 @Test(.actionCatalog) func malformedPhotoCommandsCannotReachNativeEffect() async throws {
     let fixture = try await CameraFixture()
     try await fixture.runtime.prepareForInteraction()
-    await #expect(throws: PhotographerIntentFailure.self) {
+    await #expect(throws: CameraIntentFailure.self) {
         try await fixture.runtime.perform(.savePhoto, previewID: "invalid")
     }
     #expect(await fixture.probe.exports == 0)
     #expect(await fixture.probe.operations.isEmpty)
     #expect(throws: CommunicationError.self) {
-        try PhotographerCameraIntent(
+        try CameraCaptureIntent(
             .open, previewID: UUID().uuidString, requestID: UUID().uuidString
         ).message.validatedSize()
     }
@@ -393,7 +396,7 @@ func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async
     _ = try await ui.camera.requests.submit(.init(.open))
     _ = try await ui.camera.requests.submit(.init(.close))
     #expect(await host.probe.operations == [.open, .close])
-    #expect(await host.probe.sources.allSatisfy { $0 == "photographer" })
+    #expect(await host.probe.sources.allSatisfy { $0 == "visionPerception" })
     await host.runtime.shutdown()
     await ui.stop()
 }
@@ -426,7 +429,7 @@ func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async
         await fixture.probe.operations == [
             .configure, .open, .startRecording, .stopRecording, .saveVideo, .ignoreVideo, .cancelCapture,
         ])
-    #expect(await fixture.probe.sources.allSatisfy { $0 == "photographer" })
+    #expect(await fixture.probe.sources.allSatisfy { $0 == "visionPerception" })
     let catalog = try AgentSkillLoader.registry(
         ["camera-and-vision"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
     for (alias, path) in [

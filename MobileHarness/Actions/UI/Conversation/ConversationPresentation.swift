@@ -15,6 +15,7 @@ public struct ConversationPresentation: Sendable {
     public private(set) var replyDecisionID: String?
     public private(set) var replyTaskID: String?
     public private(set) var transcriptClosed = false
+    private var waitingUpdate: (context: ActionExecutionContext, requestID: String, enabled: Bool)?
     private var repliesEnabled = true
     private var cancelledTurns: [String] = []
     private var sequences: [Update: UInt64] = [:]
@@ -27,6 +28,7 @@ public struct ConversationPresentation: Sendable {
     }
     public mutating func suspendReplies() {
         repliesEnabled = false
+        waitingUpdate = nil
         for id in [turn?.id, replyTurn?.id].compactMap({ $0 }) where !cancelledTurns.contains(id) {
             cancelledTurns.append(id)
         }
@@ -46,6 +48,36 @@ public struct ConversationPresentation: Sendable {
         context.correlationID != nil && context.correlationID == replyTurn?.id && context.ordinal == replyTurn?.ordinal
             && context.source == replySource && context.decisionID == replyDecisionID && context.taskID == replyTaskID
     }
+    // A waiting Tool can arrive before the scheduled beginReplyTurn Action. Keep the latest
+    // update for that request without letting it claim the reply's Display sequence.
+    mutating func acceptWaiting(_ context: ActionExecutionContext, requestID: String, enabled: Bool) -> Bool {
+        if context.decisionID != nil { return accept(context, update: .replyWaiting) }
+        guard repliesEnabled, let id = context.correlationID, !cancelledTurns.contains(id),
+            let ordinal = context.ordinal, ordinal > 0, context.sequence > 0
+        else { return false }
+        if let previous = waitingUpdate?.context, previous.sessionID == context.sessionID,
+            previous.source == context.source, previous.sequence >= context.sequence
+        {
+            return false
+        }
+        guard context.sequence > (producerSequences[context.source] ?? 0) || requestID == replyDecisionID else {
+            return false
+        }
+        waitingUpdate = (context, requestID, enabled)
+        return requestID == replyDecisionID && id == replyTurn?.id && ordinal == replyTurn?.ordinal
+            && context.source == replySource && context.taskID == replyTaskID
+            && (!enabled || context.sequence > (sequences[.reply] ?? 0))
+    }
+
+    func waitingRequestAfterBegin(_ context: ActionExecutionContext) -> String? {
+        guard let update = waitingUpdate, update.enabled, update.requestID == context.decisionID,
+            update.context.sessionID == context.sessionID, update.context.source == context.source,
+            update.context.correlationID == context.correlationID, update.context.ordinal == context.ordinal,
+            update.context.taskID == context.taskID, update.context.sequence > context.sequence
+        else { return nil }
+        return update.requestID
+    }
+
     public mutating func accept(_ context: ActionExecutionContext, update: Update) -> Bool {
         guard let id = context.correlationID, let ordinal = context.ordinal, ordinal > 0, context.sequence > 0
         else { return false }

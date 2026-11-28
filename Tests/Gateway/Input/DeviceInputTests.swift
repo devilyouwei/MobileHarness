@@ -122,7 +122,7 @@ extension LiveRuntimeTests {
         var inferred = observations.stream.makeAsyncIterator()
         let context = try AgentContextRepository(
             agent: .visionPerception, scope: "direct-camera-test", state: VisionPerceptionContextState())
-        let role = try VisionPerceptionAgent(
+        let role = try PoseInferenceWorkflow(
             pose: DirectPose(observed: observations.continuation), sessionID: "generation",
             cameraInput: source, sampling: FrameSamplingConfiguration(initialInterval: 0), context: context)
         #expect(await source.subscriptions == 0)
@@ -180,7 +180,7 @@ extension LiveRuntimeTests {
         try ProviderDiscoveryIntent(requestID: oversized).input(sessionID: "session"),
         try ProviderSettingsIntent(operation: .restore, requestID: oversized).input(sessionID: "session"),
         try MemoryHistoryIntent.delete(oversized).input(sessionID: "session"),
-        try PhotographerCameraIntent(.savePhoto, previewID: oversized, requestID: "request").input(
+        try CameraCaptureIntent(.savePhoto, previewID: oversized, requestID: "request").input(
             sessionID: "session"),
     ]
     for input in requests {

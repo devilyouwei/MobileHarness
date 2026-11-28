@@ -18,6 +18,7 @@
             let status = await agent?.status()
             return AgentStateSnapshot(
                 path: "agents.speechperception",
+                business: ["lifecyclePhase": .lifecyclePhase(status?.lifecycle, closed: closed)],
                 runtime: [
                     "presentationFailure": presentationFailure.map { .text($0) } ?? .unknown,
                     "rolePhase": status.map { .text($0.lifecycle.rawValue) } ?? .unknown,
@@ -79,7 +80,7 @@
             outputTask = Task {
                 do {
                     try await IndependentOutputWorkflow.consumeSignals(
-                        value.outputs, contracts: AgentContracts.communication
+                        value.outputs, publicationChannels: value.descriptor.publicationChannels
                     ) { envelope in
                         do {
                             if case .toolCall = envelope.output {

@@ -30,10 +30,10 @@ Speech.Playback.speak 等待音频排空；内部 Tool Speech.Listening.update �
 | 函数 | 解析与完成 | 静态 timeout |
 | --- | --- | --- |
 | speak | 只接受 audioID，最多 36 字节且可解析为 ID；调用播放端点并等待它返回 | 300 秒 |
-| setVolume | 音量为有限的 0…1。指定 executionID 设置对应播报的目标音量，省略时定位同一执行所有者的当前播报。 | 3 秒 |
+| setVolume | 音量为有限的 0…1。唯一参数为 volume。空闲时设置下一段的音量，播放时同时调整当前播报。 | 3 秒 |
 | update | enabled/paused 严格为 true/false；revision 为正 UInt64；可选启动反馈参数 | 90 秒 |
 
-`speak` 声明暂停、继续和单实例取消。每次执行登记独立的 `SpeechPlaybackControl`。暂停与继续等待播放器实际状态，播报结束后随执行清理控制器。`setVolume` 是独立 Tool，以单次结果确认目标增益已设置。目标由可信执行所有者与当前播报匹配，旧序号不能覆盖较新的增益；音量变更保持当前播放位置和暂停状态。
+`speak` 声明暂停、继续和单实例取消。每次执行登记独立的 `SpeechPlaybackControl`。暂停与继续等待播放器实际状态，播报结束后随执行清理控制器。`setVolume` 是独立 Tool，以单次结果确认目标增益已设置。端点保存目标增益，绑定语音服务时同步该值。音量变更保持当前播放位置和暂停状态。
 
 speak 将所有参数解析错误映射为 missingAudio，并在播放前后检查取消。端点契约要求播放排空与音频租约释放；入口不把音频存在或写入设备当作已播放完成。函数没有文本合成参数，也没有播放缓存。
 
@@ -55,7 +55,7 @@ Assistant 的语音子能力预留并生产 AudioCache 句柄；Speech.Playback.
 
 [`Playback/`](Playback/) 的 [PlaybackActions.swift](Playback/PlaybackActions.swift) 校验参数并返回实际回执。[SpeechPlayback.swift](Playback/SpeechPlayback.swift) 借出预留的音频句柄，允许 Assistant 并行继续生产 PCM。播放结束等待原生排空，取消加入流清理和租约释放。聆听策略由根语音会话拥有。
 
-`adjust` 在独立通道接纳当前回复的档位变化，可以与等待排空的 `speak` 并行。端点核对 Assistant 来源、会话、回复和递增序号。Actions 持有播放器控制，正常与降低音量的相对增益分别为 1 和 0.35。Action 回执确认控制状态已接纳，实际淡入、淡出和暂停由 PlatformKit 执行。
+Assistant 使用目标增益 1 恢复正常音量，使用 0.35 降音。实际淡入、淡出和暂停由 PlatformKit 执行。
 
 <a id="speech-shared-contracts"></a>
 

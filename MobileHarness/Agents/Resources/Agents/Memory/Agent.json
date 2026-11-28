@@ -1,26 +1,24 @@
 {
-  "version": 12,
+  "version": 14,
   "category": "cognition",
   "id": "memory",
-  "description": "I own history requests, history transactions and conversation titles through supported history interfaces. I preserve actual records and return explicit outcomes; I am not another user-facing conversation owner.",
-  "skills": [
-    "history-query"
-  ],
   "states": [],
-  "signals": {
-    "requests": [
-      "agent.task.v1"
-    ],
-    "feedback": [
-      "action.result.v1",
-      "tool.result.v1"
-    ],
-    "publications": [
-      {
-        "channel": "agent.task",
-        "protocol": "agent.task.events.v1"
-      }
-    ],
-    "subscriptions": []
-  }
+  "channels": {
+    "agent.task.v1": {
+      "type": "send",
+      "name": "agent.request",
+      "receive": true
+    },
+    "agent.task.events.v1": {
+      "type": "pubSub",
+      "name": "agent.task",
+      "publish": true
+    },
+    "runtime.delivery.v1": {
+      "type": "send",
+      "name": "runtime.agent",
+      "receive": true
+    }
+  },
+  "feedback": []
 }
