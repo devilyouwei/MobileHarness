@@ -42,3 +42,9 @@
 ## 实施结果
 
 文件已按上表移动；Xcode 工程文件引用与分组、`AgentConfigurations`/提示词路径、`verify-app-agent-resources.py`、boundary checker 的路径与 README 链接同步更新；每个新目录有 README。
+
+## 三个感知角色的目录与 Tool 回执
+
+VisionPerception、Photographer、ApplicationControl 以 SpeechPerception 为参照，经角色绑定的端口发送独立的 Tool 请求，并直接消费相应回执。相机操作和应用设置按原请求推进事务，失败进入原有的清理和呈现流程。三个角色移除旧执行反馈订阅。加载与蓝牙状态的展示调用由发送处在返回、抛错或取消时释放在途记录。
+
+四个感知角色共用 Input、Workflow、Output 三种目录，分别放角色输入、处理策略、输出编码或派发。根目录放角色入口、容器和会话装配。SpeechPerception 本身仅调整文件位置与文档。同步角色 README、总体设计、Xcode 工程引用、边界检查与回归测试。

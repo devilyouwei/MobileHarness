@@ -212,13 +212,10 @@ private actor ResourcePresentationFixture: ResourcePresentationCapability {
         return
     }
     let raw = "e" + String(repeating: "\u{0301}", count: 3000)
-    let payload = InputPayload.toolResult(ToolResult(callID: call.id, value: raw, isError: true))
-    try await agent.receive(
-        AgentInput(
-            id: UUID().uuidString,
-            sessionID: session, payload: payload,
-            metadata: InputMetadata(
-                payload: payload, source: "runtime", origin: .runtime, rootID: UUID().uuidString)))
+    try await agent.acceptToolReply(
+        .init(
+            source: first.source, inputID: first.inputID, sequence: first.sequence,
+            tool: .init(callID: call.id, value: raw, isError: true), failure: nil), for: first)
     let failure = try #require(await iterator.next())
     guard case .toolCall(let presentation) = failure.output else {
         Issue.record("Expected failure presentation")

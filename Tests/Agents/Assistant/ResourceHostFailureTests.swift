@@ -42,16 +42,27 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
         if failing { throw ApplicationControlIntentFailure.execution("diagnostic fixture failed") }
     }
 }
-@Test(.actionCatalog) func resourceHostDispatchPresentsWithoutReplayingNativeEffect() async throws {
+@Test(.actionCatalog) func resourceCommandConsumesDirectCompletionWithoutFeedbackSubscription() async throws {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let runtime = try await resourceRuntime(
         native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
+    try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
+    #expect(await native.calls == ["download"])
+    #expect(await ui.calls.isEmpty)
+    #expect(!runtime.agent.descriptor.inputs.contains(.toolResult))
+    await runtime.shutdown()
+}
+@Test(.actionCatalog) func resourceHostDispatchPresentsWithoutReplayingNativeEffect() async throws {
+    let native = HostResourceFixture()
+    let ui = HostPresentationFixture()
+    let runtime = try await resourceRuntime(
+        native, presentation: ui, missingPaths: ["System.ModelResources.download"])
     do {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
-        Issue.record("Non-returning dispatch must fail")
+        Issue.record("Dispatch to a missing Tool must fail")
     } catch ApplicationControlIntentFailure.presented(let message) {
-        #expect(message.contains("returning feedback"))
+        #expect(message.contains("Unknown tool"))
     }
     #expect(await native.calls.isEmpty)
     #expect(await ui.calls == ["operation"])
@@ -67,15 +78,17 @@ private actor HostPresentationFixture: ResourcePresentationCapability {
     let ui = HostPresentationFixture(failing: true)
     let runtime = try await resourceRuntime(
         native, presentation: ui, includeOperationFailurePresentation: !missing,
-        nonReturningPaths: ["System.ModelResources.download"])
+        missingPaths: ["System.ModelResources.download"])
     do {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
         Issue.record("Failed diagnostic must retain original failure")
-    } catch let error as NativeCleanupFailure {
-        #expect(error.errors.count == 2)
-        let message = String(describing: error)
-        #expect(message.contains("returning feedback"))
-        #expect(message.contains(missing ? "Unknown tool" : "diagnostic fixture failed"))
+    } catch ApplicationControlIntentFailure.execution(let message) {
+        #expect(message.contains("Unknown tool: System.ModelResources.download"))
+        #expect(
+            message.contains(
+                missing
+                    ? "Unknown tool: UI.ResourcePresentation.showResourceOperationFailure" : "diagnostic fixture failed"
+            ))
     }
     #expect(await native.calls.isEmpty)
     #expect(await ui.calls.count == (missing ? 0 : 1))
@@ -190,7 +203,7 @@ private actor HeldHostBinding: ModelResourceCapability {
     let native = HostResourceFixture()
     let ui = HostPresentationFixture()
     let runtime = try await resourceRuntime(
-        native, presentation: ui, nonReturningPaths: ["System.ModelResources.download"])
+        native, presentation: ui, missingPaths: ["System.ModelResources.download"])
     await #expect(throws: ApplicationControlIntentFailure.self) {
         try await runtime.perform(.download(id: "model", endpoint: "https://example.com", allowsCellular: false))
     }
@@ -204,23 +217,23 @@ private actor HeldHostBinding: ModelResourceCapability {
 }
 
 @Test(.actionCatalog, .timeLimit(.minutes(1)), arguments: [false, true]) @MainActor
-func uiOwnedResourceDispatchChecksReturningFeedbackBeforeEffectsAndKeepsDiagnostics(failing: Bool) async throws {
+func uiOwnedResourceDispatchSurfacesMissingToolBeforeEffects(failing: Bool) async throws {
     let root = UIContainer()
     try root.start()
     let native = HostResourceFixture()
     let presentation = HostPresentationFixture(failing: failing)
     let host = try await resourceRuntime(
-        native, presentation: presentation, nonReturningPaths: ["System.ModelResources.download"],
+        native, presentation: presentation, missingPaths: ["System.ModelResources.download"],
         uiResources: root.modelResources)
     try await host.prepareForInteraction()
     do {
         _ = try await root.modelResources.requests.submit(.download("model", .init()))
-        Issue.record("A missing result contract must fail before native admission")
+        Issue.record("A missing Tool must fail before native admission")
     } catch ApplicationControlIntentFailure.presented(let message) {
-        #expect(!failing && message.contains("returning feedback"))
-    } catch let failure as NativeCleanupFailure {
-        #expect(failing && failure.errors.count == 2)
-        #expect(String(describing: failure.errors[0]).contains("returning feedback"))
+        #expect(!failing && message.contains("Unknown tool"))
+    } catch ApplicationControlIntentFailure.execution(let message) {
+        #expect(failing && message.contains("Unknown tool: System.ModelResources.download"))
+        #expect(message.contains("diagnostic fixture failed"))
     }
     #expect(await native.calls.isEmpty)
     #expect(await presentation.calls == ["operation"])
@@ -237,7 +250,7 @@ func uiActionCanPauseItsOwnAgentAndResumeAfterJoinedCleanup() async throws {
     let native = HostResourceFixture()
     let presentation = HostPresentationFixture()
     let host = try await resourceRuntime(
-        native, presentation: presentation, nonReturningPaths: ["System.ModelResources.download"],
+        native, presentation: presentation, missingPaths: ["System.ModelResources.download"],
         uiResources: root.modelResources)
     try await host.prepareForInteraction()
     await presentation.pauseAfterCommit(host.agent)

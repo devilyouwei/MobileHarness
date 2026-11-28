@@ -11,10 +11,7 @@
     "requests": [
       "agent.task.v1"
     ],
-    "feedback": [
-      "action.result.v1",
-      "tool.result.v1"
-    ],
+    "feedback": [],
     "publications": [
       {
         "channel": "agent.interruption",

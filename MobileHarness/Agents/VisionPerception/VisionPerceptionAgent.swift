@@ -22,12 +22,11 @@ public actor VisionPerceptionAgent: Agent {
     // MARK: - State and dependencies
 
     private let contextRepository: AgentContextRepository<VisionPerceptionContextState>
-    private let preprocessor = VisionPerceptionSignalPreprocessor()
+    private static let evidenceCapacity = 256
     private let contextBuilder = VisionPerceptionContextBuilder()
 
     private static let gaze = InternalTool(path: "UI.Gaze.moveEyes", required: ["x", "y"])
     private static let overlay = InternalTool(path: "UI.Pose.showPose", required: ["payload"])
-    private var resultInbox = ActionResultInbox()
     private let mailbox: AgentOutputMailbox
     private var cadence: FrameCadence
     private var gaze: FaceGazeTracker
@@ -178,15 +177,6 @@ public actor VisionPerceptionAgent: Agent {
         guard !input.metadata.expired else {
             expiredInputs += 1
             throw CommunicationError.expired
-        }
-        if case .actionResult(let result) = input.payload {
-            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-                result.owner.agent == descriptor.id,
-                result.owner.sessionID == input.sessionID
-            else { throw CommunicationError.unauthorized }
-            try await prepareSignal(input)
-            resultInbox.accept(result)
-            return
         }
         throw HarnessError.unsupportedInput
     }
@@ -487,19 +477,9 @@ public actor VisionPerceptionAgent: Agent {
                 .init(
                     id: action.id, taskID: parent.taskScope?.id ?? parent.id,
                     kind: "communication.output", data: evidence),
-                retainingLast: VisionPerceptionSignalPreprocessor.evidenceCapacity)
+                retainingLast: Self.evidenceCapacity)
         }
         try emit(.communication(action), input: parent)
-    }
-
-    // MARK: - Context
-
-    private func prepareSignal(_ input: AgentInput) async throws {
-        let snapshot = try await contextRepository.snapshot()
-        let disposition = try preprocessor.classify(input, state: snapshot.state)
-        try await contextRepository.recordSignal(
-            input, disposition: disposition, admissionSequence: snapshot.revision + 1,
-            consumed: disposition != .feedback, retainingLast: VisionPerceptionSignalPreprocessor.evidenceCapacity)
     }
 
     // MARK: - Observability
@@ -511,5 +491,4 @@ public actor VisionPerceptionAgent: Agent {
     public func contextSnapshot() async throws -> AgentContext<VisionPerceptionContextState> {
         try await contextRepository.snapshot()
     }
-    public func actionResults() -> [ActionResult] { resultInbox.results }
 }

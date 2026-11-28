@@ -418,7 +418,7 @@ private actor VisionSessionRecorder {
     #expect(await recorder.inputJoined)
 }
 
-@Test @MainActor func visionDiagnosticsAppearInAgentLogAndToast() async throws {
+@Test(.actionCatalog) @MainActor func visionDiagnosticsAppearInAgentLogAndToast() async throws {
     for code in [
         "vision.pose.failed", "vision.pipeline.failed", "vision.input.failed", "vision.pose.stalled",
         "vision.pose.stale", "vision.input.stalled", "vision.presentation.failed",

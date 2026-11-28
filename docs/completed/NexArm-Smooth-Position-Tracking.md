@@ -8,7 +8,7 @@
 
 - `PlatformKit/Connectivity/NexArm/NexArmMotorCommands.swift` 在现有文件定义公开设备约束：六轴范围、编码器范围、原生速度/加速度、默认参数、连续位置控制速度上限及手动规划导数限制。提供推荐位置更新间隔 50 ms（20 Hz）和 BLE 共用最小写间隔 30 ms（约 33 Hz）。编码器和包验证使用同一份限制。
 - `NexArmProtocol.swift`、`NexArmBluetooth.swift` 使用上述约束；保留所有生产者共享的单信用发送预算、原生可写/MTU/ACK 门控、无积压包队列及超时失败。限制不依赖 Photographer 是否限频。
-- `Agents/Photographer/PhotographerTrackingPolicy.swift` 消费基础模块的更新间隔，输出由 5 Hz 提升至最多 20 Hz；滤波系数随观测时间变化，积分按实际时间推进，长间隔至多积分 0.2 秒。保留画面中心死区、构图角度窗口、拒绝输出不推进目标、目标丢失不盲目外推。
+- `Agents/Photographer/Workflow/PhotographerTrackingPolicy.swift` 消费基础模块的更新间隔，输出由 5 Hz 提升至最多 20 Hz；滤波系数随观测时间变化，积分按实际时间推进，长间隔至多积分 0.2 秒。保留画面中心死区、构图角度窗口、拒绝输出不推进目标、目标丢失不盲目外推。
 - 检查执行链后补充：`PhotographerExecutionSession.swift` 原跟踪派发队列容量 8 会在慢执行时追赶旧目标，改为正在执行一个、待执行最新一个；替换仅限同一跟踪会话的未执行目标，公开饱和计数记录被替换数量，detach/shutdown 清空单槽并取消加入 worker。普通摄影事务不采用目标覆盖语义。补充真实角色/Gateway 派发的慢消费者回归。
 - `Actions/NexArm/Tracking/NexArmAimCommand.swift` 将目标门槛由 12 count 缩小为 3 count；保留单次步幅内的有限前瞻及硬范围钳制，运行速度根据已接纳目标间的实际时间计算，避免更新频率提高后速度反而降低。只有实际接纳才提交目标/采样历史，未发送目标可被替换。静止目标不重复发送。
 - `NexArmControlService.swift` 跟踪 worker 按设备推荐间隔处理最新单槽目标；手动 worker 引用 SDK 最小间隔。资源、取消和会话所有权保持现有设计。

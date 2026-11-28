@@ -22,7 +22,7 @@ App/Adapters/MediaInputAdapter.swift groups native image conversion and explicit
 | Types/Vision/VisionValues.swift | Generic image attachment/input, pose observation, overlay/statistics and validation errors |
 | Types/Audio/AudioFrame.swift | PCM format/frame/input values and validation errors |
 | Types/Speech/SpeechValues.swift | Speech phase and synthesis-request values |
-| Agents/VisionPerception/FrameMotionAnalyzer.swift | Motion sample attachment and fixed-size sample validation alongside its consumer |
+| Agents/VisionPerception/Workflow/FrameMotionAnalyzer.swift | Motion sample attachment and fixed-size sample validation alongside its consumer |
 | Agents/Assistant/AssistantAgent.swift | Assistant prompt/text policy with the existing actor |
 | App/Adapters/MediaInputAdapter.swift | Host sources/deadlines and native image conversion |
 

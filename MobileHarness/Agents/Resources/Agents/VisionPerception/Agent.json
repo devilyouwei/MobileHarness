@@ -7,10 +7,7 @@
   "states": [],
   "signals": {
     "requests": [],
-    "feedback": [
-      "action.result.v1",
-      "tool.result.v1"
-    ],
+    "feedback": [],
     "publications": [
       {
         "channel": "perception.vision.pose",

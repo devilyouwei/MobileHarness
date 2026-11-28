@@ -740,7 +740,7 @@ resource_assembly = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_te
 if re.search(r'\.(?:downloadArtifact|cancelArtifact|removeArtifact)\(', resource_assembly):
     errors.append('Settings resource mutations must cross Agent/Gateway commands')
 # Preference application must enter Agent routing; native lifecycle binding stays injected.
-ui_control = (ROOT / 'MobileHarness/Agents/ApplicationControl/ApplicationControlUI.swift').read_text()
+ui_control = (ROOT / 'MobileHarness/Agents/ApplicationControl/Input/ApplicationControlUI.swift').read_text()
 if not re.search(r'executeUI\(\s*intent.input\(sessionID: sessionID\)', ui_control):
     errors.append('Preference restore/save must cross ApplicationControl')
 preferences_facade = (ROOT / 'MobileHarness/Actions/System/ModelResources/ModelResourcesClient.swift').read_text()
@@ -761,7 +761,10 @@ if re.search(r'listenToContainers|containerInputs|handleSettings|handleResources
     errors.append('AgentContainer must not consume or dispatch UI requests')
 for role, capability in [('ApplicationControl', 'uiSettings'), ('Photographer', 'uiCamera'), ('Memory', 'uiHistory')]:
     source = (ROOT / f'MobileHarness/Agents/{role}/{role}Agent.swift').read_text()
-    ui_source = (ROOT / f'MobileHarness/Agents/{role}/{role}UI.swift').read_text()
+    ui_directory = ROOT / 'MobileHarness/Agents' / role
+    if role in ('ApplicationControl', 'Photographer'):
+        ui_directory /= 'Input'
+    ui_source = (ui_directory / f'{role}UI.swift').read_text()
     if capability not in source or 'try await startUIInputs()' not in source or 'await stopUIInputs()' not in source:
         errors.append(f'{role} must inject UI and own subscriptions in its lifecycle')
     if 'consumeUI(' not in ui_source or 'ExecutionSession' in ui_source or 'InputGateway' in ui_source:
@@ -769,7 +772,7 @@ for role, capability in [('ApplicationControl', 'uiSettings'), ('Photographer', 
 resource_interaction = (ROOT / 'MobileHarness/Actions/System/ModelResources/ModelResourceInteractionWorkflow.swift').read_text()
 if re.search(r'state\.(?:items|installedGroups)\s*=', resource_interaction):
     errors.append('Resource refresh state commits must use registered presentation')
-resource_agent = '\n'.join(source.read_text() for source in (ROOT / 'MobileHarness/Agents/ApplicationControl').glob('*.swift') if source.resolve() not in integration_sources)
+resource_agent = '\n'.join(source.read_text() for source in (ROOT / 'MobileHarness/Agents/ApplicationControl').rglob('*.swift') if source.resolve() not in integration_sources)
 if 'Camera.Capture.' in resource_agent:
     errors.append('Camera decisions/grants belong to Photographer, not ApplicationControl')
 if set(re.findall(r'\bimport\s+(\w+)', resource_agent)) - {'AgentCore', 'Foundation', 'ModelKit', 'StorageChat', 'StorageCore', 'Actions', 'PlatformKit'}:
@@ -1097,10 +1100,10 @@ for marker in ('id: "diagnostics"', 'dependencies: ["diagnostics"]', 'phase: .st
     if marker not in failure_lifecycle:
         errors.append(f'Container failure lifecycle ownership missing: {marker}')
 local_schema_files = (
-    'ApplicationControl/ApplicationControlInputs.swift', 'ApplicationControl/ProviderInputs.swift',
-    'ApplicationControl/ModelResourceInputs.swift', 'Photographer/PhotographerCameraInputs.swift',
+    'ApplicationControl/Input/ApplicationControlInputs.swift', 'ApplicationControl/Input/ProviderInputs.swift',
+    'ApplicationControl/Input/ModelResourceInputs.swift', 'Photographer/Input/PhotographerCameraInputs.swift',
     'Assistant/Workflow/AssistantSessionControl.swift', 'Memory/MemoryHistoryIntent.swift',
-    'SpeechPerception/SpeechListeningInputs.swift', 'AgentContracts.swift',
+    'SpeechPerception/Input/SpeechListeningInputs.swift', 'AgentContracts.swift',
 )
 for name in local_schema_files:
     source = ROOT / 'MobileHarness/Agents' / name
@@ -1140,7 +1143,7 @@ for name, filename in (
     ('SpeechRecognitionTurn', 'SpeechRecognitionTurn.swift'),
     ('TranscriptAccumulator', 'SpeechRecognitionTurn.swift'),
 ):
-    source = speech_root / filename
+    source = speech_root / 'Workflow' / filename
     if not source.is_file():
         errors.append(f'Missing speech helper: {name}')
         continue
@@ -1153,7 +1156,7 @@ for name, filename in (
 if (speech_root / 'LiveSpeechInput.swift').exists():
     errors.append('Obsolete LiveSpeechInput must not duplicate SpeechRecognitionTurn')
 
-sound_estimator = ROOT / 'MobileHarness/Agents/SpeechPerception/SoundSourceEstimator.swift'
+sound_estimator = ROOT / 'MobileHarness/Agents/SpeechPerception/Workflow/SoundSourceEstimator.swift'
 if not sound_estimator.exists() or set(re.findall(r'^import (\w+)', sound_estimator.read_text(), re.MULTILINE)) - {'Foundation'}:
     errors.append('SoundSourceEstimator must remain pure Foundation-only Agent policy')
 
@@ -1310,7 +1313,7 @@ for source in (ROOT / 'MobileHarness/Agents/Support/Core/Input').rglob('*.swift'
     if declared & domain_names:
         raise SystemExit(f'Agent-domain value in generic input contracts: {source.relative_to(ROOT)}')
 for name, path in [
-    ('SpeechPhase', 'SpeechPerception/SpeechPerceptionProcessing.swift'),
+    ('SpeechPhase', 'SpeechPerception/Workflow/SpeechPerceptionProcessing.swift'),
     ('PoseObservation', 'Support/Communication/PoseObservation.swift'),
 ]:
     source = ROOT / 'MobileHarness/Agents' / path
@@ -1433,7 +1436,7 @@ if 'context.provenance' not in output_envelope_source:
 resource_view = (ROOT / 'MobileHarness/UI/Settings/ModelResourcesView.swift').read_text()
 if 'controls.refresh()' in resource_view or 'Task.sleep(for: .seconds(1))' in resource_view:
     raise SystemExit('Resource page cannot own status polling.')
-observer_source = (ROOT / 'MobileHarness/Agents/ApplicationControl/ResourceObservationSession.swift').read_text()
+observer_source = (ROOT / 'MobileHarness/Agents/ApplicationControl/Input/ResourceObservationSession.swift').read_text()
 if set(re.findall(r'\bimport\s+(\w+)', observer_source)) - {'Foundation', 'ModelKit'}:
     raise SystemExit('Resource observation must remain independent of business mutations.')
 if 'Task.sleep' in observer_source or 'JSONEncoder' in observer_source:
@@ -1698,7 +1701,7 @@ for filename in ('VoiceAgentSession.swift', 'AudioDetectionAgentSession.swift'):
     source = (ROOT / 'MobileHarness/Agents/SpeechPerception' / filename).read_text()
     if re.search(r'AudioInputOutput|\.(?:startCapture|stopCapture|requestPermissions|playStream|stopPlayback)\(|\.present\(', source):
         errors.append(f'Role session contains execution side effects: {filename}')
-perception = (ROOT / 'MobileHarness/Agents/SpeechPerception/SpeechPerceptionMicrophone.swift').read_text()
+perception = (ROOT / 'MobileHarness/Agents/SpeechPerception/Input/SpeechPerceptionMicrophone.swift').read_text()
 if re.search(r'\.present\(|uiHome\.conversation', perception):
     # The injected Actions presentation service is the only allowed telemetry effect.
     if re.search(r'(?:state|uiHome|conversation)\.present\(|uiHome\.conversation', perception):
@@ -1720,7 +1723,7 @@ if re.search(r'endpoint\.run|class AudioDetectionWorkflow|captureStart|completed
 detection_execution = (actions_root / 'Speech/Detection/AudioDetectionExecution.swift').read_text()
 if 'makePerception' in detection_execution:
     errors.append('Actions must not create diagnostic Agent graphs')
-if 'detectionRequests' not in ui_control or 'listenFacts()' not in (ROOT / 'MobileHarness/Agents/Photographer/PhotographerUI.swift').read_text():
+if 'detectionRequests' not in ui_control or 'listenFacts()' not in (ROOT / 'MobileHarness/Agents/Photographer/Input/PhotographerUI.swift').read_text():
     errors.append('Diagnostic and camera fact inputs must be owned by their actual Agent')
 assembly = (ROOT / 'MobileHarness/Agents/AgentRuntime.swift').read_text()
 features = (ROOT / 'MobileHarness/Agents/AgentContainer.swift').read_text()
@@ -1742,6 +1745,8 @@ if 'executionAttachment' not in (ROOT / 'MobileHarness/Agents/Support/Core/Outpu
 for role in ('Assistant', 'ApplicationControl', 'Memory', 'Photographer'):
     filename = role + 'ExecutionSession.swift'
     role_host = ROOT / 'MobileHarness/Agents' / role / filename
+    if role in ('ApplicationControl', 'Photographer'):
+        role_host = role_host.parent / 'Output' / filename
     source = role_host.read_text()
     if (support / 'Communication' / filename).exists():
         errors.append(f'Role execution host belongs to its role directory: {filename}')
@@ -1787,11 +1792,12 @@ for marker in ('environmentSequence', 'pendingEnvironment', 'recordEnvironmentFa
     if marker in assembly:
         raise SystemExit(f'AgentContainer must only wire environment policy: {marker}')
 for owner, names in {
-    'ApplicationControl': ('ApplicationControlInputs.swift', 'ApplicationEnvironmentInputs.swift', 'ProviderInputs.swift', 'ModelResourceInputs.swift'),
+    'ApplicationControl/Input': ('ApplicationControlInputs.swift', 'ApplicationEnvironmentInputs.swift', 'ProviderInputs.swift', 'ModelResourceInputs.swift'),
     'Assistant/Workflow': ('AssistantSessionControl.swift',),
     'Memory': ('MemoryHistoryIntent.swift',),
-    'Photographer': ('PhotographerCameraInputs.swift',),
-    'SpeechPerception': ('SpeechListeningInputs.swift', 'VoiceInteractionSession.swift'),
+    'Photographer/Input': ('PhotographerCameraInputs.swift',),
+    'SpeechPerception/Input': ('SpeechListeningInputs.swift',),
+    'SpeechPerception': ('VoiceInteractionSession.swift',),
     'Support/Context': ('AgentStateContext.swift',),
 }.items():
     for name in names:

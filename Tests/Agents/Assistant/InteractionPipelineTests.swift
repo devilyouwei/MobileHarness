@@ -178,7 +178,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
     #expect(emitted == 2)
 }
 
-@Test(.actionCatalog) func independentManualTerminalResultIsRetainedWithoutSchedulingAnotherAction() async throws {
+@Test(.actionCatalog) func applicationControlRejectsUnsolicitedActionFeedback() async throws {
     let session = UUID().uuidString
     let agent = try ApplicationControlAgent(
         sessionID: session,
@@ -203,11 +203,8 @@ private actor InteractionPresentation: ResourcePresentationCapability {
         metadata: InputMetadata(
             payload: payload, source: "runtime", origin: .runtime,
             rootID: root, parentID: root))
-    try await agent.receive(feedback)
-    try await agent.receive(feedback)
-    #expect(await agent.manualResults().count == 1)
+    await #expect(throws: HarnessError.self) { try await agent.receive(feedback) }
     #expect(await agent.status().queuedInputs == 0)
-    #expect(await agent.manualResults().first?.report?.executionFailure?.rawValue == "device.unavailable")
     let publicState = String(decoding: try JSONEncoder().encode(await agent.applicationState()), as: UTF8.self)
     #expect(!publicState.contains(try #require(result.executionID)) && !publicState.contains("lastDeviceResult"))
     let forged = AgentInput(
@@ -215,7 +212,7 @@ private actor InteractionPresentation: ResourcePresentationCapability {
         sessionID: session, payload: payload,
         metadata: InputMetadata(
             payload: payload, source: "user", origin: .local, rootID: UUID().uuidString))
-    await #expect(throws: CommunicationError.unauthorized) { try await agent.receive(forged) }
+    await #expect(throws: HarnessError.self) { try await agent.receive(forged) }
     try await agent.receive(
         AppEnvironmentFact(category: .scene, sequence: 1, value: "active").input(sessionID: session))
     #expect(try await agent.applicationState().value?.scene == "active")

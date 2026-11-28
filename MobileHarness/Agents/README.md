@@ -208,3 +208,5 @@ Agent–Agent communication uses bound AgentMessaging with direct AgentRequestRe
 Task event producers declare their production protocols and publish on demand through identity-bound ports and do not know subscribers or their readiness. Assistant statically subscribes to Writer events from startup until role stop; its own in-memory task tracking handles producer/task/session matching and completion cleanup without opening or closing that channel. Shared Support provides generic handles and routing only; it cannot create subscriptions in response to a publication. See [Assistant](Assistant/README.md) and [communication contracts](Support/Core/Communication/README.md).
 
 配置变更通过 App 请求 AgentContainer 退出受影响的语音、Assistant、Writer 或 Decision 工作。Writer 保留已产生的草稿，Decision 废弃旧配置代的结果。首页确认就绪后恢复相关角色入口。
+
+感知角色的业务 Tool 使用调用方直接回执，各角色的 Input、Workflow、Output 子目录分别拥有输入接纳、处理策略和输出。

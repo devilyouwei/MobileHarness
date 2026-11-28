@@ -19,18 +19,18 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | 文件 | 职责 |
 | --- | --- |
 | [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | Isolated diagnostic role, result pump and neutral detection connection type specializations; no native capture ownership |
-| [SoundSourceEstimator.swift](SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
-| [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 语音分段、起声门槛和播放让声的能量档位；`SpeechOnsetPolicy` 由基础设置和播放事实得出单个窗口的起声概率、起声窗口数与维持概率 |
+| [SoundSourceEstimator.swift](Workflow/SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
+| [SpeechBoundaryPolicy.swift](Workflow/SpeechBoundaryPolicy.swift) | 语音分段、起声门槛和播放让声的能量档位；`SpeechOnsetPolicy` 由基础设置和播放事实得出单个窗口的起声概率、起声窗口数与维持概率 |
 | [PlatformKit 播放快照](../../PlatformKit/Audio/README.md) | 通过原生只读端口查询最近 32 段播放区间 |
-| [AudioFrameFloat32.swift](AudioFrameFloat32.swift) | 本目录共享的 Float32 PCM 读写与帧电平（dBFS）扩展，不改变 ModelKit 契约 |
-| [SpeechListeningInputs.swift](SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
+| [AudioFrameFloat32.swift](Input/AudioFrameFloat32.swift) | 本目录共享的 Float32 PCM 读写与帧电平（dBFS）扩展，不改变 ModelKit 契约 |
+| [SpeechListeningInputs.swift](Input/SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
 | [SpeechPerceptionAgent.swift](SpeechPerceptionAgent.swift) | 聆听策略、输入代际、VAD／ASR 协调与角色消息 |
-| [SpeechPerceptionMicrophone.swift](SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
-| [SpeechPerceptionSoundSource.swift](SpeechPerceptionSoundSource.swift) | 声源观测的最新值发布：单发布任务、500 ms 新鲜度、替换与拒绝计数；与识别链路无共享队列 |
-| [SpeechPerceptionProcessing.swift](SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
-| [SpeechPCMPreparation.swift](SpeechPCMPreparation.swift) | Capture-scoped optional enhancement and 48/16 kHz resampling; clears history at full-utterance boundaries |
-| [SpeechRecognitionTurn.swift](SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
-| [VoiceActivitySegmenter.swift](VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
+| [SpeechPerceptionMicrophone.swift](Input/SpeechPerceptionMicrophone.swift) | 只读 PCM 的唯一角色订阅、布局校验与模型输入转换 |
+| [SpeechPerceptionSoundSource.swift](Output/SpeechPerceptionSoundSource.swift) | 声源观测的最新值发布：单发布任务、500 ms 新鲜度、替换与拒绝计数；与识别链路无共享队列 |
+| [SpeechPerceptionProcessing.swift](Workflow/SpeechPerceptionProcessing.swift) | 感知角色私有 Context、预处理和聆听策略 |
+| [SpeechPCMPreparation.swift](Workflow/SpeechPCMPreparation.swift) | Capture-scoped optional enhancement and 48/16 kHz resampling; clears history at full-utterance boundaries |
+| [SpeechRecognitionTurn.swift](Workflow/SpeechRecognitionTurn.swift) | 已提交片段、冷启动前缀和转写聚合的有界工作 |
+| [VoiceActivitySegmenter.swift](Workflow/VoiceActivitySegmenter.swift) | VAD 分段、尾静音及实际片段结束判定 |
 | [VoiceAgentSession.swift](VoiceAgentSession.swift) | 感知容器、Assistant 语音子能力与 Actions 语音执行的连接适配器 |
 | [VoiceInteractionSession.swift](VoiceInteractionSession.swift) | 容器内部的语音／诊断组合与生命周期，不向 App 暴露 |
 
@@ -266,7 +266,7 @@ SpeechPerceptionAgent按至多32ms原始片段和512样本DSP输出处理音频�
 
 ## 流式关键词探测
 
-[SpeechKeywordProbe](SpeechKeywordProbe.swift) 从 VAD 首个起声候选接收 16 kHz PCM，
+[SpeechKeywordProbe](Workflow/SpeechKeywordProbe.swift) 从 VAD 首个起声候选接收 16 kHz PCM，
 保留最多 1,600 个预卷采样。每个候选最多排队 8 包，满时关闭本轮探测，ASR 继续。
 设置选择关键词模型且模型已就绪时，从候选窗口开始累积关键词缓存，关闭或模型未就绪则跳过。
 一轮最多发布一个符合 160 ms 尾部静音门限的首次命中。词表包含独立的 `stop` 和「停下」以及中英文长口令。命中必须关联到确认起声后的语句，并仍属于当前采集代。起声撤销、端点和采集关闭使候选失效。原生采集支持全双工且关键词检测已启用时，空闲中和播放中都可产生观察。Assistant 独立决定业务动作。
@@ -278,3 +278,9 @@ SpeechPerceptionAgent按至多32ms原始片段和512样本DSP输出处理音频�
 同一次设置测试内，连续 600 ms 低电平之后的下一次有声输入开启新关键词会话，带入至多 100 ms 预卷。成功交给模型的采样数与处理后电平通过有界频率投影至 UI。
 
 正式采集和关键词测试在开始时读取已保存的关键词置信度，并为该次采集固定词表和阈值。设置测试中的会话重开使用相同词表参数。
+
+## 目录职责
+
+- [Input](Input/) 接收聆听意图和原生麦克风帧，转换输入样本。
+- [Workflow](Workflow/) 拥有语音边界、识别轮次、关键词探测和声源估计。
+- [Output](Output/) 发布最新声源观察并保留发布失败和替换计数。

@@ -17,12 +17,12 @@
 | 文件 | 职责 |
 | --- | --- |
 | [PhotographerAgent.swift](PhotographerAgent.swift) | 相机意图、固定任务和姿态跟踪的角色生命周期 |
-| [PhotographerCameraInputs.swift](PhotographerCameraInputs.swift) | 相机意图、低频状态观察及本角色固定任务解码 |
-| [PhotographerCameraWorkflow.swift](PhotographerCameraWorkflow.swift) | 单槽相机命令、身份验证及结果关联 |
-| [PhotographerExecutionSession.swift](PhotographerExecutionSession.swift) | 摄影注册、受保护输出消费及停止加入 |
-| [PhotographerProcessing.swift](PhotographerProcessing.swift) | 摄影私有状态、阶段与输入预处理 |
-| [PhotographerTrackingPolicy.swift](PhotographerTrackingPolicy.swift) | 新鲜姿态选择和跟踪策略，不操作硬件 |
-| [PhotographerUI.swift](PhotographerUI.swift) | camera 请求与低频事实的角色直接订阅 |
+| [PhotographerCameraInputs.swift](Input/PhotographerCameraInputs.swift) | 相机意图、低频状态观察及本角色固定任务解码 |
+| [PhotographerCameraWorkflow.swift](Workflow/PhotographerCameraWorkflow.swift) | 单槽相机命令、身份验证及结果关联 |
+| [PhotographerExecutionSession.swift](Output/PhotographerExecutionSession.swift) | 摄影注册、受保护输出消费及停止加入 |
+| [PhotographerProcessing.swift](Workflow/PhotographerProcessing.swift) | 摄影私有状态、阶段与输入预处理 |
+| [PhotographerTrackingPolicy.swift](Workflow/PhotographerTrackingPolicy.swift) | 新鲜姿态选择和跟踪策略，不操作硬件 |
+| [PhotographerUI.swift](Input/PhotographerUI.swift) | camera 请求与低频事实的角色直接订阅 |
 
 ## 外部关系（一层）
 
@@ -99,7 +99,7 @@ flowchart LR
 
 `PhotographerUI.swift` 在 start 建立请求与事实消费，按真实 Camera Tool 结果推进 open/close/flip/retry/save。回执在原生结果及角色终态完成后结束，照片处置使用真实 previewID，保存回执另含持久 mediaID；取消加入调用后 retire 状态。事实不通过 camera.state Signal 镜像；相机上下文在模型请求时读取所属容器快照。
 
-Assistant 的 photography Skill 可以直接调用 Camera Actions，不必须委派 Photographer Task。跟踪另行消费 VisionPerception 的 `vision.pose`：前台、连接与准入满足且姿态新鲜才发内部 aim。输出使用 PlatformKit 的位置更新建议间隔 50 ms，最多 20 Hz（实际受姿态产出频率限制）；滤波采用按观测时间计算的 120 ms 时间常数，积分使用实际目标间隔且至多 0.2 秒，画面中心立即停止累加，重复/倒退时间不推进。角色保留画面死区、构图窗口和追随增益，提供 base/pitch 目标；这些是摄影策略，设备编码器范围、运行参数和通信上限由 PlatformKit 拥有，Actions/NexArm 编译有限位置包。角色不转换速度方向位、不切换舵机模式。资源冲突与执行生命周期仍归 Actions/NexArm；设备位置模式为运行前提，软件限位不等于硬件保护。
+Assistant 的 `camera-and-vision` Skill 直接调用拍摄、录像和后台视觉的 Camera Actions。跟踪另行消费 VisionPerception 的 `vision.pose`：前台、连接与准入满足且姿态新鲜才发内部 aim。输出使用 PlatformKit 的位置更新建议间隔 50 ms，最多 20 Hz（实际受姿态产出频率限制）；滤波采用按观测时间计算的 120 ms 时间常数，积分使用实际目标间隔且至多 0.2 秒，画面中心立即停止累加，重复/倒退时间不推进。角色保留画面死区、构图窗口和追随增益，提供 base/pitch 目标；这些是摄影策略，设备编码器范围、运行参数和通信上限由 PlatformKit 拥有，Actions/NexArm 编译有限位置包。角色不转换速度方向位、不切换舵机模式。资源冲突与执行生命周期仍归 Actions/NexArm；设备位置模式为运行前提，软件限位不等于硬件保护。
 
 ## 状态、生命周期与失败
 
@@ -140,3 +140,11 @@ Photographer在既有camera.observeFacts输入中选择倒计时、照片处理�
 Photo disposition intents carry previewID. UI and model captures share Camera-owned preview State without Assistant delegation. Persistent savedMediaID is separate. Disposing of an older cached image does not change another image currently displayed by UI.
 
 UI camera requests capture previewSession before admission. Photographer attaches it to the internal Tool envelope for Camera validation, preserving the user-owned result flow without model feedback. Gallery byte reads remain a typed Camera-owned read capability; browsing is not a model input.
+
+## 目录职责
+
+- [Input](Input/) 接收相机与相册请求，并采集相机状态。
+- [Workflow](Workflow/) 关联相机命令和结果，选择新鲜姿态的跟踪目标。
+- [Output](Output/) 绑定角色执行端，分发相机与跟踪 Tool，停止时加入输出工作。
+
+业务 Tool 经绑定的角色端口发送，调用方按原请求消费执行结果。这些调用独立于模型轮次。

@@ -76,7 +76,7 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
     includeFailurePresentation: Bool = true,
     includeOperationFailurePresentation: Bool = true,
     includePreferenceFailurePresentation: Bool = true,
-    nonReturningPaths: Set<String> = [],
+    nonReturningPaths: Set<String> = [], missingPaths: Set<String> = [],
     providerDiscovery: any ProviderDiscoveryCapability = UnusedProviderDiscovery(),
     providerSettings: any ProviderSettingsCapability = UnusedProviderSettings(),
     device: any DeviceControlCapability = UnusedDeviceControl(),
@@ -121,7 +121,8 @@ func resourceFixturePolicy() throws -> CommunicationPolicy {
         + DeviceModule(device: device).definitions + NavigationModule(presentation: actualPresentation).definitions
         + CameraModule(camera: camera).definitions
     let bindings = functions.filter {
-        (includeFailurePresentation || $0.path.function != "showResourceFailure")
+        !missingPaths.contains($0.path.description)
+            && (includeFailurePresentation || $0.path.function != "showResourceFailure")
             && (includeOperationFailurePresentation || $0.path.function != "showResourceOperationFailure")
             && (includePreferenceFailurePresentation || $0.path.function != "showResourcePreferenceFailure")
     }.map {

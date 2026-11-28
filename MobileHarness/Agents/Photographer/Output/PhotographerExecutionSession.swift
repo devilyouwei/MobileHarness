@@ -55,7 +55,7 @@ public actor PhotographerExecutionSession {
                 started = true
                 pump = Task.detached { [agent] in
                     do {
-                        try await IndependentOutputWorkflow.consumeGeneration(
+                        try await IndependentOutputWorkflow.consumeSignals(
                             agent.outputs, contracts: AgentContracts.communication
                         ) { envelope in
                             await self.consume(envelope)
@@ -90,13 +90,20 @@ public actor PhotographerExecutionSession {
     }
     private func consume(_ envelope: OutputEnvelope) async {
         guard !closed, envelope.source == .photographer else { return }
-        if envelope.roundID != nil || envelope.taskScope != nil
+        if envelope.taskScope != nil
             || {
                 if case .communication = envelope.output { return true }
                 return false
             }()
         {
-            do { _ = try await boundConsumer().execute(envelope) } catch {
+            do {
+                let consumer = try boundConsumer()
+                if case .toolCall = envelope.output {
+                    _ = try await agent.executeCameraTool(envelope, using: consumer)
+                } else {
+                    _ = try await consumer.execute(envelope)
+                }
+            } catch {
                 await report("Photographer output failed: \(error)")
             }
             return
@@ -113,7 +120,7 @@ public actor PhotographerExecutionSession {
         while !Task.isCancelled, let envelope = pendingTracking {
             pendingTracking = nil
             do {
-                let result = try await boundConsumer().execute(envelope)
+                let result = try await boundConsumer().callTool(envelope)
                 if result.isError { await report(result.failure ?? result.tool?.value ?? "Tracking failed") }
             } catch is CancellationError { return } catch { await report(String(describing: error)) }
         }

@@ -8,8 +8,8 @@ The user describes the verified operational improvement from keeping raw sensor 
 
 Checked sources:
 
-- Agents/VisionPerception/VisionPerceptionCamera.swift: consumes native CameraFrame directly and locally adapts processing context; there is no Gateway input transport hop.
-- Agents/SpeechPerception/SpeechPerceptionMicrophone.swift: owns the read-only capture subscription and processes the bounded native PCM source inline before pulling the next packet.
+- Agents/VisionPerception/Input/VisionPerceptionCamera.swift: consumes native CameraFrame directly and locally adapts processing context; there is no Gateway input transport hop.
+- Agents/SpeechPerception/Input/SpeechPerceptionMicrophone.swift: owns the read-only capture subscription and processes the bounded native PCM source inline before pulling the next packet.
 - Agents/Support/Communication/PerceptionMessage.swift and AgentContracts.swift: typed semantic speech/pose/coordination messages, distinct from raw media.
 - Resources/Agents declarations: speech.final and speech.phase reach Assistant, vision.pose reaches Photographer; declaration alone does not guarantee a subscriber for other published contracts.
 - Agents/Support/InputGateway.swift and OutputGateway.swift: role policy, producer identity, communication output and canonical execution submission.

@@ -647,7 +647,7 @@ Agent 为该轮保留结果接纳状态，确认所需 Action/Tool 反馈已处�
 | [Writer 工作流](../../../MobileHarness/Agents/Writer/README.md) | submit 仍可表达新目标、补充、回答或自然语言停止意图，Writer 保留解释职责；类型化 update/answer/cancel 只用于可信上下文已有明确语义的情况，不能强迫 Assistant 预先代替 Writer 分类。保留消息 ID、delegateID、可选 workspaceID、interactionID、事件序号和来源对话；workspace 不等于任务身份。 |
 | [AgentMessageRepository](../../../MobileHarness/Storage/Database/AgentMessages/README.md) | 当前消息有接收/消费事实、不可变正文、冲突去重、领取 token、有限重试与 dead_letter。新 Reply/事件恢复不能丢失消息级拒绝、未消费终态或把接收标记当作任务完成；终态与通知的原子提交、执行权限退休与通知消费仍是独立职责。 |
 | [UI 请求机制](../../../MobileHarness/UI/Shared/README.md) | 单消费者、64 个普通在途请求、独立控制槽、当前 120 秒处理期限及取消回调不是可省略的监听细节。SignalListener 适配不能把 UI 请求降为没有回复/取消的事件，也不能让页面取消只取消回执而遗留已接纳业务工作。 |
-| [SpeechPerceptionMicrophone.swift](../../../MobileHarness/Agents/SpeechPerception/SpeechPerceptionMicrophone.swift)、[VisionPerception](../../../MobileHarness/Agents/VisionPerception/README.md) | PCM 只保留原生有界 FIFO，当前包处理后再取下一包；视觉保持单在途推理与 latest 候选。统一监听不得新增第二个媒体队列、逐帧 Task 或逐包模型/持久化读取。 |
+| [SpeechPerceptionMicrophone.swift](../../../MobileHarness/Agents/SpeechPerception/Input/SpeechPerceptionMicrophone.swift)、[VisionPerception](../../../MobileHarness/Agents/VisionPerception/README.md) | PCM 只保留原生有界 FIFO，当前包处理后再取下一包；视觉保持单在途推理与 latest 候选。统一监听不得新增第二个媒体队列、逐帧 Task 或逐包模型/持久化读取。 |
 | [AgentInput 元数据](../../../MobileHarness/Agents/Support/Core/AgentInput.swift)、[PoseObservation](../../../MobileHarness/Agents/Support/Communication/PoseObservation.swift) | 源/代际、因果链、时间、序号及 freshness 不因改名丢失；姿态几何、坐标系、置信度等业务 schema 完整迁移，而非只把旧载荷包进新名字。 |
 
 #### 生命周期与恢复边界

@@ -28,7 +28,7 @@ The diagnostic bypass is explicitly documented in the existing [diagnostics desi
 
 ### 3. Touch transaction completion is not consistent across roles
 
-[MemoryUI.mutateUI](../../MobileHarness/Agents/Memory/MemoryUI.swift) returns success when its staged output queue becomes empty and no failure has been seen, even without history.finished. [PhotographerUI.handleUI](../../MobileHarness/Agents/Photographer/PhotographerUI.swift) rejects an empty queue and requires an outcome plus its domain control marker. [ApplicationControlUI.executeUIBody](../../MobileHarness/Agents/ApplicationControl/ApplicationControlUI.swift) also rejects an empty queue and waits for an explicit terminal control.
+[MemoryUI.mutateUI](../../MobileHarness/Agents/Memory/MemoryUI.swift) returns success when its staged output queue becomes empty and no failure has been seen, even without history.finished. [PhotographerUI.handleUI](../../MobileHarness/Agents/Photographer/Input/PhotographerUI.swift) rejects an empty queue and requires an outcome plus its domain control marker. [ApplicationControlUI.executeUIBody](../../MobileHarness/Agents/ApplicationControl/Input/ApplicationControlUI.swift) also rejects an empty queue and waits for an explicit terminal control.
 
 The discrepancy means an incomplete history output sequence can appear successful where analogous adapters reject it. This is a static protocol gap, not a reproduced user-visible failure. Require an explicit successful terminal condition consistently; add failure-case regression coverage when implementing the change.
 

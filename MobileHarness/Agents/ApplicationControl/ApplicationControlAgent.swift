@@ -70,7 +70,6 @@ public actor ApplicationControlAgent: Agent {
     private let publishIssue: @MainActor @Sendable (ExecutionIssue, Bool) -> Void
     private let diagnosticContracts: Set<String> = [ContainerFailureEvent.contract, RuntimeFailureEvent.contract]
 
-    private var deviceResults = ActionResultInbox()
     private var messaging: AgentMessaging?
     private let taskCoordinator: AgentFixedTaskCoordinator<ApplicationControlContextState>
     private var fixedTaskInputs: [String: AgentInput] = [:]
@@ -118,7 +117,7 @@ public actor ApplicationControlAgent: Agent {
             category: configuration.category,
             id: .applicationControl, name: "ApplicationControl",
             inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control],
+            outputs: [.communication, .toolCall, .control],
             capabilities: try configuration.capabilities.adding(
                 internalTools: [
                     InternalTool(path: "Speech.Detection.run"),
@@ -315,7 +314,28 @@ public actor ApplicationControlAgent: Agent {
 
     // MARK: - Input processing
 
+    func executeTool(_ envelope: OutputEnvelope, using consumer: GatewayOutputConsumer) async throws
+        -> OutputExecutionResult
+    {
+        if case .toolCall(let call) = envelope.output, statePresentationCalls.contains(call.id) {
+            defer { statePresentationCalls.remove(call.id) }
+            return try await consumer.callTool(envelope)
+        }
+        let result = try await consumer.callTool(envelope)
+        try await acceptToolReply(result, for: envelope)
+        return result
+    }
+
+    func acceptToolReply(_ result: OutputExecutionResult, for envelope: OutputEnvelope) async throws {
+        try await receiveSignal(result.toolReplyInput(for: envelope))
+        await updateConnectionIsland()
+    }
+
     public func receive(_ input: AgentInput) async throws {
+        switch input.payload {
+        case .toolResult, .actionResult: throw HarnessError.unsupportedInput
+        default: break
+        }
         do {
             try await receiveSignal(input)
             await updateConnectionIsland()
@@ -349,25 +369,6 @@ public actor ApplicationControlAgent: Agent {
             try await receiveFailure(input, message: message)
             return
         }
-        if case .toolResult(let result) = input.payload,
-            windowCalls.contains(result.callID)
-        {
-            guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-                input.sessionID == sessionID, input.taskScope == nil
-            else { throw CommunicationError.unauthorized }
-            windowCalls.remove(result.callID)
-            return
-        }
-        if case .toolResult(let result) = input.payload, statePresentationCalls.contains(result.callID) {
-            guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-                input.sessionID == sessionID, input.taskScope == nil
-            else { throw CommunicationError.unauthorized }
-            statePresentationCalls.remove(result.callID)
-            return
-        }
-
         var input = input
         if case .observation(let message) = input.payload, let signal = message.content(as: AgentTaskSignal.self) {
             if signal.kind == .cancel,
@@ -547,7 +548,7 @@ public actor ApplicationControlAgent: Agent {
 
     private func acceptsPassive(_ input: AgentInput) -> Bool {
         switch input.payload {
-        case .actionResult, .toolResult, .executionFeedback: return true
+        case .toolResult: return true
         case .observation(let message):
             if case .retire? = message.resourceIntent {
                 return input.metadata.origin == .local && input.metadata.source == "runtime"
@@ -565,13 +566,6 @@ public actor ApplicationControlAgent: Agent {
         }
         guard !input.metadata.expired else { throw CommunicationError.invalidPayload }
         switch input.payload {
-        case .actionResult(let result):
-            guard input.metadata.origin == .runtime, input.metadata.source == "runtime",
-                result.owner.agent == descriptor.id, result.owner.sessionID == sessionID
-            else { throw CommunicationError.unauthorized }
-            deviceResults.accept(result)
-            processed += 1
-            return
         case .observation(let message):
             if let fact = message.appEnvironment {
                 guard input.metadata.origin == .local, input.metadata.incarnation == nil,
@@ -1019,8 +1013,6 @@ public actor ApplicationControlAgent: Agent {
                 sceneSequence: environment[.scene]?.sequence,
                 modelPreparationSequence: environment[.modelPreparation]?.sequence))
     }
-
-    public func manualResults() -> [ActionResult] { deviceResults.results }
 
     public func status() -> AgentStatus {
         AgentStatus(

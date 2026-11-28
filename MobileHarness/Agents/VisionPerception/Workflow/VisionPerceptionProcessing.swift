@@ -15,22 +15,6 @@ public struct VisionPerceptionContextState: AgentContextState {
     }
 }
 
-// MARK: - Signal preprocessing
-
-public struct VisionPerceptionSignalPreprocessor: SignalPreprocessor {
-    public static let evidenceCapacity = 256
-    public static let outputCapacity = 18
-
-    public init() {}
-    public func classify(_ input: AgentInput, state: VisionPerceptionContextState) throws -> SignalDisposition {
-        guard !input.metadata.expired else { throw CommunicationError.expired }
-        switch input.payload {
-        case .actionResult: return .feedback
-        default: throw HarnessError.unsupportedInput
-        }
-    }
-}
-
 // MARK: - Context building
 
 public struct VisionPerceptionContextBuilder: ContextBuilder {

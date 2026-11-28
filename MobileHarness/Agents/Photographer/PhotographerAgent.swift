@@ -77,7 +77,7 @@ public actor PhotographerAgent: Agent {
             category: configuration.category,
             id: configuration.agentID, name: "Photographer",
             inputs: configuration.communication.inputKinds,
-            outputs: [.communication, .actionCall, .toolCall, .control],
+            outputs: [.communication, .toolCall, .control],
             capabilities: try Self.runtimeCapabilities(configuration.capabilities))
         taskCoordinator = AgentFixedTaskCoordinator(context: self.contextRepository)
         self.sessionID = sessionID
@@ -185,6 +185,19 @@ public actor PhotographerAgent: Agent {
     // MARK: - Input processing
 
     public func receive(_ input: AgentInput) async throws {
+        if case .toolResult = input.payload { throw CommunicationError.invalidPayload }
+        try await processInput(input)
+    }
+
+    func executeCameraTool(_ envelope: OutputEnvelope, using consumer: GatewayOutputConsumer) async throws
+        -> OutputExecutionResult
+    {
+        let result = try await consumer.callTool(envelope)
+        try await processInput(result.toolReplyInput(for: envelope))
+        return result
+    }
+
+    private func processInput(_ input: AgentInput) async throws {
         if case .observation(let message) = input.payload, message.contract == CameraStateObservation.contract {
             try await receiveCameraState(input, message: message)
             return
@@ -302,23 +315,6 @@ public actor PhotographerAgent: Agent {
             throw HarnessError.notRunning
         @unknown default: throw HarnessError.queueFull
         }
-    }
-
-    private func relay(_ envelope: OutputEnvelope) -> Bool {
-        outputSequence += 1
-        let input = AgentInput(
-            id: envelope.inputID, sessionID: envelope.sessionID, payload: .event("relay"),
-            metadata: envelope.inputMetadata,
-            turn: envelope.turn, taskScope: envelope.taskScope)
-        let result = continuation.yield(
-            OutputEnvelope(
-                source: descriptor.id, context: input.context,
-                output: envelope.output, sequence: outputSequence, roundID: envelope.roundID, callID: envelope.callID,
-                taskScope: input.taskScope, resourceBindings: envelope.resourceBindings))
-        if case .enqueued = result { return true }
-        lifecycle = .failed
-        continuation.finish()
-        return false
     }
 
     // MARK: - Context

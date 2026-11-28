@@ -48,7 +48,7 @@ The 64-window post-interruption buffer opens only after the Assistant accepts an
 
 ### 6. 空转写端点确认已处理的 ASR 事件
 
-ASR 的空转写阈值仍按成功送入模型的 64 个窗计算。若模型已有片段或终稿入队，SpeechPerception 先让当前轮的输出消费者检查这些事件。用 [InferenceSession](../../../MobileHarness/ModelKit/Support/Core/InferenceSession.swift) 的累计事件计数与 [SpeechRecognitionTurn](../../../MobileHarness/Agents/SpeechPerception/SpeechRecognitionTurn.swift) 的已检查计数判断，避免冷启动后积压 PCM 快速补送时把等待读取的片段误判为空。复用原有识别器、输出队列和端点阈值。
+ASR 的空转写阈值仍按成功送入模型的 64 个窗计算。若模型已有片段或终稿入队，SpeechPerception 先让当前轮的输出消费者检查这些事件。用 [InferenceSession](../../../MobileHarness/ModelKit/Support/Core/InferenceSession.swift) 的累计事件计数与 [SpeechRecognitionTurn](../../../MobileHarness/Agents/SpeechPerception/Workflow/SpeechRecognitionTurn.swift) 的已检查计数判断，避免冷启动后积压 PCM 快速补送时把等待读取的片段误判为空。复用原有识别器、输出队列和端点阈值。
 
 ### 7. 关键词配置资源
 

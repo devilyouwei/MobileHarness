@@ -137,7 +137,7 @@ private actor CameraCaller: Agent {
             category: .cognition,
             id: .assistant, name: "Assistant fixture", inputs: [], outputs: [.toolCall, .actionCall, .control],
             capabilities: try AgentSkillLoader.registry(
-                ["photography"], fixed: AgentConfigurations.load(named: "Assistant").capabilities))
+                ["camera-and-vision"], fixed: AgentConfigurations.load(named: "Assistant").capabilities))
     }
     func start() {}
     func pause() {}
@@ -307,25 +307,14 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
         try await agent.receive(
             PhotographerCameraIntent(.close, requestID: UUID().uuidString).input(sessionID: root))
     }
-    try await agent.receive(
-        AgentInput(
-            id: UUID().uuidString,
-            sessionID: root, payload: result,
-            metadata: InputMetadata(
-                payload: result, source: "runtime", origin: .runtime, rootID: UUID().uuidString)))
-    let terminal = try #require(await reader.next())
-    #expect(terminal.inputID == envelope.inputID)
-    #expect(terminal.output.kind == .control)
+    #expect(envelope.roundID == nil)
+    #expect(!agent.descriptor.inputs.contains(.toolResult))
     await #expect(throws: CommunicationError.invalidPayload) {
         try await agent.receive(
             AgentInput(
-                id: UUID().uuidString,
-                sessionID: root, payload: result,
-                metadata: InputMetadata(
-                    payload: result, source: "runtime", origin: .runtime, rootID: UUID().uuidString)))
+                id: UUID().uuidString, sessionID: root, payload: result,
+                metadata: InputMetadata(payload: result, source: "runtime", origin: .runtime, rootID: root)))
     }
-    try await agent.receive(
-        PhotographerCameraIntent(.close, requestID: UUID().uuidString).input(sessionID: root))
     #expect(await agent.status().lifecycle == .running)
     await agent.stop()
 }
@@ -367,35 +356,13 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
     await fixture.runtime.shutdown()
 }
 
-@Test(.actionCatalog) func photographerActionsReturnActualDisposition() async throws {
+@Test(.actionCatalog) func photographerSaveToolReturnsActualDisposition() async throws {
     let fixture = try await CameraFixture()
-    try await fixture.runtime.prepareForInteraction()
-    let caller = fixture.runtime.agent
-    let capabilities = caller.descriptor.capabilities
-    for (alias, state) in [("savePhoto", CameraPhotoCommandReceipt.State.saved)] {
-        let input = AgentInput(
-            id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text(alias))
-        let call = try capabilities.resolveAction(
-            alias, parameters: ["previewID": await fixture.probe.previewID])
-        let result = try await fixture.gateway.execute(
-            OutputEnvelope(
-                source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
-                taskScope: input.taskScope))
-        #expect(result.isError == false)
-        _ = try await fixture.gateway.execute(
-            OutputEnvelope(
-                source: .photographer, context: input.context, output: .control("agent.finished"), sequence: 2,
-                taskScope: input.taskScope))
-        let snapshot = await fixture.gateway.executionResults(inputID: input.id)
-        let record = try #require(snapshot.actions.records.first)
-        guard case .value(let raw)? = record.completion else {
-            Issue.record(
-                "Missing actual photo receipt: \(String(describing: record.completion)) \(record.failureDescription ?? "")"
-            )
-            continue
-        }
-        #expect(try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(raw.utf8)).state == state)
-    }
+    let previewID = await fixture.probe.previewID
+    let raw = try await fixture.runtime.perform(.savePhoto, previewID: previewID)
+    let receipt = try JSONDecoder().decode(CameraPhotoCommandReceipt.self, from: Data(try #require(raw).utf8))
+    #expect(receipt.state == .saved)
+    #expect(receipt.previewID == previewID)
     #expect(await fixture.probe.exports == 1)
     #expect(await fixture.probe.photoVisible)
     await fixture.runtime.shutdown()
@@ -404,21 +371,9 @@ func photographerCameraUsesSharedFunctionsAndRetainsFailuresBeforeRecovering()
 @Test(.actionCatalog) func malformedPhotoCommandsCannotReachNativeEffect() async throws {
     let fixture = try await CameraFixture()
     try await fixture.runtime.prepareForInteraction()
-    let caller = fixture.runtime.agent
-    let input = AgentInput(
-        id: UUID().uuidString, sessionID: UUID().uuidString, payload: .text("invalid photo"))
-    let call = try caller.descriptor.capabilities.resolveAction("savePhoto", parameters: ["previewID": "invalid"])
-    let result = try await fixture.gateway.execute(
-        OutputEnvelope(
-            source: .photographer, context: input.context, output: .actionCall(call), sequence: 1,
-            taskScope: input.taskScope))
-    #expect(result.isError == true)
-    _ = try await fixture.gateway.execute(
-        OutputEnvelope(
-            source: .photographer, context: input.context, output: .control("agent.finished"), sequence: 2,
-            taskScope: input.taskScope))
-    let snapshot = await fixture.gateway.executionResults(inputID: input.id)
-    #expect(snapshot.actions.records.isEmpty)
+    await #expect(throws: PhotographerIntentFailure.self) {
+        try await fixture.runtime.perform(.savePhoto, previewID: "invalid")
+    }
     #expect(await fixture.probe.exports == 0)
     #expect(await fixture.probe.operations.isEmpty)
     #expect(throws: CommunicationError.self) {
@@ -473,7 +428,7 @@ func cameraContainerCallsPhotographerDirectlyAndWaitsForNativeCompletion() async
         ])
     #expect(await fixture.probe.sources.allSatisfy { $0 == "photographer" })
     let catalog = try AgentSkillLoader.registry(
-        ["photography"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
+        ["camera-and-vision"], fixed: AgentConfigurations.load(named: "Assistant").capabilities)
     for (alias, path) in [
         ("configureCamera", "Camera.Capture.configure"), ("startRecording", "Camera.Video.startRecording"),
         ("stopRecording", "Camera.Video.stopRecording"), ("saveVideo", "Camera.Video.saveVideo"),

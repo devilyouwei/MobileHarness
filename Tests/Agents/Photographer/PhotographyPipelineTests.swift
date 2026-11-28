@@ -694,7 +694,7 @@ extension LiveRuntimeTests {
 }
 
 extension LiveRuntimeTests {
-    @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionAcceptsTerminalReceiptsWithoutBlockingFrameAdmission()
+    @Test(.actionCatalog, .timeLimit(.minutes(1))) func visionAcceptsFramesWithoutAnActionFeedbackInbox()
         async throws
     {
         let session = UUID().uuidString
@@ -708,16 +708,15 @@ extension LiveRuntimeTests {
         try await manager.register(agent, sessionID: session)
         try await agent.bind(AgentMessaging { _, _, _ in DeliveryReport() })
         try await manager.start(.visionPerception)
-        let input = InputGateway(manager: manager)
         let owner = ExecutionOwner(
             agent: .visionPerception, incarnation: try await manager.identity(.visionPerception), sessionID: session)
         let result = ActionResult(
             executionID: UUID().uuidString, owner: owner,
             path: ActionPath(domain: "UI", module: "Gaze", function: "moveEyes"), causality: .root(),
             status: .succeeded, effect: .contractCompleted, completion: .completed)
-        #expect(await input.deliverActionResult(result) == .accepted)
-        #expect(await agent.actionResults() == [result])
-        await #expect(throws: CommunicationError.unauthorized) {
+        #expect(!agent.descriptor.inputs.contains(.actionResult))
+        #expect(!agent.descriptor.inputs.contains(.toolResult))
+        await #expect(throws: HarnessError.unsupportedInput) {
             try await agent.receive(
                 AgentInput(
                     id: UUID().uuidString,

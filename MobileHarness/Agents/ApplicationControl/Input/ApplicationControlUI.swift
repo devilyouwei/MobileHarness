@@ -94,7 +94,7 @@ extension ApplicationControlAgent {
         let call = try permission.call(["windowID": reference])
         windowCalls.insert(call.id)
         defer { windowCalls.remove(call.id) }
-        let result = try await consumer.executeReturning(
+        let result = try await consumer.callTool(
             OutputEnvelope(source: descriptor.id, context: context, output: .toolCall(call)))
         try Task.checkCancellation()
         if result.isCancellationOnly { throw CancellationError() }
@@ -143,7 +143,8 @@ extension ApplicationControlAgent {
         let envelope = OutputEnvelope(
             source: descriptor.id, context: context, output: .toolCall(call), executionAttachment: ready)
         let operation = Task {
-            let outcome = try await consumer.execute(envelope)
+            let outcome = try await consumer.callTool(envelope)
+            if outcome.isCancellationOnly { throw CancellationError() }
             if outcome.isError {
                 throw ApplicationControlIntentFailure.execution(
                     outcome.failure ?? outcome.tool?.value ?? "Detection failed")
@@ -367,7 +368,7 @@ extension ApplicationControlAgent {
                 let result: OutputExecutionResult
                 do {
                     if case .toolCall = envelope.output {
-                        result = try await consumer.executeReturning(envelope)
+                        result = try await executeTool(envelope, using: consumer)
                     } else {
                         result = try await consumer.execute(envelope)
                     }

@@ -25,14 +25,14 @@ flowchart LR
     Model -->|"Revision invalidation stream"| Control
     Runtime -->|"Direct typed observations"| Control
     Control -->|"Identity-bound tool calls"| Gateway
-    Gateway -->|"Correlated execution feedback"| Control
+    Gateway -->|"Tool result for the waiting caller"| Control
     Control -->|"Passive State snapshot"| Readers
     Control -->|"Issue records and eligible home notices"| Issues
 ```
 
 Gateway is the role's execution boundary for registered Actions functions, including Provider, ModelResources, Device, Speech Detection, and UI presentation and window functions. App binds the neutral staging and maintenance ports at composition time. Agents owns role authorization, and the role uses fixed tool permissions declared in code.
 
-Assistant's `application-control` Skill calls registered Actions through Assistant's own Gateway scope. ApplicationControl's descriptor declares fixed-task inputs and permission to send `agent.task.events.v1` to Assistant. Its handler validates and decodes authorized fixed-task envelopes, tracks them by scope, handles cancellation, and reports the outcome. The [Assistant descriptor](../Resources/Agents/Assistant/Agent.json) exposes Writer through its enabled text task adapter. The interaction between Assistant and this role in normal operation is a passive State read through the Agents catalog. See [fixed-task admission](../Support/Communication/README.md#固定任务准入) for the shared envelope contract.
+Assistant's `application-control` Skill calls registered window, page, model-resource, provider and Bluetooth Actions through Assistant's own Gateway scope. ApplicationControl's descriptor declares fixed-task inputs and permission to send `agent.task.events.v1` to Assistant. Its handler validates and decodes authorized fixed-task envelopes, tracks them by scope, handles cancellation, and reports the outcome. The [Assistant descriptor](../Resources/Agents/Assistant/Agent.json) exposes Writer through its enabled text task adapter. The interaction between Assistant and this role in normal operation is a passive State read through the Agents catalog. See [fixed-task admission](../Support/Communication/README.md#固定任务准入) for the shared envelope contract.
 
 ## Internal execution flow
 
@@ -77,7 +77,7 @@ flowchart TB
     Failure --> Policy
     Output -->|"Submit calls"| Gateway
     Gateway -->|"Return tool outcomes"| Output
-    Output -->|"Deliver feedback for correlation"| Policy
+    Output -->|"Advance originating transaction"| Policy
     UIInputs --> Reply
     Policy --> Issues
     Snapshot --> State
@@ -86,12 +86,12 @@ flowchart TB
 | Component | Responsibility |
 | --- | --- |
 | [ApplicationControlContainer.swift](ApplicationControlContainer.swift) | Owns the installed session and environment worker, forwards foreground changes, and projects passive State. |
-| [ApplicationControlExecutionSession.swift](ApplicationControlExecutionSession.swift) | Registers the role, binds the Gateway consumer, drains independent output, and joins shutdown. |
-| [ApplicationControlUI.swift](ApplicationControlUI.swift) | Owns typed UI subscriptions and request-scoped execution, including cancellation and reply creation. |
-| [ApplicationControlAgent.swift](ApplicationControlAgent.swift), [ApplicationControlProcessing.swift](ApplicationControlProcessing.swift) | Admit inputs, maintain Context, correlate pending calls, and advance requests from actual outcomes. |
-| [ApplicationControlFunctions.swift](ApplicationControlFunctions.swift), [ApplicationControlPolicy.swift](ApplicationControlPolicy.swift) | Own fixed invocation permissions and pure classification of device facts and failures. |
-| [ApplicationEnvironmentInputs.swift](ApplicationEnvironmentInputs.swift), [ResourceObservationSession.swift](ResourceObservationSession.swift) | Coalesce environment facts and manage the foreground-scoped revision subscription. |
-| [ApplicationControlInputs.swift](ApplicationControlInputs.swift), [ModelResourceInputs.swift](ModelResourceInputs.swift), [ProviderInputs.swift](ProviderInputs.swift) | Define typed local intents, observations, and the business payloads accepted through fixed-task envelopes. |
+| [ApplicationControlExecutionSession.swift](Output/ApplicationControlExecutionSession.swift) | Registers the role, binds the Gateway consumer, drains independent output, and joins shutdown. |
+| [ApplicationControlUI.swift](Input/ApplicationControlUI.swift) | Owns typed UI subscriptions and request-scoped execution, including cancellation and reply creation. |
+| [ApplicationControlAgent.swift](ApplicationControlAgent.swift), [ApplicationControlProcessing.swift](Workflow/ApplicationControlProcessing.swift) | Admit inputs, maintain Context, correlate pending calls, and advance requests from actual outcomes. |
+| [ApplicationControlFunctions.swift](Output/ApplicationControlFunctions.swift), [ApplicationControlPolicy.swift](Workflow/ApplicationControlPolicy.swift) | Own fixed invocation permissions and pure classification of device facts and failures. |
+| [ApplicationEnvironmentInputs.swift](Input/ApplicationEnvironmentInputs.swift), [ResourceObservationSession.swift](Input/ResourceObservationSession.swift) | Coalesce environment facts and manage the foreground-scoped revision subscription. |
+| [ApplicationControlInputs.swift](Input/ApplicationControlInputs.swift), [ModelResourceInputs.swift](Input/ModelResourceInputs.swift), [ProviderInputs.swift](Input/ProviderInputs.swift) | Define typed local intents, observations, and the business payloads accepted through fixed-task envelopes. |
 
 ## Request and completion contracts
 
@@ -120,4 +120,12 @@ The execution session owns registration and the identity-bound consumer. Leaving
 
 Model resource save intents transport vadOnsetWindows and vadThreshold through the existing authorized saveSource function and return the persisted draft.
 
-Resource save and restore use the same protected Action pipeline for the capability-to-model ID map and VAD settings. Result validation accepts only declared fields. The binding applies the committed model map to ModelKit. SpeechPerception reads enhancement and quick-interrupt policy at capture admission.
+Resource save and restore use the same request-scoped Tool calls for the capability-to-model ID map and VAD settings. Result validation accepts only declared fields. The binding applies the committed model map to ModelKit. SpeechPerception reads enhancement and quick-interrupt policy at capture admission.
+
+## 目录职责
+
+- [Input](Input/) 接收窗口、设置、设备和资源请求，观察资源变更。
+- [Workflow](Workflow/) 解释输入事实并选择应用状态、展示和故障处理策略。
+- [Output](Output/) 声明角色调用的函数并消费输出流，使用直接 Tool 回执推进设置和呈现事务。
+
+业务 Tool 经绑定的角色端口发送，调用方按原请求消费执行结果。这些调用独立于模型轮次。

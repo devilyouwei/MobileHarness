@@ -44,7 +44,8 @@ extension PhotographerAgent {
         let call = try InternalTool(path: "Camera.Album.perform").call([:])
         let envelope = OutputEnvelope(
             source: descriptor.id, context: context, output: .toolCall(call), executionAttachment: request)
-        let result = try await consumer.execute(envelope)
+        let result = try await consumer.callTool(envelope)
+        if result.isCancellationOnly { throw CancellationError() }
         if result.isError {
             // take preserves the original storage/platform failure when the handler ran.
             _ = try await request.take()
@@ -105,11 +106,11 @@ extension PhotographerAgent {
                     value.previewSession.map { ["actions.camera.preview": $0] } ?? [:])
                 let result: OutputExecutionResult
                 if case .toolCall = envelope.output {
-                    result = try await consumer.executeReturning(envelope)
+                    result = try await executeCameraTool(envelope, using: consumer)
+                    outcome = result
                 } else {
                     result = try await consumer.execute(envelope)
                 }
-                if case .toolCall = envelope.output { outcome = result }
                 if result.failure != nil { throw PhotographerIntentFailure.execution(result) }
                 if case .control(let state) = envelope.output, state.hasPrefix("photographer.camera.") {
                     guard let outcome else { throw CommunicationError.invalidPayload }

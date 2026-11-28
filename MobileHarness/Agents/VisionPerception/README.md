@@ -20,14 +20,14 @@
 
 | 文件 | 职责 |
 | --- | --- |
-| [FaceGazeTracker.swift](FaceGazeTracker.swift) | 人脸目标选择与视线平滑 |
-| [FrameCadence.swift](FrameCadence.swift) | 采样节奏、姿态需求与有界运动判据 |
-| [FrameMotionAnalyzer.swift](FrameMotionAnalyzer.swift) | 图像运动证据的纯计算 |
-| [PoseOverlayPayload.swift](PoseOverlayPayload.swift) | 推理观测到有界骨架调用载荷的转换 |
+| [FaceGazeTracker.swift](Workflow/FaceGazeTracker.swift) | 人脸目标选择与视线平滑 |
+| [FrameCadence.swift](Workflow/FrameCadence.swift) | 采样节奏、姿态需求与有界运动判据 |
+| [FrameMotionAnalyzer.swift](Workflow/FrameMotionAnalyzer.swift) | 图像运动证据的纯计算 |
+| [PoseOverlayPayload.swift](Output/PoseOverlayPayload.swift) | 推理观测到有界骨架调用载荷的转换 |
 | [VisionAgentSession.swift](VisionAgentSession.swift) | 视觉角色注册、推理／输出分支和停止加入 |
 | [VisionPerceptionAgent.swift](VisionPerceptionAgent.swift) | 视觉角色准入、单推理／最新候选和实际输出 |
-| [VisionPerceptionCamera.swift](VisionPerceptionCamera.swift) | 原始相机帧的角色只读订阅 |
-| [VisionPerceptionProcessing.swift](VisionPerceptionProcessing.swift) | 视觉私有 Context、预处理与采样配置 |
+| [VisionPerceptionCamera.swift](Input/VisionPerceptionCamera.swift) | 原始相机帧的角色只读订阅 |
+| [VisionPerceptionProcessing.swift](Workflow/VisionPerceptionProcessing.swift) | 视觉私有 Context、预处理与采样配置 |
 
 ## 外部关系（一层）
 
@@ -155,3 +155,11 @@ OutputMailbox has 18 total slots shared by discrete output and the overlay/gaze/
 ## Passive container state
 
 stateSnapshot projects local installation/closure and existing work or Agent lifecycle/queue counters directly from memory. Reading starts no role, persistence restoration or inference. Initialization remains in the existing owner lifecycle. The root catalog binds independent readers without sampling roles or maintaining another mutable role-state registry.
+
+## 目录职责
+
+- [Input](Input/) 订阅相机帧并校验捕获代。
+- [Workflow](Workflow/) 计算帧采样节奏、运动证据、姿态上下文和视线目标。
+- [Output](Output/) 将同帧姿态编码成有界骨架 Tool 载荷。
+
+业务 Tool 经绑定的角色端口发送，调用方按原请求消费执行结果。这些调用独立于模型轮次。

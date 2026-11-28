@@ -4,17 +4,14 @@
   "id": "photographer",
   "description": "I own camera and album intent, capture/tracking workflows, preview disposition and photo/video lifecycle. I consume supported camera, album and tracking inputs; my registration does not expose a general public delegation entry.",
   "skills": [
-    "photography"
+    "camera-and-vision"
   ],
   "states": [],
   "signals": {
     "requests": [
       "agent.task.v1"
     ],
-    "feedback": [
-      "action.result.v1",
-      "tool.result.v1"
-    ],
+    "feedback": [],
     "publications": [
       {
         "channel": "agent.task",

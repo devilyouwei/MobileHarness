@@ -38,3 +38,10 @@ Mobile Harness `0.1.0 (2026112706)` 通过 iPhoneOS Debug 构建、严格签名�
 - 本机 Core ML 使用 `Models/YOLOPose/yolo26n-pose.mlpackage` 通过 RGB 夹具的加载、推理、卸载和重载，以及四个方向的 BGRA 夹具推理。缺少制品时显式加载失败的用例也通过。[模型验证用例](../../Tests/ModelKit/Vision/PoseTests.swift)
 - `./scripts/check.sh` 在既有的 AgentContainer State Value codec 和 15 个 Xcode 中文资源归属检查处退出。改动文件的 Swift 严格格式、8 项 Python 工具测试和 `git diff --check` 单独通过。
 - `./scripts/build-ios.sh` 的五个 Simulator scheme 全部通过。主 App 校验了 94 个 Agent／Skill 资源、Live Activity 和中英文本地化。真机相机、骨架和视线的现场复验未执行。
+
+## 2026-11-28 感知角色的独立 Tool 回执
+
+- 常规 Swift 回归通过 1,996 项，其中集成测试 1,305 项。最终源码的 38 项定向回归通过，覆盖相机启动请求返回后的姿态呈现、保存照片的实际回执、资源操作直接完成、缺失 Tool、诊断呈现失败、暂停及重新接纳请求。相机与设备端点使用测试替身。
+- LiveRuntimeTests 的 232 项测试通过。原生呈现套件启动了 cameraNativeMetalDrawStopAndLayerHandoff，未报告该项结束。真机相机和 YOLO 实时叠加未验收。
+- 五个 iOS 模拟器 scheme 构建通过，主 App 的 94 项 Agent／Skill 资源、Live Activity 和中英文本地化通过校验。最终应用源码使用 simulator 依赖配置复编译通过。
+- 工程检查在原有 State Value codec 和 15 项 Xcode 中文资源分组处退出，输出与改动前一致。改动范围的 Swift 严格格式、8 项 Python 工具测试、工程与 plist 语法、四个角色 README 的本地链接以及差异格式检查通过。

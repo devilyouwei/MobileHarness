@@ -25,6 +25,22 @@ public struct OutputExecutionResult: Sendable {
         self.failure = failure
         self.failureCode = failureCode
     }
+    /// Convert the reply to the original Tool invocation into a local workflow input.
+    func toolReplyInput(for envelope: OutputEnvelope) throws -> AgentInput {
+        guard source == envelope.source, inputID == envelope.inputID, sequence == envelope.sequence,
+            case .toolCall(let call) = envelope.output
+        else { throw CommunicationError.invalidPayload }
+        let reply: ToolResult
+        if let failure {
+            reply = ToolResult(callID: call.id, value: failure, isError: true, failureCode: failureCode?.rawValue)
+        } else if let tool, tool.callID == call.id {
+            reply = tool.agentResult(roundID: envelope.roundID, invocation: invocation)
+        } else {
+            throw CommunicationError.invalidPayload
+        }
+        return try envelope.toolFeedbackInput(reply)
+    }
+
     public var isError: Bool { !isCancellationOnly && (failure != nil || tool?.isError == true) }
 
     /// Cancellation remains an unsuccessful outcome, but is not itself a runtime incident.
