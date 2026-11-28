@@ -617,7 +617,7 @@ let package = Package(
             path: "MobileHarness/Agents",
             exclude: [
                 "AGENTS.md",
-                "ApplicationControl/README.md", "Assistant/README.md", "Memory/README.md",
+                "ApplicationControl/README.md", "Assistant/README.md", "Assistant/Trigger/README.md", "Memory/README.md",
                 "Writer/README.md", "README.md",
                 "SpeechPerception/README.md",
                 "Support/Chat/README.md",

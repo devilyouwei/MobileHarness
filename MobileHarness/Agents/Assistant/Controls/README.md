@@ -5,7 +5,7 @@ Control library and execution. Declarations load from [Agents/Resources/Agents/A
 | File | Responsibility |
 | --- | --- |
 | [AssistantControls.swift](AssistantControls.swift) | Library loading and validation, `AgentControlOperation`, fixed registrations and the usage guide. |
-| [AssistantControlExecution.swift](AssistantControlExecution.swift) | `executeControl`, `control` gating, the state/Skill/send entries, the `task` trigger, `setHostState` and the late-bound `AssistantControlLink`. |
+| [AssistantControlExecution.swift](AssistantControlExecution.swift) | `executeControl`, `control` gating, the state/Skill/send entries, dispatch to the [state triggers](../Trigger/README.md), `setHostState` and the late-bound `AssistantControlLink`. |
 
 The late-bound link also forwards speech publication failures to the Assistant's utterance wait owner; it does not deliver speech text.
 

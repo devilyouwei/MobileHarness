@@ -1513,6 +1513,10 @@
 		CD15EFF754CE53C7A4ED2D3F /* MobileHarness/Agents/Resources/Skills/WriterWorkspace/Description.zh-Hans.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Resources/Skills/WriterWorkspace/Description.zh-Hans.md; sourceTree = SOURCE_ROOT; };
 		FF5B4F0015C6525BADC36C3A /* MobileHarness/Agents/Resources/Skills/WriterFileEditing/Description.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Resources/Skills/WriterFileEditing/Description.md; sourceTree = SOURCE_ROOT; };
 		AC841A21EBCD5F3291751094 /* MobileHarness/Agents/Resources/Skills/WriterFileEditing/Description.zh-Hans.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Resources/Skills/WriterFileEditing/Description.zh-Hans.md; sourceTree = SOURCE_ROOT; };
+		03FB776CF5F281B9F03FE4D5 /* MobileHarness/Agents/Assistant/Trigger/AssistantTriggers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Trigger/AssistantTriggers.swift; sourceTree = SOURCE_ROOT; };
+		21285753DED8DA59CF1A6747 /* MobileHarness/Agents/Assistant/Trigger/ListeningTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Trigger/ListeningTrigger.swift; sourceTree = SOURCE_ROOT; };
+		72A1AC3D4A9111FE3E568089 /* MobileHarness/Agents/Assistant/Trigger/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MobileHarness/Agents/Assistant/Trigger/README.md; sourceTree = SOURCE_ROOT; };
+		3E67F7148879CD6F85E12B50 /* MobileHarness/Agents/Assistant/Trigger/TaskTrigger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileHarness/Agents/Assistant/Trigger/TaskTrigger.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2275,6 +2279,7 @@
 			children = (
 				0B34BAAD85CD5AF991A10695 /* MobileHarness/Agents/Assistant/AssistantContextState.swift */,
 				05EE2E5026329899D0AC513B /* Controls */,
+				37E00960343924C9594B07D9 /* Trigger */,
 				ABC9FB37C73A4152CE4EC341 /* Input */,
 				3F96DCEE3BE4CBC75A1BDF17 /* Output */,
 				6E8B9E85991274BD2584B12A /* State */,
@@ -5016,6 +5021,17 @@
 				A748F2F2E01C567B971028DA /* MobileHarness/Agents/Memory/Output/HistoryReadDispatch.swift */,
 			);
 			name = Output;
+			sourceTree = "<group>";
+		};
+		37E00960343924C9594B07D9 /* Trigger */ = {
+			isa = PBXGroup;
+			children = (
+				03FB776CF5F281B9F03FE4D5 /* MobileHarness/Agents/Assistant/Trigger/AssistantTriggers.swift */,
+				21285753DED8DA59CF1A6747 /* MobileHarness/Agents/Assistant/Trigger/ListeningTrigger.swift */,
+				72A1AC3D4A9111FE3E568089 /* MobileHarness/Agents/Assistant/Trigger/README.md */,
+				3E67F7148879CD6F85E12B50 /* MobileHarness/Agents/Assistant/Trigger/TaskTrigger.swift */,
+			);
+			name = Trigger;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

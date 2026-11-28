@@ -1093,34 +1093,10 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         let stream = AsyncStream<OutputEnvelope>.makeStream(bufferingPolicy: .bufferingOldest(outputCapacity))
         outputs = stream.stream
         continuation = stream.continuation
-        var handlers: [String: AgentStateTriggerHandler] = [:]
-        handlers["task"] = { [weak self] write in
-            guard let self else { throw CommunicationError.unavailableTarget }
-            return try await self.taskTrigger(write)
-        }
-        handlers["listening"] = { [weak self] write in
-            guard let self else { throw CommunicationError.unavailableTarget }
-            try await self.applyListeningState(write)
-            return .publish
-        }
-        let triggers = try AgentStateTriggers(handlers)
-        try triggers.validate(schema: AgentConfigurations.stateSchema(named: State.configurationName))
+        let triggers = try makeStateTriggers()
         triggerSlot.withLock { $0 = triggers }
     }
 
-    private func applyListeningState(_ write: AgentStateWrite) async throws {
-        guard let listening else { return }
-        let enabled = write.new != "false"
-        let reply =
-            write.source == .model && !enabled && listening.isListening
-            ? activeInput.flatMap { $0.id == write.inputID && $0.sessionID == write.sessionID ? $0 : nil }
-            : nil
-        try await listening.apply(enabled, source: write.source, wakeCondition: write.wakeCondition)
-        if let reply {
-            // Join only audio production here. The caller still owns generation and round settlement.
-            await speechOutput?.cancel(input: reply)
-        }
-    }
     /// Shared with explicit model diagnostics; capability declarations remain in role JSON.
     public nonisolated static func systemPrompt(capabilities: CapabilityRegistry) throws -> String {
         try State.systemPrompt(capabilities)

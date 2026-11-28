@@ -226,3 +226,7 @@ Control 是 Assistant 自己执行、不进入 Actions Shell 的内置函数（�
 - `ContainerContextValue` 只编码 `value`，不再输出 `availability` 包装（`ContextAvailability` 删除）；来源自身的业务字段（如 `actions.robot` 的 `availability`）不受影响。
 - 无意义值只指 null（读取失败、未观测的 `Value.unknown` 编码为 null）：递归剔除；字符串 `"unknown"`、空字符串、本就为空的容器均是有意义的值，予以保留。来源整体为 null 或仅因剔除 null 而为空时，`AgentStateContext` 组装 CURRENT STATE 时直接省略，不注入占位或诊断。
 - 影响：`ContainerContextValue.swift`、`AssistantStateBindings.swift`、`AgentStateContext.swift`、`AssistantChatStatus.swift`（State 标签按有无来源判断为空）、Context README、RobotInteraction 指令、相关测试。
+
+## Assistant Trigger 目录拆分
+
+由 Assistant/Trigger 管理状态声明到处理函数的绑定，以及 task 和 listening 的条件与副作用。Controls 保留模型和宿主的统一状态写入、校验和发布入口，Workflow 在构造时装配处理函数，Input 继续拥有聆听门控。沿用共享 Trigger 分发与错误语义，核对目录文档、Xcode 工程引用，并运行工程检查和 iOS 构建。

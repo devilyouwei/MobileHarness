@@ -32,7 +32,7 @@ SpeechPerception sends authenticated VAD, ASR and keyword facts. Assistant owns 
 
 ## Files
 
-The root keeps the Agent entry, container, execution session and processing assembly. Responsibilities live in [Controls](Controls/README.md), [Input](Input/README.md), [Output](Output/README.md), [Workflow](Workflow/README.md) and [State](State/README.md). `Resources/Agents/Assistant` mirrors this for controls (`Controls/`) and input prompts (`Input/`).
+The root keeps the Agent entry, container, execution session and processing assembly. Responsibilities live in [Controls](Controls/README.md), [Input](Input/README.md), [Output](Output/README.md), [Workflow](Workflow/README.md), [Trigger](Trigger/README.md) and [State](State/README.md). `Resources/Agents/Assistant` mirrors this for controls (`Controls/`) and input prompts (`Input/`).
 
 | File | Responsibility |
 | --- | --- |
@@ -47,7 +47,8 @@ The root keeps the Agent entry, container, execution session and processing asse
 | [AssistantChatPeerEvents.swift](Workflow/AssistantChatPeerEvents.swift) | Writer events, completion facts and the Writer notice queue and playback. |
 | [AssistantChatStatus.swift](State/AssistantChatStatus.swift) | Status, resident context, visible variables and effective capabilities. |
 | [AssistantControls.swift](Controls/AssistantControls.swift) | Control library: aliases, declarations, `destination` (`send` is `peer`; the rest are `self`), `AgentControlOperation` and fixed registrations. |
-| [AssistantControlExecution.swift](Controls/AssistantControlExecution.swift) | Control execution (`executeControl`, `control` gating, state/Skill/send entries, the `task` trigger) and the late-bound `AssistantControlLink`. |
+| [Trigger](Trigger/README.md) | State trigger registration and handlers for listening changes and foreground goals. |
+| [AssistantControlExecution.swift](Controls/AssistantControlExecution.swift) | Control execution (`executeControl`, `control` gating, state/Skill/send entries) and the late-bound `AssistantControlLink`. |
 | [AssistantChatContext.swift](Workflow/AssistantChatContext.swift) | AssistantChatState, workflow control intent, transactional AssistantHistoryContext and recovery/compression. |
 | [AssistantHistoryProjection.swift](Workflow/AssistantHistoryProjection.swift) | Durable history reconstruction and private request selection. |
 | [AssistantContainer.swift](AssistantContainer.swift) | Stable role capability, UI-facing state/control and resident-state projection. |
@@ -57,7 +58,7 @@ The root keeps the Agent entry, container, execution session and processing asse
 | [AssistantSessionControl.swift](Workflow/AssistantSessionControl.swift) | Runtime cleanup/close message and typed decoding. |
 | [AssistantInterrupt.swift](Input/AssistantInterrupt.swift) | Public interruption target, signal and result contracts. |
 | [ListeningControl.swift](Input/ListeningControl.swift) | Assistant 私有布尔聆听门控。 |
-| [ListeningCoordinator.swift](Input/ListeningCoordinator.swift) / [QuietExitJudge.swift](Input/QuietExitJudge.swift) | `listening` Trigger handler, `quiet` exit judgment and its record. |
+| [ListeningCoordinator.swift](Input/ListeningCoordinator.swift) / [QuietExitJudge.swift](Input/QuietExitJudge.swift) | Listening input gate, `quiet` exit judgment and its record. |
 | [AssistantInputDecision.swift](Input/AssistantInputDecision.swift) | Settings-selected Decision model, bounded inference for interrupt and quiet wake, and targeted interrupt settlement. |
 | [AssistantInputBatch.swift](Input/AssistantInputBatch.swift) | Trusted source timeline, batch text, source-line markers and input prompt access. |
 | [AgentStateBindings.swift](../Support/Context/AgentStateBindings.swift) | Business-only exact-path State adaptation. |
