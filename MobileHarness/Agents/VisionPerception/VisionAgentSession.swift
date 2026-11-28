@@ -100,7 +100,12 @@ public enum VisionPipelineWorkflow {
                                     // Present before dispatch: a transport rejection must not hide the failure.
                                     await status("Pose detection stopped. Try again.", sessionID)
                                 }
-                                let result = try await consumer.execute(envelope)
+                                let result =
+                                    if case .toolCall = envelope.output {
+                                        try await consumer.callTool(envelope)
+                                    } else {
+                                        try await consumer.execute(envelope)
+                                    }
                                 if envelope.media != nil, !result.isCancellationOnly {
                                     let details = [
                                         result.failure, result.tool?.isError == true ? result.tool?.value : nil,

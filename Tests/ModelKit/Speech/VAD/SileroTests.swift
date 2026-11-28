@@ -26,7 +26,8 @@ private struct BoundaryRecorder {
     mutating func consume(_ frame: AudioFrame, probability: Float, threshold: Float, onsetWindows: Int = 3)
         -> RecordedSegment?
     {
-        _ = policy.consume(frame, probability: probability, threshold: threshold, onsetWindows: onsetWindows)
+        _ = policy.consume(
+            frame, level: frame.rmsDecibels, probability: probability, threshold: threshold, onsetWindows: onsetWindows)
         var completed: RecordedSegment?
         for event in policy.streamEvents {
             switch event {
@@ -47,9 +48,9 @@ private struct BoundaryRecorder {
     }
 }
 
-@Test func speechBoundariesUseConsecutiveProbabilityNotAmplitude() throws {
+@Test func speechBoundariesRequireConsecutiveQualifiedWindows() throws {
     var policy = BoundaryRecorder()
-    let frame = try pcm(Array(repeating: 0, count: 512), sequence: 0)
+    let frame = try pcm(Array(repeating: 0.1, count: 512), sequence: 0)
     for _ in 0..<2 { #expect(policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) == nil) }
     #expect(!policy.isSpeaking)
     _ = policy.consume(frame, probability: 0.1, threshold: 0.5, onsetWindows: 3)
@@ -64,7 +65,7 @@ private struct BoundaryRecorder {
 
 @Test func speechBoundariesLimitContinuousSpeech() throws {
     var policy = BoundaryRecorder()
-    let frame = try pcm(Array(repeating: 0, count: 512), sequence: 0)
+    let frame = try pcm(Array(repeating: 0.1, count: 512), sequence: 0)
     var completed: RecordedSegment?
     for _ in 0..<380 {
         if let value = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) {
@@ -191,7 +192,7 @@ func realSileroStreamingResetTailAndSilence() async throws {
     var sequence: UInt64 = 0
     func frame() throws -> AudioFrame {
         defer { sequence += 1 }
-        return try pcm(Array(repeating: 0, count: 512), sequence: sequence)
+        return try pcm(Array(repeating: 0.1, count: 512), sequence: sequence)
     }
     for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.9, threshold: 0.5, onsetWindows: 3) }
     for _ in 0..<10 { _ = policy.consume(try frame(), probability: 0.1, threshold: 0.5, onsetWindows: 3) }
@@ -208,7 +209,7 @@ func realSileroStreamingResetTailAndSilence() async throws {
     var policy = BoundaryRecorder()
     var segments: [RecordedSegment] = []
     for index in 0..<800 {
-        let frame = try pcm(Array(repeating: 0, count: 512), sequence: UInt64(index))
+        let frame = try pcm(Array(repeating: 0.1, count: 512), sequence: UInt64(index))
         if let segment = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) {
             segments.append(segment)
         }
@@ -225,7 +226,7 @@ func realSileroStreamingResetTailAndSilence() async throws {
 
 @Test func silenceAfterExactChunkBoundaryDoesNotBecomeAnotherASRInput() throws {
     var policy = BoundaryRecorder()
-    let frame = try pcm(Array(repeating: 0, count: 512), sequence: 0)
+    let frame = try pcm(Array(repeating: 0.1, count: 512), sequence: 0)
     for _ in 0..<375 { _ = policy.consume(frame, probability: 0.9, threshold: 0.5, onsetWindows: 3) }
     var last: RecordedSegment?
     for _ in 0..<25 { last = policy.consume(frame, probability: 0.1, threshold: 0.5, onsetWindows: 3) }
@@ -293,8 +294,8 @@ private actor ConstantVAD: VoiceActivitySession {
     var endings: [VoiceSegmentEnd] = []
     for index in 0..<825 {
         let probability: Float = index >= 800 || (200..<210).contains(index) ? 0.1 : 0.9
-        let frame = try pcm(Array(repeating: 0, count: 512), sequence: UInt64(index))
-        _ = policy.consume(frame, probability: probability, threshold: 0.5, onsetWindows: 3)
+        let frame = try pcm(Array(repeating: probability >= 0.5 ? 0.1 : 0, count: 512), sequence: UInt64(index))
+        _ = policy.consume(frame, level: frame.rmsDecibels, probability: probability, threshold: 0.5, onsetWindows: 3)
         for event in policy.streamEvents {
             switch event {
             case .audio(let frames): streamed += frames.map(\.sequence)

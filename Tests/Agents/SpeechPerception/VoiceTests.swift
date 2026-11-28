@@ -549,24 +549,35 @@ func expressionPreservesSemanticIdentifier(_ emotion: UIActions.Emotion) async t
 
 struct EndpointVAD: VoiceActivityCapability {
     var voicedWindows = 3
+    var leadingQuietWindows = 0
+    var repeatsAfterReset = true
     var availability: CapabilityAvailability { .available }
     func detectVoiceActivity(format: ModelKit.AudioFormat) -> any VoiceActivitySession {
-        EndpointVADSession(voicedWindows: voicedWindows)
+        EndpointVADSession(
+            voicedWindows: voicedWindows, leadingQuietWindows: leadingQuietWindows, repeatsAfterReset: repeatsAfterReset
+        )
     }
 }
 
 private actor EndpointVADSession: VoiceActivitySession {
     private var position: Int64 = 0
     private var pending = 0
-    private let voicedSamples: Int64
-    init(voicedWindows: Int = 3) { voicedSamples = Int64(voicedWindows * 512) }
+    private let voicedRange: Range<Int64>
+    private let repeatsAfterReset: Bool
+    private var hasReset = false
+
+    init(voicedWindows: Int = 3, leadingQuietWindows: Int = 0, repeatsAfterReset: Bool = true) {
+        voicedRange = Int64(leadingQuietWindows * 512)..<Int64((leadingQuietWindows + voicedWindows) * 512)
+        self.repeatsAfterReset = repeatsAfterReset
+    }
     func process(_ frame: ModelKit.AudioFrame) throws -> [VoiceActivityScore] {
         pending += frame.sampleCount
         var scores: [VoiceActivityScore] = []
         while pending >= 512 {
             scores.append(
                 try VoiceActivityScore(
-                    startSample: position, sampleCount: 512, probability: position < voicedSamples ? 1 : 0))
+                    startSample: position, sampleCount: 512,
+                    probability: voicedRange.contains(position) && (!hasReset || repeatsAfterReset) ? 1 : 0))
             position += 512
             pending -= 512
         }
@@ -576,6 +587,7 @@ private actor EndpointVADSession: VoiceActivitySession {
     func reset() {
         position = 0
         pending = 0
+        hasReset = true
     }
     func cancel() {}
 }
@@ -602,7 +614,7 @@ func nativeSpeechPublishesCaptureAndOnsetSignals() async throws {
         let timestamp = Double(sequence) * 0.064
         try microphone.capture.send(
             MicrophoneFrame(
-                samples: [Float](repeating: 0, count: 1024), sampleRate: 16000, sequence: sequence,
+                samples: [Float](repeating: sequence < 2 ? 0.1 : 0, count: 1024), sampleRate: 16000, sequence: sequence,
                 timestamp: timestamp, capturedAt: origin.advanced(by: .seconds(timestamp))))
     }
     for _ in 0..<1000 {
@@ -672,8 +684,9 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
     let outputTask = Task {
         for await envelope in fixtureOutputs(speech) { try await output.dispatch(envelope) }
     }
+    let speechSamples = [Float](repeating: 0.1, count: 1536)
     let first = try syntheticAudioInput(
-        samples: Data(repeating: 0, count: 1536 * 4), sampleRate: 16000, sequence: 0, timestamp: 0)
+        samples: speechSamples.withUnsafeBytes { Data($0) }, sampleRate: 16000, sequence: 0, timestamp: 0)
     let second = try syntheticAudioInput(
         samples: Data(repeating: 0, count: 16 * 512 * 4), sampleRate: 16000,
         sequence: 1, timestamp: 0.096)
@@ -933,8 +946,10 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
             data: Data(repeating: 0, count: samples * 4), format: format,
             sequence: UInt64(position), timestamp: Double(position) / 16000)
     }
-    _ = policy.consume(try frame(1536), probability: 1, threshold: 0.5, onsetWindows: 3)
-    for _ in 0..<25 { _ = policy.consume(try frame(1024), probability: 0, threshold: 0.5, onsetWindows: 3) }
+    _ = policy.consume(try frame(1536), level: -20, probability: 1, threshold: 0.5, onsetWindows: 3)
+    for _ in 0..<25 {
+        _ = policy.consume(try frame(1024), level: -120, probability: 0, threshold: 0.5, onsetWindows: 3)
+    }
     let padding = policy.streamEvents.reduce(0) { total, event in
         if case .audio(let frames) = event { return total + frames.reduce(0) { $0 + $1.sampleCount } }
         return total
@@ -953,7 +968,7 @@ func speechPerceptionRoutesOnlyFinalAndRejectsAfterStop() async throws {
     let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
     func frame(_ sequence: UInt64, _ count: Int) throws -> ModelKit.AudioFrame {
         try .init(
-            data: Data(repeating: 0, count: count * 4), format: format,
+            floatSamples: Array(repeating: 0.1, count: count), format: format,
             sequence: sequence, timestamp: Double(sequence) / 16000)
     }
     let partial = try await segmenter.process(frame(0, 256), threshold: 0.5, onsetWindows: 3)
@@ -992,7 +1007,7 @@ private actor EndpointPCMVoiceActivity: VoiceActivitySession {
         return [
             try VoiceActivityScore(
                 startSample: start, sampleCount: frame.sampleCount,
-                probability: frame.floatSamples.first == 0 ? 0 : 1)
+                probability: (frame.floatSamples.first ?? 0) > 0 ? 1 : 0)
         ]
     }
     func finish() -> [VoiceActivityScore] { [] }
@@ -1001,13 +1016,13 @@ private actor EndpointPCMVoiceActivity: VoiceActivitySession {
 }
 
 private func submitEndpointWindow(
-    _ segmenter: VoiceActivitySegmenter, _ index: Int, sample: Float
+    _ segmenter: VoiceActivitySegmenter, _ index: Int, sample: Float, playing: Bool = false
 ) async throws -> VoiceSegmentation {
     let format = try ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32)
     let frame = try ModelKit.AudioFrame(
         floatSamples: Array(repeating: sample, count: 512), format: format,
         sequence: UInt64(index), timestamp: Double(index) * 0.032)
-    return try await segmenter.process(frame, onsetWindows: 1)
+    return try await segmenter.process(frame, onsetWindows: 1, playing: playing)
 }
 
 private func endedAtSilence(_ result: VoiceSegmentation) -> Bool {
@@ -1015,6 +1030,67 @@ private func endedAtSilence(_ result: VoiceSegmentation) -> Bool {
         if case .end(.silence) = $0 { return true }
         return false
     }
+}
+
+@Test func speechLevelGateLearnsIdleNoiseAndFreezesDuringPlayback() async throws {
+    let segmenter = VoiceActivitySegmenter(session: EndpointPCMVoiceActivity())
+    let background = -pow(Float(10), -40 / 20)
+    let weakSpeechScore = pow(Float(10), -39 / 20)
+    let loudSpeech = pow(Float(10), -24 / 20)
+    let lowSignal = try await submitEndpointWindow(segmenter, 0, sample: 0.0001)
+    #expect(!lowSignal.isSpeaking && lowSignal.streamEvents.isEmpty)
+
+    for index in 1...100 {
+        _ = try await submitEndpointWindow(segmenter, index, sample: background, playing: true)
+    }
+    let frozen = try await submitEndpointWindow(segmenter, 101, sample: background, playing: true)
+    #expect(frozen.levelGates.noiseFloor == lowSignal.levelGates.noiseFloor)
+    for index in 102...230 {
+        _ = try await submitEndpointWindow(segmenter, index, sample: background)
+    }
+    let distant = try await submitEndpointWindow(segmenter, 231, sample: weakSpeechScore)
+    #expect(!distant.isSpeaking && distant.streamEvents.isEmpty)
+    #expect(distant.levelGates.noiseFloor > -42)
+    let nearby = try await submitEndpointWindow(segmenter, 232, sample: loudSpeech)
+    #expect(nearby.isSpeaking)
+    let weakerTail = try await submitEndpointWindow(segmenter, 233, sample: weakSpeechScore)
+    #expect(weakerTail.isSpeaking && !weakerTail.streamEvents.isEmpty)
+    await segmenter.cancel()
+}
+
+@Test(arguments: [(true, false), (false, false), (true, true)])
+func speechLevelGateLearnsOnlyFromAcceptedNonoverlappingTurns(accepted: Bool, playing: Bool) async throws {
+    let segmenter = VoiceActivitySegmenter(session: EndpointPCMVoiceActivity())
+    let nearby = pow(Float(10), -24 / 20)
+    let quieter = pow(Float(10), -49 / 20)
+    for index in 0..<12 {
+        _ = try await submitEndpointWindow(segmenter, index, sample: nearby, playing: playing)
+    }
+    for index in 12..<36 { _ = try await submitEndpointWindow(segmenter, index, sample: 0) }
+    let endpoint = try await submitEndpointWindow(segmenter, 36, sample: 0)
+    #expect(endedAtSilence(endpoint))
+    try await segmenter.reset(requireFreshOnset: false, acceptedTranscript: accepted)
+
+    let learned = accepted && !playing
+    let next = try await submitEndpointWindow(segmenter, 0, sample: quieter)
+    #expect(next.isSpeaking == !learned)
+    if learned {
+        let resumed = try await submitEndpointWindow(segmenter, 1, sample: nearby)
+        #expect(resumed.isSpeaking)
+        let quietTail = try await submitEndpointWindow(segmenter, 2, sample: quieter)
+        #expect(quietTail.isSpeaking && !quietTail.streamEvents.isEmpty)
+        for index in 3..<27 {
+            let belowGate = try await submitEndpointWindow(segmenter, index, sample: 0.0003)
+            #expect(belowGate.isSpeaking)
+        }
+        let noiseEndpoint = try await submitEndpointWindow(segmenter, 27, sample: 0.0003)
+        #expect(endedAtSilence(noiseEndpoint))
+        try await segmenter.reset()
+        await segmenter.resetLevelCalibration()
+        let newRoute = try await submitEndpointWindow(segmenter, 0, sample: quieter)
+        #expect(newRoute.isSpeaking)
+    }
+    await segmenter.cancel()
 }
 
 @Test func smartTurnPreservesOneTurnThroughAnUnfinishedPause() async throws {
@@ -1090,19 +1166,23 @@ func speechBoundaryUsesCurrentEndpointDuringSilence(initiallyShort: Bool) throws
         data: Data(repeating: 0, count: 512 * 4), format: format, sequence: 0, timestamp: 0)
 
     for _ in 0..<3 {
-        _ = policy.consume(frame, probability: 1, threshold: 0.5, onsetWindows: 3, useShortEndpoint: initiallyShort)
+        _ = policy.consume(
+            frame, level: -20, probability: 1, threshold: 0.5, onsetWindows: 3, useShortEndpoint: initiallyShort)
     }
     for _ in 0..<15 {
         #expect(
-            policy.consume(frame, probability: 0, threshold: 0.5, onsetWindows: 3, useShortEndpoint: initiallyShort)
+            policy.consume(
+                frame, level: -120, probability: 0, threshold: 0.5, onsetWindows: 3, useShortEndpoint: initiallyShort)
                 == nil)
     }
     let afterChange = policy.consume(
-        frame, probability: 0, threshold: 0.5, onsetWindows: 3, useShortEndpoint: !initiallyShort)
+        frame, level: -120, probability: 0, threshold: 0.5, onsetWindows: 3, useShortEndpoint: !initiallyShort)
     if initiallyShort {
         #expect(afterChange == nil)
-        for _ in 0..<8 { #expect(policy.consume(frame, probability: 0, threshold: 0.5, onsetWindows: 3) == nil) }
-        #expect(policy.consume(frame, probability: 0, threshold: 0.5, onsetWindows: 3) == .silence)
+        for _ in 0..<8 {
+            #expect(policy.consume(frame, level: -120, probability: 0, threshold: 0.5, onsetWindows: 3) == nil)
+        }
+        #expect(policy.consume(frame, level: -120, probability: 0, threshold: 0.5, onsetWindows: 3) == .silence)
     } else {
         #expect(afterChange == .silence)
     }
@@ -1837,14 +1917,14 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     let frame = try ModelKit.AudioFrame(
         data: Data(repeating: 0, count: 512 * 4), format: format, sequence: 0, timestamp: 0)
     for _ in 0..<20 {
-        _ = policy.consume(frame, probability: 0.64, threshold: 0.65, onsetWindows: windows)
+        _ = policy.consume(frame, level: -20, probability: 0.64, threshold: 0.65, onsetWindows: windows)
         #expect(!policy.isSpeaking)
     }
     for _ in 0..<(windows - 1) {
-        _ = policy.consume(frame, probability: 0.65, threshold: 0.65, onsetWindows: windows)
+        _ = policy.consume(frame, level: -20, probability: 0.65, threshold: 0.65, onsetWindows: windows)
         #expect(!policy.isSpeaking)
     }
-    _ = policy.consume(frame, probability: 0.65, threshold: 0.65, onsetWindows: windows)
+    _ = policy.consume(frame, level: -20, probability: 0.65, threshold: 0.65, onsetWindows: windows)
     #expect(policy.isSpeaking)
     let retained = policy.streamEvents.reduce(0) { total, event in
         if case .audio(let frames) = event { return total + frames.reduce(0) { $0 + $1.sampleCount } }
@@ -1876,15 +1956,17 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
         data: Data(repeating: 0, count: 512 * 4),
         format: ModelKit.AudioFormat(sampleRate: 16000, channels: 1, encoding: .float32), sequence: 0, timestamp: 0)
     for _ in 0..<20 {
-        _ = policy.consume(frame, probability: 0.7, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
+        _ = policy.consume(frame, level: -20, probability: 0.7, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
     }
     #expect(!policy.isSpeaking)
     for _ in 0..<10 {
-        _ = policy.consume(frame, probability: 0.9, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
+        _ = policy.consume(frame, level: -20, probability: 0.9, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
     }
     #expect(policy.isSpeaking)
     for _ in 0..<30 {
-        #expect(policy.consume(frame, probability: 0.7, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8) == nil)
+        #expect(
+            policy.consume(frame, level: -20, probability: 0.7, threshold: 0.65, onsetWindows: 10, onsetThreshold: 0.8)
+                == nil)
     }
     #expect(policy.isSpeaking)
 }
@@ -1912,23 +1994,47 @@ func configurableSpeechOnsetRetainsCandidate(windows: Int) throws {
     #expect(silence.rmsDecibels == -120)
 }
 
-@Test func speechSuppressionHysteresisRequiresConsecutiveWindows() {
+@Test func speechSuppressionDuckingWaitsForSixHundredMillisecondsOfQuiet() {
     var policy = SpeechEnergyBands()
-    func window(_ level: Float) -> [Float] { Array(repeating: pow(10, level / 20), count: 512) }
+    func window(_ level: Float, samples: Int = 512) -> [Float] {
+        Array(repeating: pow(10, level / 20), count: samples)
+    }
 
-    #expect(policy.observe(window(-32), hasVoice: true) == nil)
-    #expect(policy.observe(window(-37), hasVoice: true) == nil)
-    #expect(policy.observe(window(-32), hasVoice: true) == nil)
-    #expect(policy.observe(window(-32), hasVoice: true) == .medium)
-    for _ in 0..<4 { #expect(policy.observe(window(-37), hasVoice: true) == nil) }
+    #expect(policy.isQuiet)
+    #expect(policy.observe(window(-32)) == nil)
+    #expect(!policy.isQuiet)
+    #expect(policy.observe(window(-37)) == nil)
+    #expect(policy.isQuiet)
+    #expect(policy.observe(window(-32)) == nil)
+    #expect(policy.observe(window(-32)) == .medium)
+    for _ in 0..<18 { #expect(policy.observe(window(-50)) == nil) }
+    // The current band still holds at -37 dBFS, so this resets the release.
+    #expect(policy.observe(window(-37)) == nil)
+    for _ in 0..<18 { #expect(policy.observe(window(-50)) == nil) }
     #expect(policy.energy == .medium)
+    #expect(policy.observe(window(-50, samples: 383)) == nil)
+    #expect(policy.observe(window(-50, samples: 1)) == .low)
+}
 
-    for _ in 0..<5 { #expect(policy.observe(window(-16), hasVoice: true) == nil) }
-    #expect(policy.observe(window(-16), hasVoice: true) == .high)
-    for _ in 0..<4 { #expect(policy.observe(window(-23), hasVoice: true) == nil) }
+@Test(arguments: [SpeechActivity.Energy.medium, .low])
+func speechSuppressionPauseWaitsASecondBelowItsExitLevel(resume: SpeechActivity.Energy) {
+    var policy = SpeechEnergyBands()
+    func window(_ level: Float, samples: Int = 512) -> [Float] {
+        Array(repeating: pow(10, level / 20), count: samples)
+    }
+
+    #expect(policy.observe(window(-16)) == nil)
+    #expect(policy.observe(window(-16)) == .medium)
+    for _ in 0..<3 { #expect(policy.observe(window(-16)) == nil) }
+    #expect(policy.observe(window(-16)) == .high)
+    for _ in 0..<31 { #expect(policy.observe(window(-50)) == nil) }
+    // The high band uses its exit threshold after pausing.
+    #expect(policy.observe(window(-23)) == nil)
+    for index in 0..<31 { #expect(policy.observe(window(index.isMultiple(of: 2) ? -28 : -50)) == nil) }
+    let level: Float = resume == .medium ? -28 : -50
     #expect(policy.energy == .high)
-    for _ in 0..<4 { #expect(policy.observe(window(-28), hasVoice: true) == nil) }
-    #expect(policy.observe(window(-28), hasVoice: true) == .medium)
+    #expect(policy.observe(window(level, samples: 127)) == nil)
+    #expect(policy.observe(window(level, samples: 1)) == resume)
 }
 
 @Test func speechOutputTracksNativePlaybackForTheOwningReply() async throws {
@@ -2055,14 +2161,14 @@ func speechPerceptionPublishesActivityAndFinalText() async throws {
 @Test(
     .actionCatalog, .timeLimit(.minutes(1)),
     arguments: [
-        (false, false, true), (true, false, true), (true, true, true), (true, false, false), (true, true, false),
+        (false, false, false), (true, false, false), (true, true, false), (true, false, true), (true, true, true),
     ])
-func speechEnergyFollowsConfirmedVADWindows(fullDuplex: Bool, playing: Bool, loudWindowsAreVoice: Bool) async throws {
+func speechEnergyFollowsPCMOnceOnsetIsConfirmed(fullDuplex: Bool, playing: Bool, crossesEndpoint: Bool) async throws {
     let session = UUID().uuidString
     let microphone = NativeMicrophoneFixture()
     let speech = try SpeechPerceptionAgent(
         recognition: RecognitionFixture(text: "继续", includeFinal: true),
-        vad: EndpointVAD(voicedWindows: loudWindowsAreVoice ? 17 : 5),
+        vad: EndpointVAD(voicedWindows: 5, leadingQuietWindows: 6, repeatsAfterReset: false),
         sessionID: session, interactionSessionID: session, residentListening: true, microphoneInput: microphone,
         speechDetection: { (1, 0.5) },
         context: AgentContextRepository(
@@ -2080,15 +2186,22 @@ func speechEnergyFollowsConfirmedVADWindows(fullDuplex: Bool, playing: Bool, lou
     try await speech.openCapture(sessionID: session)
     await speech.setCaptureDuplex(fullDuplex)
     await speech.bindMicrophoneGeneration("capture")
-    let origin = ContinuousClock.now - .seconds(2)
+    let origin = ContinuousClock.now - .seconds(4)
     if playing { await microphone.setPlayback(.init(periods: [.init(start: origin - .milliseconds(100))])) }
-    for index in 0..<42 {
-        if index == 11, playing, loudWindowsAreVoice {
+    let levelDrops = crossesEndpoint ? 46 : 17
+    let quietStarts = levelDrops + 32
+    for index in 0..<(quietStarts + 20) {
+        if index == 17, playing {
             // A pause ends audible output, but the same confirmed utterance still drives recovery.
             await microphone.setPlayback(
-                .init(periods: [.init(start: origin - .milliseconds(100), end: origin + .milliseconds(352))]))
+                .init(periods: [.init(start: origin - .milliseconds(100), end: origin + .milliseconds(544))]))
         }
-        let amplitude: Float = index < 5 ? 0.05 : index < 11 ? 0.25 : index < 17 ? 0.05 : 0
+        let amplitude: Float
+        switch index {
+        case 0..<6, 11..<levelDrops: amplitude = 0.25
+        case 6..<11, levelDrops..<quietStarts: amplitude = 0.05
+        default: amplitude = 0
+        }
         try await speech.processMicrophone(
             MicrophoneFrame(
                 samples: Array(repeating: amplitude, count: 512), sampleRate: 16000,
@@ -2100,8 +2213,9 @@ func speechEnergyFollowsConfirmedVADWindows(fullDuplex: Bool, playing: Bool, lou
     await pump.value
     let messages = events.withLock { $0 }
     let activities = messages.compactMap { $0.content(as: SpeechActivity.self) }
-    let expected: [SpeechActivity.Energy] = loudWindowsAreVoice ? [.medium, .high, .medium, .low] : [.medium, .low]
-    #expect(activities.compactMap(\.energy) == expected)
+    let energyUpdates = activities.filter { $0.kind == .energyChanged }
+    #expect(energyUpdates.compactMap(\.energy) == [.medium, .high, .medium, .low])
+    #expect(Set(energyUpdates.compactMap(\.utterance)).count == 1)
     let final = try #require(messages.firstIndex { $0.content(as: SpeechRecognition.self)?.kind == .final })
     let started = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .captureStarted })
     let candidate = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .onsetStarted })
@@ -2110,7 +2224,10 @@ func speechEnergyFollowsConfirmedVADWindows(fullDuplex: Bool, playing: Bool, lou
     let recovered = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.energy == .low })
     let stopped = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.kind == .captureStopped })
     #expect(started < candidate && candidate < onset && onset < first && first < recovered)
-    #expect(recovered < final && final < stopped)
+    let paused = try #require(messages.firstIndex { $0.content(as: SpeechActivity.self)?.energy == .high })
+    let resumed = try #require(
+        messages.indices.first { $0 > paused && messages[$0].content(as: SpeechActivity.self)?.energy == .medium })
+    #expect(paused < final && final < resumed && resumed < recovered && recovered < stopped)
 }
 
 @Test(.actionCatalog, arguments: [true, false])

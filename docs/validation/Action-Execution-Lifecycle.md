@@ -31,3 +31,10 @@
 五个 iOS 模拟器目标构建通过。主 App 使用最终源码复编译通过，Agent／Skill、Live Activity 和中英文本地化资源通过校验。真机标签视觉验收尚未执行。
 
 Mobile Harness `0.1.0 (2026112706)` 通过 iPhoneOS Debug 构建、严格签名及打包资源校验。iPhone 17 Pro 原位更新成功，设备应用清单读回构建号 `2026112706`，系统确认 App 启动。Control 记录和标签的实际显示待真机交互验收。
+
+## 2026-11-28 Vision 请求链隔离
+
+- Vision/Gateway 定向回归通过。替身相机通过实际执行端点启动 Vision 会话，同一请求的直接重入仍被拒绝。原请求返回后，实际 Tool 执行链各完成一次骨架与视线调用，暂停会取消并加入等待下一帧的会话。其他用例覆盖终态排空、输入结束、取消、呈现载荷校验、角色授权和姿态观察投递。[回归用例](../../Tests/Gateway/Output/GatewayContainerTests.swift)
+- 本机 Core ML 使用 `Models/YOLOPose/yolo26n-pose.mlpackage` 通过 RGB 夹具的加载、推理、卸载和重载，以及四个方向的 BGRA 夹具推理。缺少制品时显式加载失败的用例也通过。[模型验证用例](../../Tests/ModelKit/Vision/PoseTests.swift)
+- `./scripts/check.sh` 在既有的 AgentContainer State Value codec 和 15 个 Xcode 中文资源归属检查处退出。改动文件的 Swift 严格格式、8 项 Python 工具测试和 `git diff --check` 单独通过。
+- `./scripts/build-ios.sh` 的五个 Simulator scheme 全部通过。主 App 校验了 94 个 Agent／Skill 资源、Live Activity 和中英文本地化。真机相机、骨架和视线的现场复验未执行。

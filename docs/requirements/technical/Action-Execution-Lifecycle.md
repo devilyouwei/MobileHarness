@@ -2,6 +2,17 @@
 
 确认方案见 [统一 Action 回报与打断等待](https://chatgpt.com/space/page_d7804d5c963881919c9567e8e4c2cb3e)。
 
+## Vision 会话与执行请求隔离
+
+相机打开、重试或切换经 Actions 启动长期视觉会话。相机启动请求和视觉输出各自发起调用，但 Swift `Task` 会将启动请求的 Gateway 请求链继承给视觉会话，导致同一执行端点上的 `UI.Pose.showPose` 和 `UI.Gaze.moveEyes` 报 `cyclicRequest`，启动请求返回后仍会重现。
+
+- 在 [VisionPerceptionContainer](../../../MobileHarness/Agents/VisionPerception/VisionPerceptionContainer.swift) 的单会话任务边界使用独立任务。容器继续拥有任务句柄、主 Actor 隔离、显式取消、清理加入及重叠准入。
+- 参照 SpeechPerception，VisionAgentSession 将 Tool 信封交给绑定角色的 `callTool`，由当前会话消费实际完成值。其余信封继续使用 `execute`。沿用 `tool.call.v1` 和 `execution.call.result.v1`，保留 Gateway 嵌套循环检测和 Actions 执行准入。视觉观察沿用 `perception.vision.pose.v1`。[VisionAgentSession](../../../MobileHarness/Agents/VisionPerception/VisionAgentSession.swift)
+- 与 SpeechPerception 一样由角色消费注入的模型能力。YOLO 继续使用 `ModelVisionContainer`、已注册的 `yolo26n-pose` 与 ModelKit 的预热和推理资源租约，在现有加载入口验证实际制品。
+- 在 [GatewayContainerTests](../../../Tests/Gateway/Output/GatewayContainerTests.swift) 中由实际 Gateway 执行端点上的请求启动会话，确认同一请求内直接重入被拒绝，原请求返回后独立会话的骨架、视线 Tool 各执行一次并完成回执，暂停取消并加入等待下一帧的会话。同步 [VisionPerception](../../../MobileHarness/Agents/VisionPerception/README.md) 和总体视觉链路，记录工程检查、Simulator 构建和真机复验状态。
+
+工程、模型与设备验证状态见 [Vision 请求链隔离](../../validation/Action-Execution-Lifecycle.md#2026-11-28-vision-请求链隔离)。
+
 ## 执行边界
 
 - Actions 的执行调度和结果账本提供真实的 Action 开始、结束和清理事实。Gateway 使用 Assistant 实例和会话的可信执行身份，投递同一反馈协议的独立事件。单个 Action 按调用 ID 配对，开始只表示实际执行，终态保留成功、失败、取消和已知副作用。排队取消可以直接收到终态。

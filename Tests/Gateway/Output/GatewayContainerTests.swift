@@ -323,6 +323,77 @@ func actionTerminalReturnsThroughGatewayBeforeAgentsAdaptation() async throws {
     try await actions.stop()
 }
 
+@Test(.actionCatalog, .timeLimit(.minutes(1))) @MainActor
+func visionSessionCallsPresentationToolsAfterCameraRequestReturns() async throws {
+    let posePath = ActionIdentifier(domain: "UI", module: "Pose", function: "showPose")
+    let gazePath = ActionIdentifier(domain: "UI", module: "Gaze", function: "moveEyes")
+    let poseCalls = GatewayCounter()
+    let gazeCalls = GatewayCounter()
+    let actions = ActionsContainer()
+    try actions.configure(
+        BehaviorAssembly(capabilityModules: [
+            GatewayFixtureModule(definitions: [
+                .init(
+                    path: posePath, displayName: "Pose fixture", kind: .finite, completion: "Presented.",
+                    handler: { _ in await poseCalls.increment() }),
+                .init(
+                    path: gazePath, displayName: "Gaze fixture", kind: .finite, completion: "Presented.",
+                    handler: { _ in await gazeCalls.increment() }),
+            ])
+        ]))
+    let engine = try actions.configureExecution(resources: [])
+    try actions.start()
+    let root = GatewayContainer()
+    let ports = try root.configure()
+    let execution = try await ActionExecutionTransport.connect(ports: ports, engine: engine)
+    let signals = ports.signals
+    let photographer = try await signals.register(address: AgentID.photographer.rawValue, incarnation: "one") { _ in }
+    let actionsEndpoint = try await signals.endpoint(address: "actions.execution")
+    let owner = ExecutionOwner(endpoint: AgentID.visionPerception.rawValue, incarnation: "one", sessionID: "vision")
+    _ = try await signals.register(address: owner.endpoint, incarnation: owner.incarnation) { _ in }
+    let context = ActionExecutionContext(source: owner.endpoint, sessionID: owner.sessionID, inputID: "frame")
+    let pose = FunctionInvocation(
+        tool: .init(id: "pose", toolPath: posePath.description), context: context)
+    let gaze = FunctionInvocation(
+        tool: .init(id: "gaze", toolPath: gazePath.description), context: context)
+    let vision = VisionPerceptionContainer()
+    let frames = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let presented = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingOldest(1))
+    let open = try SignalRequestProtocol<Bool, Task<Void, any Error>>(
+        id: "fixture.camera.open.v1", maximumRequestBytes: 1, maximumReplyBytes: nil, requestSize: { _ in 1 })
+    try await signals.registerRequest(open, endpoint: actionsEndpoint) { _ in
+        await #expect(throws: SignalTransportError.cyclicRequest) {
+            _ = try await execution.execute(pose, owner: owner)
+        }
+        return Task {
+            defer { presented.continuation.finish() }
+            try await vision.run {
+                for await _ in frames.stream {
+                    let poseResult = try await execution.execute(pose, owner: owner)
+                    let gazeResult = try await execution.execute(gaze, owner: owner)
+                    #expect(poseResult == .completed)
+                    #expect(gazeResult == .completed)
+                    presented.continuation.yield(true)
+                }
+                try Task.checkCancellation()
+            }
+        }
+    }
+    try await root.start()
+    let session = try await signals.request(source: photographer, target: actionsEndpoint, using: open, request: true)
+    frames.continuation.yield(())
+    var receipts = presented.stream.makeAsyncIterator()
+    #expect(await receipts.next() == true)
+    try await vision.suspend()
+    await #expect(throws: CancellationError.self) { try await session.value }
+    frames.continuation.finish()
+    try await vision.stop()
+    try await root.stop()
+    try await actions.stop()
+    #expect(await poseCalls.count == 1)
+    #expect(await gazeCalls.count == 1)
+}
+
 @Test(.actionCatalog) @MainActor func failedExecutionBindingLeavesIndependentTransportAvailable() async throws {
     let harness = try await GatewayHarness()
     let root = GatewayContainer()

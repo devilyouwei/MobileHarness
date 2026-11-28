@@ -91,6 +91,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private var publishedVADWindowSequence: UInt64 = 0
     private var utteranceEnergy: (utterance: String, policy: SpeechEnergyBands)?
     private var speechFrameSequence: UInt64 = 0
+    private var calibrationFormat: (layout: AudioChannelLayout, rate: Int)?
     private let pcmPreparation: SpeechPCMPreparation
     private let speechEnhancementEnabled: @Sendable () async throws -> Bool
     private var sessionID: String
@@ -259,9 +260,11 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         Logger(subsystem: "dev.mobileharness", category: "SpeechListening").notice("\(value, privacy: .public)")
     }
     /// Onset evidence for false-trigger analysis: gates and levels only, never audio or text.
-    private func traceOnset(_ onset: SpeechOnsetPolicy, playing: Bool, probability: Float, level: Float) {
+    private func traceOnset(
+        _ onset: SpeechOnsetPolicy, playing: Bool, probability: Float, level: Float, gates: SpeechLevelAdmission.Gates
+    ) {
         let value =
-            "onset playing=\(playing) probability=\(probability) onsetThreshold=\(onset.onsetThreshold) windows=\(onset.onsetWindows) level=\(level)dBFS fullDuplex=\(listeningPolicy.fullDuplex)"
+            "onset playing=\(playing) probability=\(probability) onsetThreshold=\(onset.onsetThreshold) windows=\(onset.onsetWindows) level=\(level)dBFS noiseFloor=\(gates.noiseFloor) onsetLevel=\(gates.onset) continuationLevel=\(gates.continuation) fullDuplex=\(listeningPolicy.fullDuplex)"
         Logger(subsystem: "dev.mobileharness", category: "SpeechOnset").notice("\(value, privacy: .public)")
     }
     public func resumeListening() async throws {
@@ -576,6 +579,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         keywordDetectionEnabled = generation != nil && keywordDetection.enabled
         keywordThreshold = keywordDetection.threshold
         nativeCaptureGeneration = generation
+        calibrationFormat = nil
         speechFrameSequence = 0
         lastSequence = nil
         lastTimestamp = nil
@@ -647,7 +651,8 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         if present { try presentPhase(next, input: input) }
     }
     private func resetListening(
-        after input: AgentInput, discardEarlierPCM: Bool = false, requireFreshOnset: Bool = false
+        after input: AgentInput, discardEarlierPCM: Bool = false, requireFreshOnset: Bool = false,
+        acceptedTranscript: Bool = false
     ) async throws {
         resetKeywordProbe()
         let captureSession = sessionID
@@ -659,7 +664,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             soundRate = nil
             await pcmPreparation.reset()
         }
-        try await segmenter?.reset(requireFreshOnset: requireFreshOnset)
+        try await segmenter?.reset(requireFreshOnset: requireFreshOnset, acceptedTranscript: acceptedTranscript)
         try Task.checkCancellation()
         guard lifecycle == .running, sessionID == captureSession, nativeCaptureGeneration == captureGeneration else {
             throw CancellationError()
@@ -693,6 +698,12 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let samples = audio.samples
         try Task.checkCancellation()
         if mode == .soundSourceOnly { activeInput = input }
+        if let segmenter, calibrationFormat?.layout != audio.layout || calibrationFormat?.rate != audio.sampleRate {
+            let captureGeneration = nativeCaptureGeneration
+            await segmenter.resetLevelCalibration()
+            guard nativeCaptureGeneration == captureGeneration else { return }
+            calibrationFormat = (audio.layout, audio.sampleRate)
+        }
         if soundLayout != audio.layout || soundRate != audio.sampleRate {
             soundEstimator.reset()
             await pcmPreparation.reset()
@@ -769,7 +780,7 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let result = try await segmenter.process(
             frame, threshold: onset.threshold, onsetWindows: onset.onsetWindows,
             useShortEndpoint: useShortEndpoint,
-            onsetThreshold: onset.onsetThreshold)
+            onsetThreshold: onset.onsetThreshold, playing: playing)
         try Task.checkCancellation()
         guard vadGeneration == captureGeneration else { return }
         let beganTurn =
@@ -782,7 +793,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         if beganTurn {
             turnOrdinal += 1
             currentTurn = AgentTurn(id: UUID().uuidString, ordinal: turnOrdinal)
-            traceOnset(onset, playing: playing, probability: result.probability, level: frame.rmsDecibels)
+            traceOnset(
+                onset, playing: playing, probability: result.probability, level: frame.rmsDecibels,
+                gates: result.levelGates)
         }
         await reportVAD(
             result.windows, capturedAt: capturedAt, confirmed: beganTurn ? currentTurn?.id : nil)
@@ -821,8 +834,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
         let captureGeneration = vadGeneration
         resetKeywordProbe()
         recognitionSuspended = true
-        await finishUtteranceEnergy()
-        guard vadGeneration == captureGeneration else { return }
         phase = .processing
         soundEstimator.reset()
         if soundLayout == .firstOrderAmbisonicsACNSN3D, case .audio(let audio) = input.payload {
@@ -850,7 +861,9 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             guard vadGeneration == captureGeneration else { return }
             publishedRecognitionFinal = true
         }
-        try await resetListening(after: input, requireFreshOnset: noTextEndpoint)
+        try await resetListening(
+            after: input, requireFreshOnset: noTextEndpoint,
+            acceptedTranscript: !noTextEndpoint && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         try await transition(to: text.isEmpty ? .empty : .listening, input: input, present: !recognitionSuspended)
     }
     func reportError(_ error: any Error, input: AgentInput) {
@@ -866,8 +879,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
     private func recoverRecognition(_ error: any Error) async {
         let captureGeneration = vadGeneration
         resetKeywordProbe()
-        await finishUtteranceEnergy()
-        guard vadGeneration == captureGeneration else { return }
         let failedInput = activeInput?.assigning(turn: currentTurn)
         if let failedInput, failedInput.turn != nil, !publishedRecognitionFinal {
             let detail = String(decoding: String(describing: error).utf8.prefix(496), as: UTF8.self)
@@ -1067,17 +1078,17 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             guard vadGeneration == generation else { return }
             await publishOnset(candidate: window.onsetCandidate, confirmed: index == confirmation ? utterance : nil)
             guard vadGeneration == generation else { return }
-            if index == confirmation, let utterance {
+            if index == confirmation, let utterance, utteranceEnergy == nil {
                 utteranceEnergy = (utterance, SpeechEnergyBands())
             }
-            if window.speaking, let utterance = utteranceEnergy?.utterance,
-                let energy = utteranceEnergy?.policy.observe(window.pcm, hasVoice: window.hasVoice)
-            {
-                await publishSpeech(
-                    SpeechActivity(
-                        .energyChanged, generation: generation, utterance: utterance,
-                        energy: energy))
-                guard vadGeneration == generation else { return }
+            if let utterance = utteranceEnergy?.utterance {
+                let energy = utteranceEnergy?.policy.observe(window.pcm)
+                if !window.speaking, utteranceEnergy?.policy.isQuiet == true { utteranceEnergy = nil }
+                if let energy {
+                    await publishSpeech(
+                        SpeechActivity(.energyChanged, generation: generation, utterance: utterance, energy: energy))
+                    guard vadGeneration == generation else { return }
+                }
             }
             guard window.sampleCount == 512 else { continue }
             let start = capturedAt + .nanoseconds(window.offset * 62_500)
@@ -1086,16 +1097,6 @@ public actor SpeechPerceptionAgent: Agent, VoicePerceptionHandling {
             vadWindowSequence += 1
             if vadWindowSequence - publishedVADWindowSequence >= 4 { await publishVADProgress() }
         }
-    }
-
-    private func finishUtteranceEnergy() async {
-        guard let previous = utteranceEnergy else { return }
-        utteranceEnergy = nil
-        guard previous.policy.energy != .low, let generation = vadGeneration else { return }
-        await publishSpeech(
-            SpeechActivity(
-                .energyChanged, generation: generation, utterance: previous.utterance,
-                energy: .low))
     }
 
     private func publishVADProgress() async {

@@ -145,7 +145,6 @@ extension AssistantChatWorker {
             input.sessionID == speechSessionID
         {
             guard lifecycle == .running || lifecycle == .paused else { throw HarnessError.notRunning }
-            try settleSpeechEnergy(input, recognition: recognition)
             if recognition.text.isEmpty {
                 if let failure = recognition.failure {
                     emit(.control("agent.error: speech recognition: \(failure)"), for: input)

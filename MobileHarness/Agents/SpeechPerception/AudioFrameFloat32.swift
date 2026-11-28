@@ -15,10 +15,11 @@ extension AudioFrame {
     }
 
     /// Level of the whole frame in dBFS, floored at -120 for digital silence.
-    var rmsDecibels: Float {
-        let values = floatSamples
-        guard !values.isEmpty else { return -120 }
-        let power = values.reduce(Float(0)) { $0 + $1 * $1 } / Float(values.count)
-        return max(-120, 10 * log10(max(power, 1e-12)))
+    var rmsDecibels: Float { Self.rmsDecibels(samples: floatSamples) }
+
+    static func rmsDecibels(samples: [Float]) -> Float {
+        guard !samples.isEmpty else { return -120 }
+        let power = samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(samples.count)
+        return Float(10 * log10(max(power, 1e-12)))
     }
 }

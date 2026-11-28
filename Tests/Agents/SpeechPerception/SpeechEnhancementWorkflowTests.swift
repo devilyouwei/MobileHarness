@@ -24,13 +24,17 @@ private actor EnhancedPCMRecorder {
         maximum = max(maximum, peak)
     }
 }
-private actor ZeroEnhancementFixture: SpeechEnhancementCapability {
+private actor LevelEnhancementFixture: SpeechEnhancementCapability {
     var availability: CapabilityAvailability { .available }
     var sizes: [Int] = []
+    let level: Float
+
+    init(level: Float = 0) { self.level = level }
+
     func enhance(_ audio: AudioFrame) async throws -> AudioFrame {
         sizes.append(audio.sampleCount)
         return try AudioFrame(
-            data: Data(repeating: 0, count: audio.data.count), format: audio.format,
+            floatSamples: Array(repeating: level, count: audio.sampleCount), format: audio.format,
             sequence: audio.sequence, timestamp: audio.timestamp)
     }
 }
@@ -100,13 +104,13 @@ private struct EnhancementASRFixture: SpeechRecognitionCapability {
 }
 
 @Test(.actionCatalog, arguments: [false, true])
-func speechEnhancementWorkflowFeedsBothVADAndASR(enabled: Bool) async throws {
+func speechEnhancementOutputDeterminesASRAdmission(enabled: Bool) async throws {
     let vad = EnhancedPCMRecorder()
     let asr = EnhancedPCMRecorder()
     let session = UUID().uuidString
     let agent = try SpeechPerceptionAgent(
         recognition: EnhancementASRFixture(recorder: asr),
-        vad: EnhancementVADFixture(vad), enhancement: ZeroEnhancementFixture(),
+        vad: EnhancementVADFixture(vad), enhancement: LevelEnhancementFixture(),
         speechEnhancementEnabled: { enabled }, sessionID: session, speechDetection: { (1, 0.5) },
         context: AgentContextRepository(
             agent: .speechPerception, scope: UUID().uuidString, state: SpeechPerceptionContextState()))
@@ -120,14 +124,13 @@ func speechEnhancementWorkflowFeedsBothVADAndASR(enabled: Bool) async throws {
                 sampleRate: 48000, sequence: UInt64(index), timestamp: Double(index * 4000) / 48000),
             sessionID: session, captureGeneration: session)
     }
-    let deadline = ContinuousClock.now.advanced(by: .seconds(3))
-    while await asr.count == 0, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
     #expect(await vad.count > 0)
-    #expect(await asr.count > 0)
     if enabled {
         #expect(await vad.maximum == 0)
-        #expect(await asr.maximum == 0)
+        #expect(await asr.count == 0)
     } else {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await asr.count == 0, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
         #expect(await vad.maximum > 0.2)
         #expect(await asr.maximum > 0.2)
     }
@@ -137,7 +140,7 @@ func speechEnhancementWorkflowFeedsBothVADAndASR(enabled: Bool) async throws {
 @Test(.actionCatalog) func speechEnhancementResetsHistoryAtUtteranceCompletion() async throws {
     let vad = EnhancedPCMRecorder()
     let asr = EnhancedPCMRecorder()
-    let enhancement = ZeroEnhancementFixture()
+    let enhancement = LevelEnhancementFixture(level: 0.1)
     let session = UUID().uuidString
     let origin = ContinuousClock.now
     let agent = try SpeechPerceptionAgent(

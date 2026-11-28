@@ -263,3 +263,35 @@ MobileHarness 0.1.0（2026112613）通过 iPhoneOS Debug 构建、严格签名�
 `check.sh` 在已有的 State Value codec 与 Xcode 中文资源归属检查处退出。Swift 严格格式检查、8 项 Python 工具测试、工程 plist 和 `git diff --check` 分开执行通过。
 
 MobileHarness 0.1.0（`2026112705`）通过 iPhoneOS Debug 构建、严格签名和打包资源校验。在 iPhone 17 Pro 原位安装，设备应用清单确认构建号，App 启动成功。字幕、灵动岛和播报行为待真机验收。
+
+### 起声确认后的连续声学让声（2026-11-28）
+
+Swift 定向回归 7 项、18 个用例通过，覆盖未起声的高能量、起声后由 VAD 判为非语音的高能量、播放失去有声区间、能量跨 ASR 终稿、回落恢复、识别失败、路由准入和播放控制身份。替身验证了 ASR 终稿不会触发音量恢复及过期 Tool 回包不会提前续播。ASR 收尾仍沿现有采集 FIFO 排队，恢复延迟及听感留待真机测量。
+
+`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。独立执行的 8 项 Python 工程工具测试、变更 Swift 严格格式、plist 和 `git diff --check` 通过。
+
+`./scripts/build-ios.sh` 的五个模拟器 scheme 构建通过。最终源码的 App 复编译与 Agent/Skill、Live Activity、中英本地化资源校验通过。真实模型、原生 UI 与物理设备声学验收未执行。
+
+### ASR 声量自适应准入（2026-11-28）
+
+语音、VAD、ASR 及播放控制 Swift 定向回归 172 项通过。替身用例覆盖高 VAD 分数的低电平拒绝、噪声底随背景更新、播放期间冻结估计、非空终稿校准、空终稿与播放重叠跳过校准、较弱尾音、连续低电平端点、换代后重新校准，以及增强后静音不触发 ASR。首轮工程回归发现的两项增强夹具与新电平契约冲突，更新夹具后定向重跑通过。另有 Decision 测试在首轮工程回归得到 `decision_failed`，四个输入隔离重跑均通过。最终普通 Swift 工程回归 1,993 项、独立串行运行时回归 232 项通过。
+
+`./scripts/check.sh` 仍在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。8 项 Python 工程工具测试、变更 Swift 严格格式、plist 和 diff 独立验证通过。`./scripts/build-ios.sh` 的五个模拟器 scheme 及 Agent/Skill、Live Activity、中英本地化资源检查通过。
+
+实际电视对白与用户重叠时的字错率、电视单独播放的误提交、轻声和短指令召回尚未真机测量；本轮未执行真实模型和 iOS 真机验收。
+
+### ASR 自适应版真机安装（2026-11-28）
+
+MobileHarness 0.1.0（2026112801）通过 iPhoneOS Debug 构建、严格签名验证及 Agent/Skill、Live Activity、中英本地化资源检查。iPhone 17 Pro 从 2026112706 原位更新，安装回执序列 8328；独立设备清单确认构建号，系统启动成功。真实声学验收尚未执行。
+
+### 播放让声恢复缓冲（2026-11-28）
+
+6 项 Swift 定向测试、16 个用例通过。覆盖 600 ms 降音释放和 1,000 ms 暂停释放的精确样本边界、电平反弹重置等待、暂停等待期间在两种较低的档位之间波动、释放至降低或正常音量、ASR 终稿先于恢复、播放执行身份、迟到 Tool 回包和打断优先级。替身 PCM 回归验证释放命令的时序。
+
+`./scripts/check.sh` 在既有 State Value codec 和 Xcode 本地化资源归属检查处退出。8 项 Python 工程工具测试、变更 Swift 严格格式和 diff 检查独立通过。
+
+`./scripts/build-ios.sh` 的五个模拟器 scheme 构建和 App 打包资源校验通过。本轮未安装到 iPhone，实际听感待真机测量。
+
+### 恢复缓冲版真机安装（2026-11-28）
+
+MobileHarness 0.1.0（2026112802）通过 iPhoneOS Debug 构建、严格签名和三项打包资源校验。iPhone 17 Pro 从 2026112801 原位更新，安装回执序列 8344；设备应用清单确认构建号，系统启动成功。600 ms 降音恢复和 1,000 ms 暂停恢复的实际听感待测。

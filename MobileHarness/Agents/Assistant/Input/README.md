@@ -31,7 +31,7 @@ SpeechPerception publishes three facts through Gateway within the interaction se
 | `user.input.speech.v1` | Subscribe to final ASR results. Nonempty text enters ordinary admission or quiet wake. Empty and failed results settle the utterance. |
 | `perception.speech.keyword.v1` | Check keyword label, capture generation, utterance and arrival relative to the current reply. |
 
-`energyChanged` carries the capture and utterance identity and is processed independently of onset or progress messages. The worker retains the current speech energy even while no reply is active. A matching low-energy update, capture stop or ASR final releases the energy state. The interruption window uses the capture time in received VAD snapshots.
+`energyChanged` carries the capture and utterance identity and is processed independently of onset or progress messages. The worker retains the current speech energy even while no reply is active. A matching low-energy update, capture stop or capture replacement releases the energy state. ASR final settles input admission independently of playback energy. The interruption window uses the capture time in received VAD snapshots.
 
 The Assistant retains up to 128 terminal utterance receipts. Final ASR enters normal admission immediately. A keyword from that utterance can still win against the same active reply while a Decision is pending. A settled utterance stays settled when the keyword arrives. If the keyword is accepted first, the utterance stays open until final ASR settles. Its text enters the queue once and skips the interruption Decision.
 

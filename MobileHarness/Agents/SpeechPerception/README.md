@@ -20,7 +20,7 @@ UI.home.listeningRequests 是本角色单独订阅的控制源，提供 enabled/
 | --- | --- |
 | [AudioDetectionAgentSession.swift](AudioDetectionAgentSession.swift) | Isolated diagnostic role, result pump and neutral detection connection type specializations; no native capture ownership |
 | [SoundSourceEstimator.swift](SoundSourceEstimator.swift) | 声道测量到有限方向估计的算法 |
-| [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 边界、结束与恢复的纯策略；`SpeechOnsetPolicy` 由基础设置和播放事实得出单个窗口的起声概率、起声窗口数与维持概率 |
+| [SpeechBoundaryPolicy.swift](SpeechBoundaryPolicy.swift) | 语音分段、起声门槛和播放让声的能量档位；`SpeechOnsetPolicy` 由基础设置和播放事实得出单个窗口的起声概率、起声窗口数与维持概率 |
 | [PlatformKit 播放快照](../../PlatformKit/Audio/README.md) | 通过原生只读端口查询最近 32 段播放区间 |
 | [AudioFrameFloat32.swift](AudioFrameFloat32.swift) | 本目录共享的 Float32 PCM 读写与帧电平（dBFS）扩展，不改变 ModelKit 契约 |
 | [SpeechListeningInputs.swift](SpeechListeningInputs.swift) | 聆听手势／策略输入和采集结束事实 |
@@ -137,15 +137,21 @@ flowchart TB
 
 选择 mono/W，每次转换至多 8192 samples；按设置经 48 kHz 降噪窗口或直接转换，最后状态化重采样为 16 kHz ModelKit.AudioFrame。ASR turn 最多 2048 事件、480,000 排队 mono samples；12 秒为内部段边界。缓冲满显式失败，不扩大容量等待模型。采集代重绑重置格式、声源与 DSP，旧代 PCM 不可进入新会话。
 
-若一轮一直没有非空转写，`SpeechRecognitionTurn` 在成功送达识别器的 PCM 达到 32,768 样本（64 × 512、2.048 秒）且检查完识别器已经产生的事件后允许主动结束。SpeechPerception 结束同轮关键词探测，封口等待终稿最多 500 ms，随后取消并加入旧识别任务。ASR 通过同一个最终事件发布文本或空结果。发生主动端点后重置 DSP、VAD 状态与识别轮，VAD 连续 160 ms 低于基础阈值才重新接纳起声。出现过非空转写的一轮使用常规 VAD 端点。
+若一轮一直没有非空转写，`SpeechRecognitionTurn` 在成功送达识别器的 PCM 达到 32,768 样本（64 × 512、2.048 秒）且检查完识别器已经产生的事件后允许主动结束。SpeechPerception 结束同轮关键词探测，封口等待终稿最多 500 ms，随后取消并加入旧识别任务。ASR 通过同一个最终事件发布文本或空结果。发生主动端点后重置 DSP、VAD 状态与识别轮，连续 160 ms 没有同时满足基础 VAD 阈值和维持声量门槛才重新接纳起声。出现过非空转写的一轮使用常规 VAD 端点。
 
 ## 分段算法
 
 `VoiceActivitySegmenter` validates contiguous scores over 16 kHz mono Float32: at most 16000 samples per frame, 32000 pending samples and 64 scores per process call. Default probability threshold is 0.65, valid 0.05…0.95. Overlap rejects inputBusy; failure closes/cancels the VAD session and clears damaged state.
 
-`SpeechBoundaryPolicy` uses sample counts: configurable onset 1…16 windows of 512 samples (default 8 / 256 ms), pre-roll budget max(4096, onset windows × 512), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Consecutive silent VAD scores determine the endpoint. Native playback at the PCM capture time uses 16 windows (512 ms); the ordinary endpoint uses 25 windows (800 ms). Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. Reset clears DSP/segmentation state without choosing a new device.
+`SpeechBoundaryPolicy` uses sample counts: configurable onset 1…16 windows of 512 samples (default 8 / 256 ms), pre-roll budget max(4096, onset windows × 512), endpoint padding 3072 (192 ms), and model-sized segment 192000 (12 s). Consecutive windows below the combined VAD and continuation-level gate determine the endpoint. Native playback at the PCM capture time uses 16 windows (512 ms); the ordinary endpoint uses 25 windows (800 ms). Silence is held back, then preserved in full if speech resumes; only endpoint padding is forwarded at utterance end. Prefix/suffix operations preserve whole frames, so padding is quantized to VAD windows. Maximum-duration boundaries keep speaking/hysteresis and stable utterance identity; there is no sixty-second complete-turn cutoff. Finish includes pending speaking tail and an explicit inputFinished event. An utterance reset clears segmentation and retains the current capture calibration.
 
 每代 VAD 保留最近 64 个完整的 512 样本窗，每累计至多四窗发布进度。每个起声保存首个候选之前最近 64 窗的最早采集时刻。这一事实随起声和 ASR 终稿发布，供 Assistant 处理跨频道到达顺序。发布起声前先冲刷此前窗口的进度，再计入该起声所在窗。停采集和识别恢复会结束旧代。
+
+### ASR 声量准入
+
+起声与句内维持分别要求 VAD 分数达标，且同一预处理窗口的 RMS 达到声量门槛。起声使用较严格的声量门槛；维持门槛较低，弱尾音和句内暂停沿用分段的保留及补边策略。空闲、无候选、无播放或播放尾部且 VAD 分数低于 0.30 与基础阈值中的较小者，按样本数平滑更新噪声底。噪声底初值 −70 dBFS，观测值限制在 −78…−32 dBFS。
+
+起声门槛取 −58 dBFS、噪声底加 8 dB（上限 −32）及说话参考电平减 12 dB（上限 −44）中的最大值。维持门槛分别取 −66 dBFS、噪声底加 3 dB（上限 −40）及参考电平减 20 dB（上限 −54）的最大值。参考电平未建立时只用绝对门槛与噪声底。正常静音端点且收到非空 ASR 终稿后，使用至多 32 个合格窗口的中位电平校准参考；需要至少 8 个窗口，VAD 分数至少 0.8、电平至少 −48 dBFS 且高于噪声底至少 12 dB，整句无播放重叠。后续每句按差值的四分之一向新电平移动，最大 2 dB。失败、新采集代、原生布局或采样率变化清除校准。校准仅在当前采集内存活，语音让声继续由确认起声后的实际电平驱动。
 
 ### 语句结束确认
 
@@ -226,7 +232,7 @@ SpeechPerception 在采集、聆听许可、识别阶段和播放准入变化时
 
 半双工恢复完成 ASR/VAD 重置后记录单调接纳时刻；原生帧以 capturedAt 判断，播放期间录到但在恢复后才出队的旧包仍被拒绝。新采集代清除门限。手机与蓝牙耳机的 Voice Processing 路线均返回全双工；播放期间保持底层采播；半双工恢复围栏独立于下述全双工短时语音接纳策略。
 
-Speech detection preferences are injected through a throwing read-only closure and snapshotted before VAD session creation. The capture keeps the same base settings; `SpeechOnsetPolicy` derives each window's gates: playback adds 0.15 to the onset probability and two onset windows, capped at 0.95/16, while confirmed speech retains the base probability for continuation/endpoint detection. No per-packet persistence reads occur. When a new utterance begins, the `SpeechOnset` log category records playback state, onset probability/threshold/window count, the window level in dBFS and the duplex route — numbers only, no audio or text — as the evidence needed to analyze false triggers on device. Hardware echo and noise suppression come only from the Voice Processing graph and the optional denoiser; the onset gates add no energy- or noise-floor rule, and a failed denoiser never falls back to original PCM.
+Speech detection preferences are injected through a throwing read-only closure and snapshotted before VAD session creation. The capture keeps the same base settings; `SpeechOnsetPolicy` derives each window's gates: playback adds 0.15 to the onset probability and two onset windows, capped at 0.95/16, while confirmed speech uses the base probability and continuation level for continuation/endpoint detection. No per-packet persistence reads occur. When a new utterance begins, the `SpeechOnset` log category records playback state, onset probability/threshold/window count, the window level, applicable level gates and noise floor in dBFS, and the duplex route — numbers only, no audio or text — as the evidence needed to analyze false triggers on device. The Voice Processing graph and optional denoiser filter PCM before the admission checks. An enabled denoiser failure uses the perception recovery path.
 
 ## Optional speech enhancement
 
@@ -250,7 +256,9 @@ Each native input is processed inline; there is no second native FIFO. The windo
 
 PlatformKit 通过 `AudioCaptureObserving.playbackSnapshot()` 提供最近 32 段原生播放区间。SpeechPerception 按原始采集时间选取门槛。播放和结束后 200 ms 使用较严格的起声门槛，只有实际播放区间使用短静音端点。
 
-有效采集中的已确认语句逐窗检查当前 VAD 判定，能量上报与播报状态及采集路由的双工能力独立。通过的语音窗计算 RMS，未通过的窗口按静音推进恢复并清零高能量累计。中、高档进入阈值分别为 −34、−20 dBFS，离开阈值分别为 −39、−25 dBFS。两个连续语音窗可进入中档，连续六个高能量语音窗才进入高档。离开高档需要五个窗口，回到低档通常需要三个。仅发布档位变化。声学端点和识别失败发布当前语句的低档恢复。采集结束以对应采集代的 `captureStopped` 生效。采集开始、起声、能量变化、恢复与采集结束按生成顺序进入 VAD 信道。VAD、ASR、关键词命中与声音定位各用自己的有界 FIFO，每个信道串行提交，不同信道并行。语音信号先入队再记录诊断证据；关闭或替换后的旧采集结果停止发布。
+有效采集确认起声后，语音让声读取之后每个已处理 PCM 窗的 RMS。静音端点与 ASR 终稿独立结算，能量仍为中档或高档时继续观察；识别已结束、能量为低档且未累计升档时结束观察。后续确认起声可沿用仍在进行的声学观察及其原始语句身份。中、高档进入阈值分别为 −34、−20 dBFS，离开阈值分别为 −39、−25 dBFS。连续两个窗口可进入中档，连续六个高能量窗口才进入高档。中档连续处于 −39 dBFS 或以下累计 600 ms 后恢复原音量。高档连续达到退出线 −25 dBFS 或以下累计 1,000 ms 后按届时电平恢复，中档与低档之间的电平变化可继续累计。电平回到当前档保持范围时清零累计。时间按 16 kHz PCM 的已处理样本数计算。仅发布档位变化。识别失败和采集结束以对应采集代的 `captureStopped` 清除让声，采集代替换隔离旧事件。ASR 收尾期间 PCM 仍沿现有采集 FIFO 等待消费。
+
+采集开始、起声、能量变化、恢复与采集结束按生成顺序进入 VAD 信道。VAD、ASR、关键词命中与声音定位各用自己的有界 FIFO，每个信道串行提交，不同信道并行。语音信号先入队再记录诊断证据；关闭或替换后的旧采集结果停止发布。
 
 ASR完整语句结束后重置识别和预处理历史，允许下一片音频立即进入VAD。ASR收尾中的现有识别状态机、半双工播放暂停、会话与采集代隔离仍由原有生命周期控制。
 

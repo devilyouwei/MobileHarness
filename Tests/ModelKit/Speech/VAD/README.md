@@ -2,7 +2,7 @@
 
 Purpose: verify the VAD adapter and current streaming boundary policy without keeping obsolete production batch APIs for tests.
 
-- Consecutive-probability onset, endpoint padding, internal pauses, maximum-duration chunking and exact sample order.
+- Consecutive VAD and level-qualified onset, endpoint padding, internal pauses, maximum-duration chunking and exact sample order.
 - Streaming resampler continuity/reset, final subframe preservation, cancellation and continuous speech beyond sixty seconds without ending the utterance.
 - Test-only BoundaryRecorder assembles emitted events for assertions; production retains no full utterance copy.
 

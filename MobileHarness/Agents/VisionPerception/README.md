@@ -6,11 +6,15 @@
 
 [VisionPerceptionContainer.swift](VisionPerceptionContainer.swift) 是 AgentContainer 的稳定子能力。持有至多一个捕获代任务，VisionAgentSession 在其内完成注册、原生观察和受保护输出消费。重叠 run 显式 busy；取消和 suspend 加入实际任务；根 stop 永久关闭容器。会话失败与清理失败分别保留。
 
+捕获代任务独立于触发它的相机执行请求，有自己的 Gateway 请求链。容器持有任务句柄并在取消时加入。会话装配在主 Actor 上执行。
+
 生命周期由[模块根](../README.md#agent-container)统一编排；子容器能力不授予执行权。
 
 ## 职责与注入能力
 
 构造注入 PlatformKit `CameraFrameObserving`、ModelKit `PoseCapability`、采样／镜像配置、会话身份及私有 Context。角色主动订阅原始 CameraFrame，负责节奏、运动证据、姿态关联、骨架和眼睛目标；不持有 UI 子容器、相机控制器或 Storage 根。
+
+生产装配提供 ModelKit 的 `ModelVisionContainer`，供会话调用 `estimatePose`。ModelKit 管理默认 `yolo26n-pose` 的预热、模型制品解析和推理租约。[ModelKit Vision](../../ModelKit/Vision/README.md)
 
 ## 文件与职责
 
@@ -43,7 +47,7 @@ flowchart LR
  subgraph Peers["其他 Agent：仅经 Gateway 通信"]
  PH["Photographer"]:::agent
  end
- G -->|"vision.pose"| PH
+ G -->|"perception.vision.pose.v1"| PH
 
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -78,7 +82,7 @@ flowchart TB
  Q --> G["Gateway：调度／Signal 递送"]:::gateway
  G --> X["UI.Pose.showPose／UI.Gaze.moveEyes"]:::action
  X --> U["UI.camera：同帧骨架；UI.home：眼睛"]:::ui
- G --> PH["Photographer：vision.pose"]:::agent
+ G --> PH["Photographer：perception.vision.pose.v1"]:::agent
  classDef ui fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
  classDef platform fill:#dcfce7,stroke:#16a34a,color:#14532d
  classDef model fill:#f3e8ff,stroke:#9333ea,color:#581c87
@@ -128,7 +132,9 @@ Geometry/rotation changes reset gray/ROI/noise/association/stability state but r
 
 ## Pose and presentation contracts
 
-vision.pose permits up to 300 people, each exactly 17 COCO joints, upright/unmirrored pixel coordinates, finite x/y (possibly outside frame), confidence 0–1, sequence/time/rotation and dimensions 1–4096. Encoded limit is 256 KiB, validity one second capped by parent. Empty people is an observed empty frame. One independent publisher retains one latest pending pose; subscriber rejection does not stop local presentation.
+`perception.vision.pose.v1` on channel `perception.vision.pose` permits up to 300 people, each exactly 17 COCO joints, upright/unmirrored pixel coordinates, finite x/y (possibly outside frame), confidence 0–1, sequence/time/rotation and dimensions 1–4096. Encoded limit is 256 KiB, validity one second capped by parent. Empty people is an observed empty frame. One independent publisher retains one latest pending pose. Local presentation continues if a subscriber rejects delivery.
+
+The bound role consumer uses `callTool` for `UI.Pose.showPose` and `UI.Gaze.moveEyes`. The request uses `tool.call.v1` and the actual completion returns on `execution.call.result.v1` for the session to consume. The session records non-cancellation failures for media presentation health.
 
 showPose payload is ≤3000 UTF-8 bytes with at most six full COCO-17 people. Coordinates are integer normalized×10000, bounded −10000…20000; confidence is integer×1000 and out-of-frame confidence becomes zero. Optional same-frame statistics carry wait/inference/total latency, actual FPS, replacement count, next cadence and motion evidence. UI handles crop/mirroring and rejects stale sequence.
 

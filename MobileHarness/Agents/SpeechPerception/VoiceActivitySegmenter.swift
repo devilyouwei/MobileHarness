@@ -8,13 +8,13 @@ public struct VoiceSegmentation: Sendable {
         public let sampleCount: Int
         public let onsetCandidate: Bool
         let speaking: Bool
-        let hasVoice: Bool
         let pcm: [Float]
     }
     public let streamEvents: [VoiceStreamEvent]
     public let isSpeaking: Bool
     public let probability: Float
     public let windows: [Window]
+    let levelGates: SpeechLevelAdmission.Gates
 }
 
 /// Bounded input policy around an abstract VAD session. Never imports a concrete model or audio hardware.
@@ -38,7 +38,7 @@ public actor VoiceActivitySegmenter {
 
     public func process(
         _ frame: AudioFrame, threshold: Float = 0.65, onsetWindows: Int = 8, useShortEndpoint: Bool = false,
-        onsetThreshold: Float? = nil
+        onsetThreshold: Float? = nil, playing: Bool = false
     ) async throws -> VoiceSegmentation {
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !busy else { throw CapabilityError.inputBusy }
@@ -70,10 +70,10 @@ public actor VoiceActivitySegmenter {
                     floatSamples: slice, format: frame.format,
                     sequence: UInt64(position), timestamp: Double(position) / 16000)
                 let wasSpeaking = policy.isSpeaking
-                let windowThreshold = wasSpeaking ? threshold : (onsetThreshold ?? threshold)
                 _ = policy.consume(
-                    window, probability: score.probability, threshold: threshold, onsetWindows: onsetWindows,
-                    useShortEndpoint: useShortEndpoint, onsetThreshold: onsetThreshold,
+                    window, level: AudioFrame.rmsDecibels(samples: slice), probability: score.probability,
+                    threshold: threshold, onsetWindows: onsetWindows,
+                    playing: playing, useShortEndpoint: useShortEndpoint, onsetThreshold: onsetThreshold,
                     confirmEndpoint: endpointConfirmation != nil)
                 if let endpointConfirmation {
                     if wasSpeaking {
@@ -92,8 +92,7 @@ public actor VoiceActivitySegmenter {
                 windows.append(
                     .init(
                         offset: Int(score.startSample - frameStart), sampleCount: score.sampleCount,
-                        onsetCandidate: policy.hasOnsetCandidate, speaking: policy.isSpeaking,
-                        hasVoice: score.probability >= windowThreshold, pcm: slice))
+                        onsetCandidate: policy.hasOnsetCandidate, speaking: policy.isSpeaking, pcm: slice))
                 streamEvents += policy.streamEvents
                 consumed += score.sampleCount
                 position += Int64(score.sampleCount)
@@ -101,13 +100,15 @@ public actor VoiceActivitySegmenter {
             }
             pending.removeFirst(consumed)
             return VoiceSegmentation(
-                streamEvents: streamEvents, isSpeaking: policy.isSpeaking, probability: probability, windows: windows
+                streamEvents: streamEvents, isSpeaking: policy.isSpeaking, probability: probability, windows: windows,
+                levelGates: policy.levelGates
             )
         } catch {
             closed = true
             await session.cancel()
             pending.removeAll()
             policy.reset()
+            policy.resetLevelCalibration()
             clearTurnAudio()
             throw error
         }
@@ -161,7 +162,7 @@ public actor VoiceActivitySegmenter {
 
     public func reset() async throws { try await reset(requireFreshOnset: false) }
 
-    func reset(requireFreshOnset: Bool) async throws {
+    func reset(requireFreshOnset: Bool, acceptedTranscript: Bool = false) async throws {
         guard !closed else { throw CapabilityError.sessionClosed }
         guard !busy else { throw CapabilityError.inputBusy }
         busy = true
@@ -171,13 +172,17 @@ public actor VoiceActivitySegmenter {
         position = 0
         probability = 0
         policy.reset(requireFreshOnset: requireFreshOnset)
+        policy.resetLevelTurn(acceptedTranscript: acceptedTranscript)
         clearTurnAudio()
     }
+    func resetLevelCalibration() { policy.resetLevelCalibration() }
+
     public func cancel() async {
         closed = true
         await session.cancel()
         pending.removeAll()
         policy.reset()
+        policy.resetLevelCalibration()
         clearTurnAudio()
     }
 }

@@ -545,7 +545,7 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(order: String) as
     // An energy update can be the first event while both reply and playback are idle.
     try await agent.receive(
         speechSignal(
-            SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .high)))
+            SpeechActivity(.energyChanged, generation: "capture", utterance: "command", energy: .high)))
     #expect(adjustments.withLock { $0.isEmpty })
     try await agent.receive(speechSignal(SpeechActivity(.captureStarted, generation: "capture")))
     try await agent.receive(.init(id: "reply", sessionID: "s", payload: .text("Tell a story")))
@@ -587,14 +587,14 @@ func keywordAndModelShareOneInterruptionAndLogTheWinningSignal(order: String) as
     try await agent.receive(
         speechSignal(
             SpeechActivity(
-                .energyChanged, generation: "capture", utterance: "ongoing", energy: .medium)))
+                .energyChanged, generation: "capture", utterance: "command", energy: .medium)))
     for _ in 0..<500 where volumeCalls.withLock({ $0.isEmpty }) { try await Task.sleep(for: .milliseconds(2)) }
     let volume = try #require(volumeCalls.withLock { $0.first })
     guard case .toolCall(let volumeCall) = volume.output else { throw HarnessError.invalidTransition }
     #expect(volumeCall.arguments == ["volume": "0.35", "executionID": playbackExecutionID])
     #expect(volume.roundID == nil && volume.callID == nil)
     try await agent.receive(
-        speechSignal(SpeechActivity(.energyChanged, generation: "capture", utterance: "ongoing", energy: .low)))
+        speechSignal(SpeechActivity(.energyChanged, generation: "capture", utterance: "command", energy: .low)))
     for _ in 0..<500 where volumeCalls.withLock({ $0.count < 2 }) { try await Task.sleep(for: .milliseconds(2)) }
     let latestVolume = try #require(volumeCalls.withLock { $0.last })
     guard case .toolCall(let latestCall) = latestVolume.output else { throw HarnessError.invalidTransition }

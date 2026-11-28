@@ -1099,7 +1099,7 @@ SpeechPerception selects mono/W from validated native PCM and owns capture-scope
 
 BasicInteraction also exposes explicit startListening/stopListening Actions through Agent → Gateway → Actions. The voice execution owner calls the neutral perception policy port and directly applies its revision, without recursively scheduling another Action. Stop revokes consent and joins native capture cleanup without cancelling and joining its own reply execution. Reply completion cannot renew consent; a fresh screen hold or explicit user start is required. The owning [Listening design](Actions/Speech/Listening/README.md) defines the local lifecycle and failure details.
 
-SpeechPerception validates capture layout, rate and sequence before preparing model input. It publishes VAD capture, onset and progress, ASR partial and final, and Zipformer keyword matches in the interaction session. Assistant subscribes to VAD, ASR final and keyword matches. A final can carry empty text or a recognition failure. Sound-source observations use their own channel. See [SpeechPerception](Agents/SpeechPerception/README.md).
+SpeechPerception validates capture layout, rate and sequence before preparing model input. VAD and capture-scoped adaptive level gates jointly admit speech to ASR. It publishes VAD capture, onset and progress, ASR partial and final, and Zipformer keyword matches in the interaction session. Assistant subscribes to VAD, ASR final and keyword matches. A final can carry empty text or a recognition failure. Sound-source observations use their own channel. See [SpeechPerception](Agents/SpeechPerception/README.md).
 
 The speech facts follow PlatformKit → SpeechPerception → Gateway → Assistant. VAD, ASR and keywords use separate channels. UI shows user and reply captions independently. See [Assistant full-duplex interaction](#assistant-full-duplex-interaction) for how the Assistant uses these facts.
 
@@ -1159,7 +1159,7 @@ sequenceDiagram
 
 Assistant maps natural text through its injected speech-output interface into an owner-bound AudioCache ID and a playback call. Its private speech producer owns ModelKit TTS, bounded FIFO admission and joined cancellation; it has no separate Agent registration or messaging endpoint. Actions checks out the matching single-use stream and waits for native output drain. Synthesis admission, producer completion, playback drain and listening restoration are joined separately.
 
-SpeechPerception publishes confirmed speech energy independently of playback. Voice activity, ASR, keyword matches and sound location each enter a Gateway-owned FIFO. Each channel preserves its emission order and runs independently. Assistant retains that session’s energy and applies it to the active or next `speak` execution. It sends lifecycle commands through `ActionControl` and uses the independent `Speech.Playback.setVolume` Tool for gain. Actions owns execution lifecycle and playback volume. PlatformKit confirms the player state after the native transition, including a fade before pausing and after resuming. ASR and other Actions continue. An accepted interruption cancels the target reply through the existing cleanup path. Playback control follows the executing instance, and speech energy follows the capture and utterance.
+A confirmed onset enables SpeechPerception to report PCM energy independently of playback and ASR completion. Energy recovery follows a sustained drop below the current band or capture retirement. Voice activity, ASR, keyword matches and sound location each enter a Gateway-owned FIFO. Each channel preserves its emission order and runs independently. Assistant retains that session’s energy and applies it to the active or next `speak` execution. It sends lifecycle commands through `ActionControl` and uses the independent `Speech.Playback.setVolume` Tool for gain. Actions owns execution lifecycle and playback volume. PlatformKit confirms the player state after the native transition, including a fade before pausing and after resuming. ASR and other Actions continue. An accepted interruption cancels the target reply through the existing cleanup path. Playback control follows the executing instance, and speech energy follows the capture and utterance.
 
 On restricted audio routes, the voice coordinator obtains playback admission after the current utterance finishes and pauses recognition. It joins eligible restoration after playback settles. Phone and headset routes with confirmed combined Voice Processing (echo cancellation and noise suppression) continue recognition during playback; Bluetooth is not a reason to disable duplex. Native mono capture fails explicitly when that processor cannot be enabled. Restoration checks listening consent, capture identity and other audio owners. SpeechPerception controls the recognition lifecycle. Assistant manages model production, reply waiting and cancellation within its own workflow. Writer uses its own Island presentation. Playback and restoration each report their outcomes. See [Assistant speech](Agents/Assistant/README.md#presentation-speech-and-cleanup), [Speech](Actions/Speech/README.md) and [AudioCache](Storage/Cache/Audio/README.md).
 
@@ -1252,11 +1252,13 @@ sequenceDiagram
     C-->>V: direct read-only frames
     V->>M: cadence-selected current frame
     M-->>V: pose inference
-    V->>G: internal presentation call
+    V->>G: tool.call.v1
     G->>X: prepare / execute presentation
     X->>X: check frame and UI generation
     X->>UI: matched frame / skeleton / gaze
-    V->>G: authorized vision.pose Signal
+    X-->>G: execution.call.result.v1
+    G-->>V: correlated Tool completion
+    V->>G: perception.vision.pose.v1
     G-->>P: delivered pose observation
     P->>G: tracking call from fresh pose
     G->>X: execute with motor permit
@@ -1267,6 +1269,8 @@ Authorized camera calls reach Actions through the Gateway invocation Signal. Cam
 Camera observations retain gravity-upright source orientation for inference and an independent native sensor-to-portrait reference for preview. Photo and movie capture use the rotation supplied from the active window. Actions forwards that immutable metadata; UI combines it with actual window interface orientation for shared video/skeleton/gaze geometry. Physical rotation does not force a portrait-locked preview into gravity-upright aspect-fill. Native capture ownership and the iPhone portrait interface policy remain unchanged. Detailed geometry belongs in [UI Camera](UI/Camera/README.md#interface-based-preview-geometry) and [Platform Vision](PlatformKit/Vision/README.md#capture-and-preview-orientation).
 
 VisionPerception owns cadence, motion evidence, target association and projection. Agents authorizes protected presentation/tracking calls; Gateway checks generic identity and envelopes. Actions validates frame sequence, freshness, orientation and UI generation. Model/overlay failure preserves valid native preview. Photographer selects tracking from real fresh pose evidence; device output still requires authorization and a live resource permit. See [Camera](Actions/Camera/README.md), [VisionPerception](Agents/VisionPerception/README.md) and [Photographer](Agents/Photographer/README.md).
+
+The VisionPerception container owns a capture-generation task with its own Gateway request chain. The camera control request can complete while that session continues to submit presentation Tools and consume their correlated results. Suspension cancels and joins the session.
 
 #### Shared capture and lens authority
 

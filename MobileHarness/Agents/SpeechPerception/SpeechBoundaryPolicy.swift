@@ -1,22 +1,23 @@
 import Foundation
 import ModelKit
 
-/// Hysteresis over confirmed VAD windows. Initial calibration thresholds are in dBFS.
+/// Hysteresis over PCM windows after confirmed onset. Initial calibration thresholds are in dBFS.
 struct SpeechEnergyBands {
+    // The segmentation path supplies 16 kHz PCM, with 16 samples per millisecond.
+    private static let duckReleaseSamples = 600 * 16
+    private static let pauseReleaseSamples = 1_000 * 16
+
     private(set) var energy: SpeechActivity.Energy = .low
     private var candidate: SpeechActivity.Energy = .low
     private var windows = 0
     private var loudWindows = 0
+    private var releaseSamples = 0
+    var isQuiet: Bool { energy == .low && candidate == .low }
 
-    mutating func observe(_ samples: [Float], hasVoice: Bool) -> SpeechActivity.Energy? {
+    mutating func observe(_ samples: [Float]) -> SpeechActivity.Energy? {
         guard !samples.isEmpty else { return nil }
-        let level: Double
-        if hasVoice {
-            let power = samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(samples.count)
-            level = 10 * log10(max(power, 1e-12))
-        } else {
-            level = -.infinity
-        }
+        let power = samples.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(samples.count)
+        let level = 10 * log10(max(power, 1e-12))
         loudWindows = level >= -20 ? min(6, loudWindows + 1) : 0
         let high = loudWindows == 6 || (energy == .high && level > -25)
         let medium = level >= -34 || (energy != .low && level > -39)
@@ -25,13 +26,82 @@ struct SpeechEnergyBands {
             candidate = next
             windows = 0
         }
-        guard next != energy else { return nil }
-        windows += 1
-        let required = energy == .high ? 5 : next == .high ? 1 : next == .low ? 3 : 2
-        guard windows >= required else { return nil }
+        guard next != energy else {
+            releaseSamples = 0
+            return nil
+        }
+        if next == .high || energy == .low {
+            windows += 1
+            guard next == .high || windows >= 2 else { return nil }
+        } else {
+            // Any level below the current band counts toward its release.
+            releaseSamples += samples.count
+            let required = energy == .high ? Self.pauseReleaseSamples : Self.duckReleaseSamples
+            guard releaseSamples >= required else { return nil }
+        }
         energy = next
         windows = 0
+        releaseSamples = 0
         return next
+    }
+}
+
+/// Capture-scoped calibration over the same prepared PCM used by VAD and ASR.
+struct SpeechLevelAdmission {
+    struct Gates: Sendable {
+        let noiseFloor: Float
+        let onset: Float
+        let continuation: Float
+    }
+
+    private var noiseFloor: Float = -70
+    private var speakerLevel: Float?
+    private var turnLevels: [Float] = []
+    private var overlapsPlayback = false
+    private var completedLevel: Float?
+
+    var gates: Gates {
+        Gates(
+            noiseFloor: noiseFloor,
+            onset: max(-58, min(-32, noiseFloor + 8), speakerLevel.map { min(-44, $0 - 12) } ?? -58),
+            continuation: max(-66, min(-40, noiseFloor + 3), speakerLevel.map { min(-54, $0 - 20) } ?? -66))
+    }
+
+    mutating func observeBackground(level: Float, samples: Int) {
+        let bounded = min(-32, max(-78, level))
+        noiseFloor += (bounded - noiseFloor) * min(1, Float(samples) / 16_000)
+    }
+
+    mutating func observeSpeech(level: Float, probability: Float, playing: Bool) {
+        overlapsPlayback = overlapsPlayback || playing
+        guard !overlapsPlayback, probability >= 0.8, level >= max(-48, noiseFloor + 12), turnLevels.count < 32
+        else { return }
+        turnLevels.append(level)
+    }
+
+    mutating func clearCandidate() {
+        turnLevels.removeAll(keepingCapacity: true)
+        overlapsPlayback = false
+    }
+
+    mutating func completeTurn() {
+        if !overlapsPlayback, turnLevels.count >= 8 {
+            let sorted = turnLevels.sorted()
+            completedLevel = (sorted[(sorted.count - 1) / 2] + sorted[sorted.count / 2]) / 2
+        }
+        clearCandidate()
+    }
+
+    mutating func resetTurn(acceptedTranscript: Bool) {
+        if acceptedTranscript, let completedLevel {
+            if let previous = speakerLevel {
+                speakerLevel = previous + min(2, max(-2, 0.25 * (completedLevel - previous)))
+            } else {
+                speakerLevel = completedLevel
+            }
+        }
+        completedLevel = nil
+        clearCandidate()
     }
 }
 
@@ -59,19 +129,39 @@ struct SpeechBoundaryPolicy {
     private var duration = 0
     private var hasSpeech = false
     private var rearmSilence: Int?
+    private var levelAdmission = SpeechLevelAdmission()
+    var levelGates: SpeechLevelAdmission.Gates { levelAdmission.gates }
+
+    mutating func resetLevelCalibration() { levelAdmission = SpeechLevelAdmission() }
+
+    mutating func resetLevelTurn(acceptedTranscript: Bool) {
+        levelAdmission.resetTurn(acceptedTranscript: acceptedTranscript)
+    }
+
     mutating func consume(
-        _ frame: AudioFrame, probability: Float, threshold: Float, onsetWindows: Int = 8,
-        useShortEndpoint: Bool = false,
+        _ frame: AudioFrame, level: Float, probability: Float, threshold: Float, onsetWindows: Int = 8,
+        playing: Bool = false, useShortEndpoint: Bool = false,
         onsetThreshold: Float? = nil, confirmEndpoint: Bool = false
     ) -> VoiceSegmentEnd? {
         streamEvents = []
+        let gates = levelGates
+        let continuesSpeech = probability >= threshold && level >= gates.continuation
         if let quiet = rearmSilence {
-            let quietSamples = probability < threshold ? quiet + frame.sampleCount : 0
+            let quietSamples = continuesSpeech ? 0 : quiet + frame.sampleCount
             rearmSilence = quietSamples >= Self.rearmSilenceSamples ? nil : quietSamples
             return nil
         }
-        let threshold = isSpeaking ? threshold : (onsetThreshold ?? threshold)
-        if probability >= threshold { hasSpeech = true }
+        let startsSpeech = probability >= (onsetThreshold ?? threshold) && level >= gates.onset
+        let voiced = isSpeaking ? continuesSpeech : startsSpeech
+        if voiced { hasSpeech = true }
+        if isSpeaking || startsSpeech {
+            levelAdmission.observeSpeech(level: level, probability: voiced ? probability : 0, playing: playing)
+        } else {
+            if candidate == 0, !playing, probability < min(0.3, threshold) {
+                levelAdmission.observeBackground(level: level, samples: frame.sampleCount)
+            }
+            levelAdmission.clearCandidate()
+        }
         if !isSpeaking {
             preRoll.append(frame)
             while preRoll.count > 1
@@ -79,7 +169,7 @@ struct SpeechBoundaryPolicy {
             {
                 preRoll.removeFirst()
             }
-            candidate = probability >= threshold ? candidate + frame.sampleCount : 0
+            candidate = voiced ? candidate + frame.sampleCount : 0
             guard candidate >= onsetWindows * 512 else { return nil }
             isSpeaking = true
             streamEvents.append(.audio(preRoll))
@@ -87,15 +177,15 @@ struct SpeechBoundaryPolicy {
             preRoll.removeAll()
         } else {
             duration += frame.sampleCount
-            if probability >= threshold {
+            if voiced {
                 streamEvents.append(.audio(holdback + [frame]))
                 holdback.removeAll(keepingCapacity: true)
             } else {
                 holdback.append(frame)
             }
         }
-        silentWindows = probability >= threshold ? 0 : silentWindows + 1
-        silentSamples = probability >= threshold ? 0 : silentSamples + frame.sampleCount
+        silentWindows = voiced ? 0 : silentWindows + 1
+        silentSamples = voiced ? 0 : silentSamples + frame.sampleCount
         if silentWindows == 0 { endpointDeferred = false }
         let silenceLimit = useShortEndpoint ? Self.shortSilenceWindows : Self.longSilenceWindows
         if endpointDeferred {
@@ -133,6 +223,7 @@ struct SpeechBoundaryPolicy {
     }
 
     private mutating func endAtSilence() {
+        levelAdmission.completeTurn()
         // Keep 192 ms of endpoint padding; retain in-sentence silence in full.
         if hasSpeech {
             streamEvents.append(.audio(Self.prefix(holdback, sampleLimit: Self.endpointPaddingSamples)))

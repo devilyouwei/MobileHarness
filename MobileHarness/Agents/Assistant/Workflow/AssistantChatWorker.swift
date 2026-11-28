@@ -445,7 +445,7 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
             guard let utterance = activity.utterance, let energy = activity.energy else { return }
             if energy == .low {
                 if speechEnergy?.utterance == utterance { try releaseSpeechEnergy(sessionID: input.sessionID) }
-            } else if !speechTerminals.contains(utterance) {
+            } else {
                 speechEnergy = (utterance, energy)
                 try applySpeechEnergy(energy, sessionID: input.sessionID)
             }
@@ -484,14 +484,6 @@ public actor AssistantChatWorker<State: AssistantChatState>: Agent {
         guard speechEnergy != nil else { return }
         speechEnergy = nil
         try applySpeechEnergy(.low, sessionID: sessionID)
-    }
-
-    func settleSpeechEnergy(_ input: AgentInput, recognition: SpeechRecognition) throws {
-        guard input.metadata.origin == .agent, input.metadata.source == AgentID.speechPerception.rawValue,
-            recognition.generation == speechCaptureGeneration, let utterance = speechEnergy?.utterance,
-            input.turn?.id == utterance
-        else { return }
-        try releaseSpeechEnergy(sessionID: input.sessionID)
     }
 
     private func adjustSpeechPlayback(_ energy: SpeechActivity.Energy, sessionID: String, inputID: String) throws {
